@@ -36,11 +36,13 @@ def outcome_label(l: dict) -> str:
     t = l.get("mtype", "")
     h = l.get("handicap")
     team = {"1": l["home"], "2": l["away"]}
+    push = h is not None and float(h) == int(float(h))   # línea entera: con ese número exacto se devuelve
+    push_txt = f" (con {_line(h)} exactos se devuelve)" if push else ""
     if t == "totals" and h is not None:
-        return f"{'Más' if o.lower().startswith('más') else 'Menos'} de {_line(h)} goles"
+        return f"{'Más' if o.lower().startswith('más') else 'Menos'} de {_line(h)} goles{push_txt}"
     if t in ("teamtotals-team1", "teamtotals-team2") and h is not None:
         who = l["home"] if t.endswith("1") else l["away"]
-        return f"{who}: {'más' if o.lower().startswith('más') else 'menos'} de {_line(h)} goles"
+        return f"{who}: {'más' if o.lower().startswith('más') else 'menos'} de {_line(h)} goles{push_txt}"
     if t in ("toscore-team1", "toscore-team2"):
         who = l["home"] if t.endswith("1") else l["away"]
         return f"{who} {'marca' if o.lower().startswith('s') else 'no marca'}"
@@ -48,9 +50,12 @@ def outcome_label(l: dict) -> str:
         return "Ambos marcan: Sí" if o.lower().startswith("s") else "Ambos marcan: No"
     if t == "spreads" and h is not None and o in team:
         hh = float(h) if o == "1" else -float(h)   # la línea viene expresada para el local
-        return f"{team[o]} {'+' if hh > 0 else ''}{_line(hh)} (hándicap asiático)"
+        if hh == 0:
+            return f"{team[o]} gana (si empatan, se devuelve)"
+        return (f"{team[o]} {'+' if hh > 0 else ''}{_line(hh)} (hándicap asiático"
+                + ("; si empata en la línea, se devuelve)" if push and hh != 0 else ")"))
     if t == "drawnobet" and o in team:
-        return f"{team[o]} (empate no válido)"
+        return f"{team[o]} gana (si empatan, se devuelve)"
     if o in team:
         return f"Gana {team[o]}"
     if o.upper() == "X":
@@ -62,7 +67,7 @@ def analysis(pick: dict) -> str:
     """Texto breve y honesto basado en los datos que realmente tenemos."""
     parts = []
     for l in pick["legs"]:
-        line = (f"{escape(outcome_label(l))} ({escape(l['market'])}) en {escape(l['home'])} vs {escape(l['away'])}: "
+        line = (f"{escape(outcome_label(l))} en {escape(l['home'])} vs {escape(l['away'])}: "
                 f"cuota justa estimada {odds(l['fair_odds'])}, cuota disponible {odds(l['price'])}"
                 + (f" (+{pct(l['edge'])} de valor)." if l['edge'] >= 0 else " (en línea con la cuota justa)."))
         ctx = l.get("context")
@@ -86,7 +91,7 @@ def _legs_block(pick: dict) -> str:
     for l in pick["legs"]:
         rows.append(f"⚽ <b>{escape(l['home'])} vs {escape(l['away'])}</b>\n"
                     f"🏆 {escape(l['league'])} · 🕒 {local_time(l['kickoff'])}\n"
-                    f"🎯 {escape(l['market'])}: <b>{escape(outcome_label(l))}</b> @ {odds(l['price'])}")
+                    f"🎯 <b>{escape(outcome_label(l))}</b> @ {odds(l['price'])}")
     return "\n\n".join(rows)
 
 

@@ -139,8 +139,9 @@ def test_messages_render():
     assert "Candidato #7" in formatting.owner_candidate(p)
     L = formatting.outcome_label
     assert L({"outcome": "Más", "mtype": "totals", "handicap": 2.5, "home": "A", "away": "B"}) == "Más de 2.5 goles"
+    assert L({"outcome": "Más", "mtype": "totals", "handicap": 2.0, "home": "A", "away": "B"}) == "Más de 2 goles (con 2 exactos se devuelve)"
     assert L({"outcome": "2", "mtype": "spreads", "handicap": -0.5, "home": "A", "away": "B"}) == "B +0.5 (hándicap asiático)"
-    assert L({"outcome": "1", "mtype": "spreads", "handicap": -1.0, "home": "A", "away": "B"}) == "A -1 (hándicap asiático)"
+    assert L({"outcome": "1", "mtype": "spreads", "handicap": -1.0, "home": "A", "away": "B"}) == "A -1 (hándicap asiático; si empata en la línea, se devuelve)"
 
 
 if __name__ == "__main__":

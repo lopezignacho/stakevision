@@ -147,7 +147,8 @@ def selections_for_fixture(fx: dict, odds: dict, markets: dict) -> list[Selectio
                 fixture_id=fx["fixtureId"],
                 home=fx.get("participant1Name") or str(fx.get("participant1Id")),
                 away=fx.get("participant2Name") or str(fx.get("participant2Id")),
-                league=" · ".join(x for x in (fx.get("categoryName"), fx.get("tournamentName")) if x),
+                league=config.TOURNAMENTS.get(fx.get("tournamentId")) or
+                " · ".join(x for x in (fx.get("categoryName"), fx.get("tournamentName")) if x),
                 kickoff=fx.get("startTime"),
                 market_id=str(mid), market=meta.get("name") or str(mid), mtype=meta.get("type") or "",
                 outcome_id=str(oid), outcome=meta["outcomes"].get(str(oid), str(oid)),
@@ -193,11 +194,15 @@ def build_picks(selections: list[Selection]) -> list[Pick]:
                 if config.ODDS_MIN <= s.price <= config.ODDS_MAX
                 and config.FALLBACK_MIN_EDGE <= s.edge < config.MIN_EDGE]
         near.sort(key=lambda s: s.edge, reverse=True)
-        for s in near:
-            if s.fixture_id in used:
-                continue
-            chosen.append(Pick("simple", [s], tier="justa"))
-            used.add(s.fixture_id)
-            if len(chosen) >= config.MIN_DAILY_CANDIDATES:
-                break
+        # Variedad: primero un mercado de cada tipo; si no alcanza, se repiten tipos.
+        types_used = {l.mtype for p in chosen for l in p.legs}
+        for allow_repeat in (False, True):
+            for s in near:
+                if len(chosen) >= config.MIN_DAILY_CANDIDATES:
+                    break
+                if s.fixture_id in used or (not allow_repeat and s.mtype in types_used):
+                    continue
+                chosen.append(Pick("simple", [s], tier="justa"))
+                used.add(s.fixture_id)
+                types_used.add(s.mtype)
     return chosen
