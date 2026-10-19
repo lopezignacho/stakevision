@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-19T20:30:23.191797+00:00",
+ "updated_at": "2026-10-19T20:35:19.642928+00:00",
  "summary": {
   "picks": 0,
   "wins": 0,
@@ -28,7 +28,11 @@
      "market": "Más/Menos Tiempo Completo",
      "outcome": "Más",
      "price": 1.82,
-     "label": "Más de 2 goles"
+     "label": "Más de 2 goles",
+     "mtype": "totals",
+     "handicap": 2.0,
+     "sport": "soccer",
+     "score": null
     }
    ],
    "analysis": "Más de 2 goles (Más/Menos Tiempo Completo) en Parma Calcio vs Torino FC: cuota justa estimada 1.80, cuota disponible 1.82 (+0,9% de valor).\nProbabilidad estimada: 55,4%. Para no perder a esta cuota se necesita 54,9%."
