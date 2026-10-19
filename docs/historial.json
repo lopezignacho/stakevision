@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-19T07:24:19.210510+00:00",
+ "updated_at": "2026-10-19T07:32:13.380616+00:00",
  "summary": {
   "picks": 0,
   "wins": 0,
@@ -9,5 +9,28 @@
   "avg_odds": null,
   "units": 0
  },
- "picks": []
+ "picks": [
+  {
+   "id": "1",
+   "published_at": "2026-10-19T07:32:08Z",
+   "kickoff": "2026-10-19T18:45:00.000Z",
+   "kind": "simple",
+   "price": 1.82,
+   "stake": 1,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Parma Calcio",
+     "away": "Torino FC",
+     "league": "Italy · Serie A",
+     "market": "Más/Menos Tiempo Completo",
+     "outcome": "Más",
+     "price": 1.82,
+     "label": "Más de 2 goles"
+    }
+   ],
+   "analysis": "Más de 2 goles (Más/Menos Tiempo Completo) en Parma Calcio vs Torino FC: cuota justa estimada 1.80, cuota disponible 1.82 (+0,9% de valor).\nProbabilidad estimada: 55,4%. Para no perder a esta cuota se necesita 54,9%."
+  }
+ ]
 }
