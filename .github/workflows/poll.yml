@@ -1,0 +1,40 @@
+name: Aprobaciones y resultados
+
+on:
+  schedule:
+    # cada 10 minutos entre 08:00 y 01:00 de Chile
+    - cron: "*/10 0-4,11-23 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: stakevision-state
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Procesar botones, publicar y pedir resultados
+        env:
+          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
+          APIFOOTBALL_KEY: ${{ secrets.APIFOOTBALL_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          STATE_KEY: ${{ secrets.STATE_KEY }}
+          LINK_CODE: ${{ secrets.LINK_CODE }}
+        run: python -m sv.main poll
+      - name: Guardar estado
+        run: |
+          git config user.name "stakevision-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data docs/historial.json
+          git diff --cached --quiet || (git commit -m "Actualizar estado" && git pull --rebase && git push)

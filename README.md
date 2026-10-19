@@ -1,0 +1,54 @@
+# Stakevision
+
+Sistema automático de pronósticos de fútbol:
+
+1. **Cada mañana (09:07 Chile)** busca partidos de las próximas 30 horas y compara cada cuota de **Betano** con la cuota justa de **Pinnacle** (sin su margen).
+2. Se queda con picks de **valor ≥ 3%** y **cuota final entre 1.65 y 2.00**: simples primero; dobles solo si cada selección tiene valor por sí sola.
+3. Te los manda por privado en Telegram con botones: **✅ Solo VIP**, **✅ VIP + Gratis** o **❌ Descartar**.
+4. Lo aprobado se publica solo en los canales (revisión cada 10 minutos entre 08:00 y 01:00).
+5. Después del partido te pide el resultado (con una sugerencia según el marcador) y lo publica como respuesta al pick.
+6. La web (`docs/`) muestra el historial y las cifras, calculadas automáticamente. Los picks VIP aparecen en la web recién cuando su partido empieza.
+
+Todo corre gratis en GitHub Actions + GitHub Pages. El estado privado se guarda **cifrado** en `data/state.enc`.
+
+## Puesta en marcha (una sola vez)
+
+### 1. Secretos del repositorio
+En GitHub: **Settings → Secrets and variables → Actions → New repository secret**. Crea estos cinco:
+
+| Nombre | Qué poner |
+|---|---|
+| `ODDSPAPI_KEY` | Tu API key de oddspapi.io (Account / Settings) |
+| `APIFOOTBALL_KEY` | Tu API key de api-football (Dashboard) |
+| `TELEGRAM_TOKEN` | El token de @StakevisionBot (en BotFather; idealmente uno nuevo con /revoke) |
+| `STATE_KEY` | Una contraseña larga inventada por ti (cifra el estado; no la pierdas) |
+| `LINK_CODE` | Una palabra secreta corta, por ejemplo `ojos-verdes-2026` |
+
+Nunca pegues estas claves en el código ni en un chat.
+
+### 2. Activar la web
+**Settings → Pages → Build and deployment**: Source = *Deploy from a branch*, Branch = `main`, carpeta `/docs`.
+
+### 3. Preparar
+**Actions → Preparar (una vez) → Run workflow**. Descarga la lista de mercados.
+
+### 4. Vincular Telegram
+- Escríbele a **@StakevisionBot** por privado: `/vincular TU_LINK_CODE`
+- En el canal VIP publica: `/vincular_vip TU_LINK_CODE` (luego bórralo).
+- En unos 10 minutos el bot confirma ambos.
+
+### 5. Probar
+**Actions → Escaneo diario → Run workflow** para lanzar un escaneo ahora mismo.
+
+## Uso diario
+- Revisa la cuota de cada candidato en tu app antes de aprobar.
+- `/estado` al bot: candidatos pendientes, picks en juego, historial y consultas de OddsPapi usadas.
+
+## Ajustes
+Todo en `sv/config.py`: rango de cuotas, valor mínimo, cantidad de candidatos, ligas, stake máximo.
+
+## Límites del plan gratis
+- OddsPapi: cada escaneo usa 2 consultas; cada resultado, 1 por partido.
+- API-Football: el sistema usa como máximo 40 consultas por ejecución (el plan da 100 al día). Si no responde, el pick sale sin el contexto de forma reciente.
+
++18 · Juega con responsabilidad.

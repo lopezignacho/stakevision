@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stakevision · Pronósticos deportivos</title>
+<meta name="description" content="Pronósticos de fútbol con análisis y cuotas de valor. Historial público: verdes y rojas.">
+<link rel="icon" href="assets/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<script>
+  // Tema: día de 07:00 a 19:00, noche el resto. El botón lo cambia a mano.
+  (function () {
+    var t;
+    try { t = sessionStorage.getItem('sv-theme'); } catch (e) {}
+    if (!t) { var h = new Date().getHours(); t = (h >= 7 && h < 19) ? 'light' : 'dark'; }
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<style>
+  :root, :root[data-theme="dark"] {
+    --bg:#000; --bg-alt:#070807; --card:#0D0F0D; --chip:#151815; --line:#1C201C; --line-strong:#232823;
+    --outline:#3A403A; --text:#F1F3EF; --soft:#C9CEC6; --muted:#8E948B; --accent:#7ED957; --accent-text:#7ED957;
+    --win:#7ED957; --loss:#FF6B5E; --void:#C9CEC6;
+  }
+  :root[data-theme="light"] {
+    --bg:#F4F4F2; --bg-alt:#E9EAE6; --card:#FFF; --chip:#EEF0EB; --line:#DCDFD8; --line-strong:#D3D7CF;
+    --outline:#AEB4A9; --text:#0B0D0B; --soft:#3B4039; --muted:#596056; --accent:#7ED957; --accent-text:#2F7A12;
+    --win:#2F7A12; --loss:#C2261A; --void:#596056;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin:0; background:var(--bg); color:var(--text); font:17px/1.6 'DM Sans', sans-serif; transition: background .3s, color .3s; }
+  a { color: var(--accent-text); }
+  h1, h2, h3 { font-family: 'Poppins', sans-serif; margin: 0; }
+  h2 { font-size: clamp(1.9rem, 3.5vw, 2.8rem); line-height: 1.1; font-weight: 700; }
+  p { margin: 0; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+  .section { padding-top: 96px; padding-bottom: 96px; }
+  .alt { background: var(--bg-alt); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .eyebrow { font-size: 13px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent-text); font-weight: 700; }
+  .lead { color: var(--soft); }
+  .muted { color: var(--muted); }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .head { display: flex; flex-direction: column; gap: 12px; max-width: 680px; margin-bottom: 40px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 0 26px; border-radius: 999px; font-weight: 700; text-decoration: none; border: 1.5px solid var(--outline); color: var(--text); background: transparent; cursor: pointer; font-size: 16px; font-family: inherit; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #000; }
+  .btn.sm { min-height: 44px; padding: 0 20px; }
+  .card { background: var(--card); border: 1px solid var(--line-strong); border-radius: 20px; padding: 28px; }
+  .grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+
+  header { border-bottom: 1px solid var(--line); }
+  .nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-top: 14px; padding-bottom: 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font: 700 22px 'Poppins', sans-serif; }
+  .brand img { height: 40px; width: 82px; object-fit: contain; }
+  nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; font-size: 15px; }
+  nav a { color: var(--soft); text-decoration: none; }
+  .icon-btn { width: 44px; height: 44px; border-radius: 999px; border: 1.5px solid var(--outline); background: transparent; color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+  :root[data-theme="dark"] .moon, :root[data-theme="light"] .sun { display: none; }
+  :root[data-theme="dark"] .logo-light, :root[data-theme="light"] .logo-dark { display: none; }
+
+  .hero { display: flex; flex-wrap: wrap; align-items: center; gap: 56px; padding: 88px 24px 72px; }
+  .hero-text { flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+  .hero-logo { width: 360px; max-width: 100%; height: auto; }
+  .hero h1 { font-weight: 800; font-size: clamp(2.4rem, 5vw, 4.2rem); line-height: 1.05; letter-spacing: -.02em; }
+  .hero .lead { max-width: 560px; font-size: 19px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+  .pick-card { flex: 1 1 360px; min-width: 0; max-width: 460px; display: flex; flex-direction: column; gap: 16px; }
+  .pick-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .chip { background: var(--chip); border-radius: 12px; padding: 12px; }
+  .chip small { display: block; font-size: 12px; color: var(--muted); }
+  .chip b { font-family: 'JetBrains Mono', monospace; }
+  .league { font-size: 14px; color: var(--accent-text); font-weight: 700; }
+  .match { font: 700 24px/1.2 'Poppins', sans-serif; }
+  .leg + .leg { border-top: 1px dashed var(--line-strong); padding-top: 14px; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .stat b { display: block; font: 600 40px 'JetBrains Mono', monospace; color: var(--accent-text); }
+  .stat span { color: var(--soft); }
+
+  .table-box { overflow-x: auto; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--bg); }
+  table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 15px; }
+  th { text-align: left; padding: 14px 18px; font-weight: 500; color: var(--muted); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; background: var(--card); }
+  td { padding: 14px 18px; border-top: 1px solid var(--line-strong); vertical-align: top; }
+  .res { font-weight: 700; }
+  .res.W { color: var(--win); } .res.L { color: var(--loss); } .res.V { color: var(--void); } .res.P { color: var(--muted); }
+
+  .plan { display: flex; flex-direction: column; gap: 20px; }
+  .plan.featured { border: 2px solid var(--accent); }
+  .price { font: 800 40px 'Poppins', sans-serif; }
+  .price span { font-size: 16px; font-weight: 600; color: var(--muted); }
+  .plan ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; color: var(--soft); flex-grow: 1; }
+  .plan li { display: flex; gap: 10px; }
+  .plan li svg { flex-shrink: 0; margin-top: 3px; }
+  .badge { background: var(--accent); color: #000; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+  .steps { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+  .steps li { display: flex; flex-direction: column; gap: 6px; }
+  .steps li span:last-child { color: var(--soft); font-size: 15px; }
+
+  details { background: var(--card); border: 1px solid var(--line-strong); border-radius: 14px; padding: 18px 22px; }
+  summary { cursor: pointer; font-weight: 700; }
+  details p { margin-top: 12px; color: var(--soft); }
+  .help { border: 1.5px solid var(--outline); border-radius: 18px; padding: 24px 28px; margin-top: 20px; }
+  .help ul { margin: 10px 0 0; padding-left: 20px; color: var(--soft); }
+
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 32px; padding-top: 48px; padding-bottom: 48px; }
+  footer nav { flex-direction: column; align-items: flex-start; gap: 8px; }
+  @media (max-width: 560px) { .section { padding-top: 64px; padding-bottom: 64px; } .hero { padding-top: 48px; } .chips { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#inicio"><img src="assets/eyes-transparent.png" alt="">Stakevision</a>
+    <nav aria-label="Principal">
+      <a href="#pick-gratis">Pick gratis</a>
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#historial">Historial</a>
+      <a href="#planes">Planes</a>
+      <a href="#preguntas">Preguntas</a>
+      <button class="icon-btn" id="theme-btn" type="button" aria-label="Cambiar modo día/noche" title="Cambiar modo día/noche">
+        <svg class="sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+      </button>
+      <a class="btn primary sm" href="https://t.me/stakevision">Únete gratis</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<section id="inicio" class="wrap hero">
+  <div class="hero-text">
+    <img class="hero-logo logo-dark" src="assets/logo-full-dark.png" alt="Stakevision, pronósticos deportivos">
+    <img class="hero-logo logo-light" src="assets/logo-full-light.png" alt="Stakevision, pronósticos deportivos">
+    <h1>Vemos el partido antes del pitazo.</h1>
+    <p class="lead">Análisis de fútbol con datos, no corazonadas. Cada pick se publica antes del partido con su cuota, su stake y su porqué, y queda en un historial público: verdes y rojas.</p>
+    <div class="actions">
+      <a class="btn primary" href="https://t.me/stakevision">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4 3 11l6 2 2 6 3-4 5 4z"/><path d="m9 13 8-6"/></svg>
+        Canal gratis en Telegram</a>
+      <a class="btn" href="#planes">Ver planes VIP</a>
+    </div>
+    <p class="muted" style="font-size:14px">+18 · Juega con responsabilidad · Las apuestas implican riesgo de pérdida</p>
+  </div>
+  <div class="card pick-card" aria-label="Ejemplo de pick">
+    <div class="pick-top"><span>Así se ve cada pick</span></div>
+    <div><div class="league">Fútbol · Liga</div><div class="match">Local vs Visita</div></div>
+    <div class="chips">
+      <div class="chip"><small>Mercado</small><strong>Ambos marcan</strong></div>
+      <div class="chip"><small>Cuota</small><b>1.85</b></div>
+      <div class="chip"><small>Stake</small><b>2/10</b></div>
+    </div>
+    <p class="lead" style="font-size:15px"><strong style="color:var(--text)">Por qué:</strong> cuota justa estimada contra cuota disponible, forma reciente y el dato clave del partido.</p>
+    <p class="muted" style="font-size:13px; border-top:1px solid var(--line-strong); padding-top:14px">Publicado antes del partido · registrado en el historial</p>
+  </div>
+</section>
+
+<section class="alt" aria-label="Resumen del historial">
+  <div class="wrap" style="padding-top:40px; padding-bottom:40px">
+    <div class="stats">
+      <div class="stat"><b id="s-picks">—</b><span>Picks cerrados</span></div>
+      <div class="stat"><b id="s-yield">—</b><span>Yield acumulado</span></div>
+      <div class="stat"><b id="s-hit">—</b><span>Tasa de acierto</span></div>
+      <div class="stat"><b id="s-odds">—</b><span>Cuota media</span></div>
+    </div>
+    <p class="muted" style="font-size:14px; margin-top:20px">Cifras calculadas automáticamente desde el historial público. <span id="s-updated"></span></p>
+  </div>
+</section>
+
+<section id="pick-gratis" class="wrap" style="padding-top:96px">
+  <div class="head">
+    <div class="eyebrow">El pick gratis de hoy</div>
+    <h2>No te lo contamos: te lo mostramos.</h2>
+    <p class="lead">Un pick completo, con el mismo análisis que reciben los miembros VIP.</p>
+  </div>
+  <article class="card" id="free-pick" style="display:flex; flex-direction:column; gap:16px">
+    <p class="muted">Aún no hay pick gratis publicado hoy. Llega primero al canal de Telegram.</p>
+    <a class="btn primary" style="align-self:flex-start" href="https://t.me/stakevision">Recíbelo en Telegram</a>
+  </article>
+</section>
+
+<section id="como-funciona" class="wrap section">
+  <div class="head">
+    <div class="eyebrow">Cómo funciona</div>
+    <h2>Menos picks, mejor elegidos.</h2>
+    <p class="lead">Si un partido no tiene valor, no se publica. Preferimos un día con menos picks a un pick por cumplir.</p>
+  </div>
+  <div class="grid">
+    <div class="card"><h3 style="font-size:21px">1. Analizamos</h3><p class="lead" style="margin-top:12px">Forma reciente, contexto del partido y estadísticas por mercado.</p></div>
+    <div class="card"><h3 style="font-size:21px">2. Medimos el valor</h3><p class="lead" style="margin-top:12px">Comparamos cada cuota con nuestra cuota justa estimada. Solo pasa lo que paga más de lo que vale, entre 1.65 y 2.00.</p></div>
+    <div class="card"><h3 style="font-size:21px">3. Publicamos y registramos</h3><p class="lead" style="margin-top:12px">Cada pick sale antes del partido con cuota, stake y justificación, y entra al historial con su resultado.</p></div>
+  </div>
+</section>
+
+<section id="historial" class="alt">
+  <div class="wrap section">
+    <div class="head">
+      <div class="eyebrow">Historial público</div>
+      <h2>Verdes y rojas. Todas.</h2>
+      <p class="lead">Los picks VIP aparecen aquí cuando su partido empieza. Nada se edita ni se borra.</p>
+    </div>
+    <div class="table-box">
+      <table>
+        <thead><tr><th>Fecha</th><th>Partido</th><th>Mercado</th><th>Cuota</th><th>Stake</th><th>Resultado</th></tr></thead>
+        <tbody id="history-body">
+          <tr><td colspan="6" class="muted" style="text-align:center; padding:40px 18px">El historial comienza el día del lanzamiento.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="planes" class="wrap section">
+  <div class="head">
+    <div class="eyebrow">Planes</div>
+    <h2>Empieza gratis. Sube al VIP cuando los números te convenzan.</h2>
+  </div>
+  <div class="grid">
+    <div class="card plan">
+      <div><h3 style="font-size:22px">Canal gratis</h3><div class="price">$0</div><div class="muted">Telegram</div></div>
+      <ul><li>1 a 2 picks al día</li><li>Resultados en el historial público</li><li>Contenido sobre bankroll y valor</li></ul>
+      <a class="btn" href="https://t.me/stakevision">Unirme gratis</a>
+    </div>
+    <div class="card plan featured">
+      <div><div style="display:flex; justify-content:space-between; align-items:center; gap:12px"><h3 style="font-size:22px">VIP mensual</h3><span class="badge">Recomendado</span></div>
+        <div class="price">$14.990<span> / mes</span></div><div class="muted">Canal privado de Telegram</div></div>
+      <ul><li>3 picks diarios en promedio</li><li>Análisis completo de cada pick</li><li>Guía de gestión de bankroll</li><li>Soporte por chat</li></ul>
+      <a class="btn primary" href="#preguntas">Próximamente</a>
+    </div>
+    <div class="card plan">
+      <div><h3 style="font-size:22px">VIP trimestral</h3><div class="price">$39.990<span> / 3 meses</span></div><div class="muted">Ahorras $4.980 frente a 3 meses del plan mensual</div></div>
+      <ul><li>Todo lo del VIP mensual</li><li>Precio fijo durante todo el período</li><li>Pensado para evaluar resultados a mediano plazo</li></ul>
+      <a class="btn" href="#preguntas">Próximamente</a>
+    </div>
+  </div>
+  <div class="card" style="margin-top:20px; background:var(--bg-alt)">
+    <h3 style="font-size:22px; margin-bottom:20px">Cómo entras al VIP</h3>
+    <ol class="steps">
+      <li><span class="mono" style="color:var(--accent-text)">01</span><strong>Crea tu cuenta</strong><span>Con tu correo, para asociar la suscripción.</span></li>
+      <li><span class="mono" style="color:var(--accent-text)">02</span><strong>Elige y paga tu plan</strong><span>Débito, crédito o transferencia. Sin renovación automática.</span></li>
+      <li><span class="mono" style="color:var(--accent-text)">03</span><strong>Recibe tu link único</strong><span>Te llega por correo; sirve para una sola persona.</span></li>
+      <li><span class="mono" style="color:var(--accent-text)">04</span><strong>Entra al canal</strong><span>Y recibe los picks desde ese mismo día.</span></li>
+    </ol>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap section" style="display:flex; flex-wrap:wrap; gap:48px">
+    <div style="flex:1 1 340px; display:flex; flex-direction:column; gap:12px"><div class="eyebrow">Hablemos claro</div><h2>Lo que no te vamos a prometer.</h2></div>
+    <div style="flex:2 1 520px" class="grid">
+      <div><strong>Apuestas seguras</strong><p class="lead">No existen. Cualquiera que te las ofrezca te está vendiendo humo.</p></div>
+      <div><strong>Ganancias garantizadas</strong><p class="lead">Buscamos rentabilidad a largo plazo, y habrá rachas negativas.</p></div>
+      <div><strong>Recuperar pérdidas</strong><p class="lead">Nunca subas el stake para recuperar. Apuesta solo lo que puedas perder.</p></div>
+      <div><strong>Resultados maquillados</strong><p class="lead">Todo queda en el historial, incluidas las rojas.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="juego-responsable" class="wrap section">
+  <div class="head">
+    <div class="eyebrow">Juego responsable</div>
+    <h2>Apostar debe seguir siendo entretención.</h2>
+  </div>
+  <div class="grid">
+    <div class="card"><span class="mono" style="color:var(--accent-text)">01</span><h3 style="font-size:19px">Define un bankroll</h3><p class="lead" style="font-size:15px">Un monto separado, que puedas perder sin afectar gastos, deudas ni ahorros.</p></div>
+    <div class="card"><span class="mono" style="color:var(--accent-text)">02</span><h3 style="font-size:19px">Respeta el stake</h3><p class="lead" style="font-size:15px">Cada unidad es un porcentaje pequeño y fijo de tu bankroll. Nunca "todo a un partido".</p></div>
+    <div class="card"><span class="mono" style="color:var(--accent-text)">03</span><h3 style="font-size:19px">No persigas pérdidas</h3><p class="lead" style="font-size:15px">Después de una roja, el siguiente pick lleva el mismo stake de siempre.</p></div>
+    <div class="card"><span class="mono" style="color:var(--accent-text)">04</span><h3 style="font-size:19px">Ponte límites</h3><p class="lead" style="font-size:15px">Un tope mensual y pausas cuando el juego deja de ser diversión.</p></div>
+  </div>
+  <div class="help">
+    <p><strong>¿Sientes que perdiste el control?</strong> <span class="lead">Habla con alguien de confianza y busca apoyo. No estás solo.</span></p>
+    <ul>
+      <li><strong>Salud Responde (MINSAL):</strong> 600 360 7777, orientación en salud.</li>
+      <li><strong>Jugadores Anónimos Chile:</strong> <a href="https://jugadoresanonimos.cl">jugadoresanonimos.cl</a>, grupos de apoyo.</li>
+      <li><strong>Autoexclusión en casinos (SCJ):</strong> <a href="https://www.scj.cl">scj.cl</a>, inscripción gratuita.</li>
+      <li><strong>Si tienes pensamientos de hacerte daño:</strong> llama al *4141, gratuito y disponible las 24 horas.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="preguntas" class="wrap" style="max-width:860px; padding-bottom:96px">
+  <h2 style="margin-bottom:28px">Preguntas frecuentes</h2>
+  <div style="display:flex; flex-direction:column; gap:12px">
+    <details><summary>¿Qué deportes cubren?</summary><p>Partimos con fútbol, donde hay mejores datos. Más adelante sumaremos tenis y básquet.</p></details>
+    <details><summary>¿Cuántos picks recibo en el VIP?</summary><p>3 picks diarios en promedio. Si una jornada no tiene partidos con valor, publicamos menos: no rellenamos para cumplir una cuota.</p></details>
+    <details><summary>¿Qué significa el stake?</summary><p>Es la parte de tu bankroll que sugerimos para cada pick, en una escala de 1 a 10 (aprox. % del bankroll). Más stake no significa "más seguro", sino mayor confianza relativa.</p></details>
+    <details><summary>¿Cuándo abre el VIP?</summary><p>Estamos en etapa de prueba, construyendo el historial público. Únete al canal gratis para enterarte primero.</p></details>
+    <details><summary>¿Puedo cancelar? ¿Hay reembolso?</summary><p>Sí, cuando quieras; conservas el acceso hasta el final del período pagado. Si es tu primera suscripción y no te convence, te devolvemos el 100% si lo pides dentro de 10 días desde la compra. No hay reembolsos por resultados de las apuestas: vendemos análisis, no ganancias.</p></details>
+    <details><summary>¿Stakevision es una casa de apuestas?</summary><p>No. Entregamos análisis y opiniones; no recibimos apuestas ni manejamos tu dinero.</p></details>
+  </div>
+</section>
+</main>
+
+<footer class="alt">
+  <div class="wrap">
+    <div style="max-width:460px; display:flex; flex-direction:column; gap:12px">
+      <div class="brand"><img src="assets/eyes-transparent.png" alt="" style="height:36px; width:74px">Stakevision</div>
+      <p class="muted" style="font-size:14px">Contenido para mayores de 18 años. Stakevision entrega análisis y opiniones; no es una casa de apuestas. Apostar implica riesgo de pérdida.</p>
+    </div>
+    <nav aria-label="Redes">
+      <a href="https://t.me/stakevision">Telegram</a>
+      <a href="#juego-responsable">Juego responsable</a>
+      <a href="mailto:stakevisioncl@gmail.com">Contacto</a>
+    </nav>
+  </div>
+  <div class="wrap muted" style="padding-bottom:32px; font-size:13px">© 2026 Stakevision</div>
+</footer>
+
+<script>
+(function () {
+  var btn = document.getElementById('theme-btn');
+  btn.addEventListener('click', function () {
+    var t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', t);
+    try { sessionStorage.setItem('sv-theme', t); } catch (e) {}
+  });
+  // Cambio automático a las 19:00 / 07:00 si la persona no eligió a mano.
+  setInterval(function () {
+    var manual; try { manual = sessionStorage.getItem('sv-theme'); } catch (e) {}
+    if (manual) return;
+    var h = new Date().getHours();
+    document.documentElement.setAttribute('data-theme', (h >= 7 && h < 19) ? 'light' : 'dark');
+  }, 60000);
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function fmtDate(iso) { var d = new Date(iso); return d.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+  function pct(x) { return (x * 100).toFixed(1).replace('.', ',') + '%'; }
+  function label(l) {
+    var o = String(l.outcome).trim();
+    if (o === '1') return 'Gana ' + l.home;
+    if (o === '2') return 'Gana ' + l.away;
+    if (o.toUpperCase() === 'X') return 'Empate';
+    return o;
+  }
+  var RES = { W: ['✅ Verde', 'W'], L: ['❌ Roja', 'L'], V: ['↩️ Nula', 'V'] };
+
+  fetch('historial.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (data) {
+    var s = data.summary || {};
+    if (s.picks) {
+      document.getElementById('s-picks').textContent = s.picks;
+      if (s.yield != null) document.getElementById('s-yield').textContent = (s.yield >= 0 ? '+' : '') + pct(s.yield);
+      if (s.hit_rate != null) document.getElementById('s-hit').textContent = pct(s.hit_rate);
+      if (s.avg_odds != null) document.getElementById('s-odds').textContent = s.avg_odds.toFixed(2);
+    }
+    if (data.updated_at) document.getElementById('s-updated').textContent = 'Actualizado: ' + fmtDate(data.updated_at) + '.';
+
+    var picks = data.picks || [];
+    if (picks.length) {
+      document.getElementById('history-body').innerHTML = picks.map(function (p) {
+        var match = p.legs.map(function (l) { return esc(l.home) + ' vs ' + esc(l.away) + '<br><span class="muted" style="font-size:13px">' + esc(l.league) + '</span>'; }).join('<br>');
+        var market = p.legs.map(function (l) { return esc(l.market) + ': <strong>' + esc(label(l)) + '</strong>'; }).join('<br>');
+        var r = RES[p.result] || ['⏳ En juego', 'P'];
+        return '<tr><td class="mono">' + fmtDate(p.kickoff) + '</td><td>' + match + '</td><td>' + market +
+          (p.kind === 'doble' ? ' <span class="muted">(doble)</span>' : '') + '</td><td class="mono">' + p.price.toFixed(2) +
+          '</td><td class="mono">' + p.stake + '/10</td><td class="res ' + r[1] + '">' + r[0] + '</td></tr>';
+      }).join('');
+    }
+
+    var free = picks.filter(function (p) { return p.free; })[0];
+    if (free) {
+      var r = RES[free.result];
+      var legs = free.legs.map(function (l) {
+        return '<div class="leg"><div class="league">' + esc(l.league) + '</div><div class="match">' + esc(l.home) + ' vs ' + esc(l.away) +
+          '</div><div class="muted" style="font-size:14px">' + fmtDate(free.kickoff) + '</div></div>';
+      }).join('');
+      document.getElementById('free-pick').innerHTML = legs +
+        '<div class="chips"><div class="chip"><small>Mercado</small><strong>' + free.legs.map(function (l) { return esc(l.market) + ': ' + esc(label(l)); }).join(' + ') + '</strong></div>' +
+        '<div class="chip"><small>Cuota</small><b>' + free.price.toFixed(2) + '</b></div><div class="chip"><small>Stake</small><b>' + free.stake + '/10</b></div></div>' +
+        (free.analysis ? '<p class="lead" style="white-space:pre-line">' + esc(free.analysis) + '</p>' : '') +
+        (r ? '<p class="res ' + r[1] + '">' + r[0] + '</p>' : '') +
+        '<a class="btn primary" style="align-self:flex-start" href="https://t.me/stakevision">Recibe el de mañana en Telegram</a>';
+    }
+  }).catch(function () {});
+})();
+</script>
+</body>
+</html>
