@@ -82,7 +82,27 @@ def publish(state: dict, pid: str, caption: str) -> str:
     me = _call("GET", "me", state, fields="user_id,username")
     uid = me.get("user_id") or me.get("id")
     c = _call("POST", f"{uid}/media", state, image_url=image_url(pid), caption=caption)
-    m = _call("POST", f"{uid}/media_publish", state, creation_id=c["id"])
+    # Instagram descarga y procesa la imagen: hay que esperar a que el contenedor esté listo.
+    import time
+    status = ""
+    for _ in range(20):
+        status = _call("GET", c["id"], state, fields="status_code").get("status_code") or ""
+        if status == "FINISHED":
+            break
+        if status in ("ERROR", "EXPIRED"):
+            raise InstagramError(f"Instagram no pudo procesar la imagen ({status})")
+        time.sleep(4)
+    m = None
+    for _ in range(5):
+        try:
+            m = _call("POST", f"{uid}/media_publish", state, creation_id=c["id"])
+            break
+        except InstagramError as e:
+            if "not available" not in str(e).lower():
+                raise
+            time.sleep(5)
+    if not m:
+        raise InstagramError(f"la imagen no quedó lista a tiempo (estado: {status or 'desconocido'})")
     try:
         return _call("GET", m["id"], state, fields="permalink").get("permalink") or ""
     except InstagramError:
