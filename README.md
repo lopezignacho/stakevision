@@ -5,7 +5,7 @@ Sistema automático de pronósticos de fútbol:
 1. **Cada mañana (09:07 Chile)** busca partidos de las próximas 30 horas y compara cada cuota de **Betano** con la cuota justa de **Pinnacle** (sin su margen).
 2. Se queda con picks de **valor ≥ 3%** y **cuota final entre 1.65 y 2.00**: simples primero; dobles solo si cada selección tiene valor por sí sola.
 3. Te los manda por privado en Telegram con botones: **✅ Solo VIP**, **✅ VIP + Gratis** o **❌ Descartar**.
-4. Lo aprobado se publica solo en los canales (revisión cada 10 minutos entre 08:00 y 01:00).
+4. Lo aprobado se publica solo en los canales (revisión cada 5 minutos, todo el día).
 5. Después del partido te pide el resultado (con una sugerencia según el marcador) y lo publica como respuesta al pick.
 6. La web (`docs/`) muestra el historial y las cifras, calculadas automáticamente. Los picks VIP aparecen en la web recién cuando su partido empieza.
 

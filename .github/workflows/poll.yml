@@ -2,8 +2,8 @@ name: Aprobaciones y resultados
 
 on:
   schedule:
-    # cada 10 minutos entre 08:00 y 01:00 de Chile
-    - cron: "*/10 0-4,11-23 * * *"
+    # cada 5 minutos, todo el día (GitHub puede atrasar algunos minutos)
+    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 permissions:

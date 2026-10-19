@@ -114,7 +114,7 @@ def owner_candidate(pick: dict) -> str:
             f"📈 Cuota: <b>{odds(pick['price'])}</b> · Valor: <b>{sign}{pct(pick['edge'])}</b> · "
             f"Stake sugerido: {pick['stake']}/10\n\n"
             f"<i>{pick['analysis']}</i>\n\n"
-            f"Verifica la cuota en tu app antes de aprobar.")
+            f"Verifica la cuota en tu app antes de aprobar. Tu elección se aplica en unos minutos.")
 
 
 RESULT_LABEL = {"W": "✅ VERDE", "L": "❌ ROJA", "V": "↩️ NULA (devuelta)"}
