@@ -23,6 +23,9 @@ REFERENCE = "pinnacle"     # solo como regla de medir
 # Mercados: solo partido completo (90'), sin props de jugadores, con 2 o 3 resultados.
 # Hándicaps asiáticos de cuarto (x.25 / x.75) se excluyen porque se liquidan a medias.
 ONLY_FULLTIME = True
+# Tipos de mercado de OddsPapi que se analizan (por ahora solo goles; córners/tarjetas después).
+ALLOWED_MARKET_TYPES = {"1x2", "totals", "bothteamsscore", "spreads", "drawnobet",
+                        "teamtotals-team1", "teamtotals-team2", "toscore-team1", "toscore-team2"}
 
 # Ligas: si la lista está vacía se analizan todas las que tengan cuotas de Betano y Pinnacle.
 # Puedes limitarla con IDs de torneo de OddsPapi (ver data/tournaments.json).

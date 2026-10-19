@@ -23,17 +23,38 @@ def odds(x: float) -> str:
     return f"{x:.2f}"
 
 
+def _line(x) -> str:
+    x = float(x)
+    return f"{x:g}" if x != int(x) else f"{int(x)}"
+
+
 def outcome_label(l: dict) -> str:
+    """Texto claro de la selección, por ejemplo 'Más de 2.5 goles' o 'Colo-Colo -0.5 (hándicap asiático)'."""
+    if l.get("label"):
+        return l["label"]
     o = str(l["outcome"]).strip()
-    if o == "1":
-        return f"Gana {l['home']}"
-    if o == "2":
-        return f"Gana {l['away']}"
+    t = l.get("mtype", "")
+    h = l.get("handicap")
+    team = {"1": l["home"], "2": l["away"]}
+    if t == "totals" and h is not None:
+        return f"{'Más' if o.lower().startswith('más') else 'Menos'} de {_line(h)} goles"
+    if t in ("teamtotals-team1", "teamtotals-team2") and h is not None:
+        who = l["home"] if t.endswith("1") else l["away"]
+        return f"{who}: {'más' if o.lower().startswith('más') else 'menos'} de {_line(h)} goles"
+    if t in ("toscore-team1", "toscore-team2"):
+        who = l["home"] if t.endswith("1") else l["away"]
+        return f"{who} {'marca' if o.lower().startswith('s') else 'no marca'}"
+    if t == "bothteamsscore":
+        return "Ambos marcan: Sí" if o.lower().startswith("s") else "Ambos marcan: No"
+    if t == "spreads" and h is not None and o in team:
+        hh = float(h) if o == "1" else -float(h)   # la línea viene expresada para el local
+        return f"{team[o]} {'+' if hh > 0 else ''}{_line(hh)} (hándicap asiático)"
+    if t == "drawnobet" and o in team:
+        return f"{team[o]} (empate no válido)"
+    if o in team:
+        return f"Gana {team[o]}"
     if o.upper() == "X":
         return "Empate"
-    if o in ("1X", "X2", "12"):
-        return {"1X": f"{l['home']} o empate", "X2": f"{l['away']} o empate",
-                "12": "No hay empate"}[o]
     return o
 
 

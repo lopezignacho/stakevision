@@ -15,13 +15,13 @@ config.STATE_KEY = os.environ["STATE_KEY"]
 MARKETS = {
     "101": {"name": "Resultado final", "type": "1x2", "period": "fulltime", "handicap": 0,
             "playerProp": False, "length": 3, "outcomes": {"101": "1", "102": "X", "103": "2"}},
-    "104": {"name": "Ambos marcan", "type": "totals", "period": "fulltime", "handicap": 0,
+    "104": {"name": "Ambos marcan", "type": "bothteamsscore", "period": "fulltime", "handicap": 0,
             "playerProp": False, "length": 2, "outcomes": {"104": "Sí", "105": "No"}},
     "1010": {"name": "Más/Menos 2.5", "type": "totals", "period": "fulltime", "handicap": 2.5,
              "playerProp": False, "length": 2, "outcomes": {"1010": "Más", "1011": "Menos"}},
-    "2000": {"name": "Hándicap asiático -0.25", "type": "handicap", "period": "fulltime",
+    "2000": {"name": "Hándicap asiático -0.25", "type": "spreads", "period": "fulltime",
              "handicap": -0.25, "playerProp": False, "length": 2, "outcomes": {"2000": "1", "2001": "2"}},
-    "3000": {"name": "Resultado 1ª mitad", "type": "1x2", "period": "1st half", "handicap": 0,
+    "3000": {"name": "Resultado 1ª mitad", "type": "1x2", "period": "p1", "handicap": 0,
              "playerProp": False, "length": 3, "outcomes": {"3000": "1", "3001": "X", "3002": "2"}},
 }
 
@@ -113,7 +113,7 @@ def test_state_roundtrip_and_public_export():
 
 def test_messages_render():
     leg = {"home": "Colo-Colo", "away": "U. de Chile", "league": "Chile · Primera", "kickoff":
-           "2026-10-20T23:00:00Z", "market": "Resultado final", "outcome": "1", "price": 1.85,
+           "2026-10-20T23:00:00Z", "market": "Resultado final", "outcome": "1", "price": 1.85, "mtype": "1x2", "handicap": 0,
            "fair_odds": 1.74, "edge": 0.063, "context": {"home": {"form": "GGEPG", "gf": 1.8, "ga": 0.8}}}
     p = {"id": "7", "kind": "simple", "price": 1.85, "prob": 0.574, "edge": 0.063, "stake": 2, "legs": [leg]}
     p["analysis"] = formatting.analysis(p)
@@ -121,6 +121,10 @@ def test_messages_render():
     assert "Gana Colo-Colo" in txt and "Betano" not in txt and "23/10" not in txt
     assert "20/10 20:00" in txt  # hora de Chile (UTC-3)
     assert "Candidato #7" in formatting.owner_candidate(p)
+    L = formatting.outcome_label
+    assert L({"outcome": "Más", "mtype": "totals", "handicap": 2.5, "home": "A", "away": "B"}) == "Más de 2.5 goles"
+    assert L({"outcome": "2", "mtype": "spreads", "handicap": -0.5, "home": "A", "away": "B"}) == "B +0.5 (hándicap asiático)"
+    assert L({"outcome": "1", "mtype": "spreads", "handicap": -1.0, "home": "A", "away": "B"}) == "A -1 (hándicap asiático)"
 
 
 if __name__ == "__main__":

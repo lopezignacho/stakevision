@@ -20,6 +20,7 @@ class Selection:
     kickoff: str            # ISO UTC
     market_id: str
     market: str
+    mtype: str
     outcome_id: str
     outcome: str
     handicap: float | None
@@ -98,11 +99,10 @@ def _price(book_odds: dict, market_id: str, outcome_id: str) -> float | None:
 def _market_ok(meta: dict | None) -> bool:
     if not meta or meta.get("playerProp"):
         return False
-    if config.ONLY_FULLTIME:
-        period = (meta.get("period") or "").lower()
-        if any(t in period for t in ("half", "1st", "2nd", "p1", "p2", "extra", "overtime",
-                                     "penalt", "minute", "10min", "15min")):
-            return False
+    if config.ONLY_FULLTIME and (meta.get("period") or "").lower() != "fulltime":
+        return False
+    if config.ALLOWED_MARKET_TYPES and meta.get("type") not in config.ALLOWED_MARKET_TYPES:
+        return False
     h = meta.get("handicap")
     if h not in (None, 0) and abs((abs(float(h)) * 4) % 2 - 1) < 1e-9:
         return False  # líneas de cuarto (x.25 / x.75)
@@ -145,7 +145,7 @@ def selections_for_fixture(fx: dict, odds: dict, markets: dict) -> list[Selectio
                 away=fx.get("participant2Name") or str(fx.get("participant2Id")),
                 league=" · ".join(x for x in (fx.get("categoryName"), fx.get("tournamentName")) if x),
                 kickoff=fx.get("startTime"),
-                market_id=str(mid), market=meta.get("name") or str(mid),
+                market_id=str(mid), market=meta.get("name") or str(mid), mtype=meta.get("type") or "",
                 outcome_id=str(oid), outcome=meta["outcomes"].get(str(oid), str(oid)),
                 handicap=meta.get("handicap"),
                 price=bp, fair_prob=imp / total, ref_price=rp,

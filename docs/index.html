@@ -330,6 +330,7 @@
   function fmtDate(iso) { var d = new Date(iso); return d.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
   function pct(x) { return (x * 100).toFixed(1).replace('.', ',') + '%'; }
   function label(l) {
+    if (l.label) return l.label;
     var o = String(l.outcome).trim();
     if (o === '1') return 'Gana ' + l.home;
     if (o === '2') return 'Gana ' + l.away;
@@ -368,7 +369,7 @@
           '</div><div class="muted" style="font-size:14px">' + fmtDate(free.kickoff) + '</div></div>';
       }).join('');
       document.getElementById('free-pick').innerHTML = legs +
-        '<div class="chips"><div class="chip"><small>Mercado</small><strong>' + free.legs.map(function (l) { return esc(l.market) + ': ' + esc(label(l)); }).join(' + ') + '</strong></div>' +
+        '<div class="chips"><div class="chip"><small>Mercado</small><strong>' + free.legs.map(function (l) { return esc(label(l)); }).join(' + ') + '</strong></div>' +
         '<div class="chip"><small>Cuota</small><b>' + free.price.toFixed(2) + '</b></div><div class="chip"><small>Stake</small><b>' + free.stake + '/10</b></div></div>' +
         (free.analysis ? '<p class="lead" style="white-space:pre-line">' + esc(free.analysis) + '</p>' : '') +
         (r ? '<p class="res ' + r[1] + '">' + r[0] + '</p>' : '') +

@@ -77,6 +77,7 @@ def scan() -> None:
     for p in picks:
         d = p.to_dict()
         for leg in d["legs"]:
+            leg["label"] = formatting.outcome_label(leg)
             leg["context"] = apifootball.context(leg["home"], leg["away"], leg["kickoff"])
         state["seq"] += 1
         pid = str(state["seq"])
