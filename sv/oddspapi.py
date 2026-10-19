@@ -92,6 +92,17 @@ def markets(force: bool = False) -> dict:
     return out
 
 
+def tournaments() -> list[dict]:
+    """Lista de torneos de fútbol (se guarda en data/tournaments.json)."""
+    raw = _get("/tournaments", sportId=10)
+    out = [{"id": t["tournamentId"], "category": t.get("categoryName"), "name": t.get("tournamentName"),
+            "upcoming": t.get("upcomingFixtures", 0), "future": t.get("futureFixtures", 0)} for t in raw]
+    path = os.path.join(config.ROOT, "data", "tournaments.json")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(sorted(out, key=lambda t: (t["category"] or "", t["name"] or "")), f, ensure_ascii=False, indent=0)
+    return out
+
+
 def upcoming_fixtures(frm: str, to: str) -> list[dict]:
     """Partidos de fútbol con cuotas de Betano en la ventana (debe ser < 48 h)."""
     return _get("/fixtures", sportId=10, **{"from": frm, "to": to},

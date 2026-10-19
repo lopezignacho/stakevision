@@ -296,8 +296,12 @@ def poll() -> None:
 
 
 def setup() -> None:
-    m = oddspapi.markets(force=True)
-    print(f"Mercados de fútbol guardados: {len(m)}")
+    import os
+    if not os.path.exists(config.MARKETS_CACHE):
+        m = oddspapi.markets(force=True)
+        print(f"Mercados de fútbol guardados: {len(m)}")
+    t = oddspapi.tournaments()
+    print(f"Torneos de fútbol guardados: {len(t)}")
     print("Uso OddsPapi:", oddspapi.quota_text())
 
 
