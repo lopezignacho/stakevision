@@ -80,7 +80,8 @@ def export_public(state: dict) -> None:
             "result": p.get("result"),          # "W" | "L" | "V" | None
             "legs": [{"home": l["home"], "away": l["away"], "league": l["league"],
                       "market": l["market"], "outcome": l["outcome"], "price": l["price"],
-                      "label": l.get("label")}
+                      "label": l.get("label"), "mtype": l.get("mtype"), "handicap": l.get("handicap"),
+                      "sport": l.get("sport") or "soccer", "score": l.get("score")}
                      for l in p["legs"]],
             "analysis": html.unescape(p.get("analysis") or "") if p.get("free") else None,
         })

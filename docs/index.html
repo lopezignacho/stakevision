@@ -93,6 +93,24 @@
   .hp-status { font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 999px; background: var(--chip); color: var(--soft); }
   .hp-status.live { background: var(--accent); color: #000; }
   .hp-status.W { background: var(--win); color: #000; } .hp-status.L { background: var(--loss); color: #fff; }
+  .live-box { border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+              background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+  .live-box[hidden] { display: none; }
+  .live-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; font-weight: 700; }
+  .live-clock { display: inline-flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent-text); }
+  .live-clock .rec { width: 8px; height: 8px; border-radius: 50%; background: #e5322d; animation: live-blink 1.2s infinite; }
+  .live-clock.ended { color: var(--soft); } .live-clock.ended .rec { background: var(--muted); animation: none; }
+  @keyframes live-blink { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .live-clock .rec { animation: none; } }
+  .sc-row { display: grid; grid-template-columns: 1fr auto auto auto 1fr; align-items: center; gap: 10px; }
+  .sc-row .t { font: 700 15px/1.2 'Poppins', sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sc-row .t.r { text-align: right; }
+  .sc-row b { font: 700 32px/1 'JetBrains Mono', monospace; min-width: 1ch; text-align: center; }
+  .sc-row i { color: var(--muted); font-style: normal; }
+  .sc-row b.bump { animation: sc-bump .9s ease-out; }
+  @keyframes sc-bump { 0% { transform: scale(1.5); color: var(--accent-text); } 100% { transform: none; } }
+  .live-verdict { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--chip); color: var(--soft); white-space: nowrap; }
+  .live-verdict.W { background: var(--win); color: #000; } .live-verdict.L { background: var(--loss); color: #fff; }
   .hp-match { font: 800 28px/1.15 'Poppins', sans-serif; margin-top: 4px; }
   .hp-match span { color: var(--muted); font-weight: 600; font-size: .7em; }
   .hp-when { color: var(--soft); font-size: 15px; margin-top: 6px; }
@@ -261,6 +279,7 @@
       <div class="hp-match" id="hp-match">Local <span>vs</span> Visita</div>
       <div class="hp-when" id="hp-when">Hoy · 15:45 p. m.</div>
     </div>
+    <div class="live-box" id="hp-live" hidden aria-live="polite"></div>
     <div class="hp-bet">
       <div><small>Nuestra selección</small><strong id="hp-sel">Ambos marcan: Sí</strong></div>
       <div class="hp-odds"><small>Cuota</small><b id="hp-odds">1.85</b></div>
@@ -485,6 +504,106 @@
   }
   var RES = { W: ['✅ Verde', 'W'], L: ['❌ Roja', 'L'], V: ['↩️ Nula', 'V'] };
 
+  // ---------- Marcador en vivo (ESPN, público y sin clave). Sirve para cualquier deporte que ESPN cubra.
+  var STOP = ['club', 'calcio', 'futbol', 'football', 'the', 'and', 'old', 'boys', 'city', 'united', 'real', 'sporting', 'atletico', 'deportivo'];
+  function toks(s) {
+    var all = String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+      .replace(/\(.*?\)/g, ' ').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(function (w) { return w.length >= 3; });
+    var key = all.filter(function (w) { return STOP.indexOf(w) < 0; });
+    return key.length ? key : all;
+  }
+  function overlap(name, team) {
+    var a = toks(name), b = toks([team.displayName, team.shortDisplayName, team.name, team.location].join(' '));
+    return a.filter(function (t) { return b.indexOf(t) >= 0; }).length;
+  }
+  function espnDate(iso) {   // ESPN agrupa los partidos por día de Nueva York
+    var o = {}; new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(new Date(iso)).forEach(function (p) { o[p.type] = p.value; });
+    return o.year + o.month + o.day;
+  }
+  function findEvent(events, leg, kickoff) {
+    var best = null, bestScore = 0, k = new Date(kickoff).getTime();
+    (events || []).forEach(function (e) {
+      var c = (e.competitions || [])[0]; if (!c) return;
+      var home = c.competitors.filter(function (x) { return x.homeAway === 'home'; })[0] || c.competitors[0];
+      var away = c.competitors.filter(function (x) { return x.homeAway === 'away'; })[0] || c.competitors[1];
+      var h = overlap(leg.home, home.team), a = overlap(leg.away, away.team);
+      var swap = false;
+      if (!(h && a)) { var h2 = overlap(leg.home, away.team), a2 = overlap(leg.away, home.team); if (h2 && a2) { h = h2; a = a2; swap = true; } }
+      var near = Math.abs(new Date(e.date).getTime() - k) <= 20 * 6e4;
+      var sc = (h && a ? 10 + h + a : 0) + (near && (h || a) ? 5 : 0) + (near ? 1 : 0);
+      if ((h && a) || (near && (h || a))) {
+        if (sc > bestScore) { bestScore = sc; best = { e: e, home: swap ? away : home, away: swap ? home : away }; }
+      }
+    });
+    return best;
+  }
+  function gradeLeg(l, h, a) {
+    var t = l.mtype || '', o = String(l.outcome || '').trim().toLowerCase(), line = l.handicap, won = null, d, g;
+    if (t === '1x2') won = { '1': h > a, 'x': h === a, '2': h < a }[o];
+    else if (t === 'bothteamsscore') won = (h > 0 && a > 0) === /^(s|y)/.test(o);
+    else if ((t === 'totals' || t.indexOf('teamtotals') === 0) && line != null) {
+      g = t === 'totals' ? h + a : (/1$/.test(t) ? h : a); d = g - line; if (d === 0) return 'V';
+      won = /^(m[aá]s|over)/.test(o) ? d > 0 : d < 0;
+    } else if (t.indexOf('toscore') === 0) { g = /1$/.test(t) ? h : a; won = (g > 0) === /^(s|y)/.test(o); }
+    else if (t === 'drawnobet' && (o === '1' || o === '2')) { if (h === a) return 'V'; won = o === '1' ? h > a : a > h; }
+    else if (t === 'spreads' && line != null && (o === '1' || o === '2')) { d = o === '1' ? h - a + line : a - h - line; if (d === 0) return 'V'; won = d > 0; }
+    return won == null ? null : (won ? 'W' : 'L');
+  }
+  function combine(rs) {
+    if (rs.indexOf(null) >= 0) return null;
+    if (rs.indexOf('L') >= 0) return 'L';
+    return rs.every(function (r) { return r === 'V'; }) ? 'V' : 'W';
+  }
+  var lastShown = {};
+  function renderLive(box, pick, rows, phase, clock) {
+    // rows: [{home, away, h, a}] · phase: 'in' | 'post' | 'settled'
+    var res = phase === 'settled' ? pick.result : combine(rows.map(function (r, i) { return gradeLeg(pick.legs[i], r.h, r.a); }));
+    var txt = { W: phase === 'in' ? '✅ Se está cumpliendo' : '✅ Se cumplió', L: phase === 'in' ? 'Por ahora no se cumple' : '❌ No se cumplió', V: phase === 'in' ? '↩️ Por ahora, se devuelve' : '↩️ Se devuelve' }[res];
+    var label = phase === 'in' ? (clock || 'En vivo') : 'Final';
+    box.innerHTML = '<div class="live-top"><span class="live-clock' + (phase === 'in' ? '' : ' ended') + '"><span class="rec"></span>' + esc(label) + '</span>' +
+      (txt ? '<span class="live-verdict ' + res + '">' + txt + '</span>' : '') + '</div>' +
+      rows.map(function (r, i) {
+        var key = box.id + i, prev = lastShown[key] || {}, bh = prev.h != null && prev.h !== r.h, ba = prev.a != null && prev.a !== r.a;
+        lastShown[key] = { h: r.h, a: r.a };
+        return '<div class="sc-row"><span class="t">' + esc(r.home) + '</span><b' + (bh ? ' class="bump"' : '') + '>' + r.h + '</b><i>–</i><b' + (ba ? ' class="bump"' : '') + '>' + r.a + '</b><span class="t r">' + esc(r.away) + '</span></div>';
+      }).join('');
+    box.hidden = false;
+  }
+  function trackLive(pick, boxes, onPhase) {
+    if (!pick) return;
+    var stored = pick.legs.every(function (l) { return l.score; });
+    if (pick.result && stored) {
+      boxes.forEach(function (b) { renderLive(b, pick, pick.legs.map(function (l) { return { home: l.home, away: l.away, h: l.score[0], a: l.score[1] }; }), 'settled'); });
+      return;
+    }
+    var timer = null;
+    function poll() {
+      var k = new Date(pick.kickoff).getTime(), now = Date.now();
+      if (now < k - 10 * 6e4) { timer = setTimeout(poll, Math.min(k - 10 * 6e4 - now, 30 * 6e4)); return; }
+      if (now > k + 8 * 36e5) return;   // demasiado tarde para seguirlo en vivo
+      Promise.all(pick.legs.map(function (l) {
+        var url = 'https://site.api.espn.com/apis/site/v2/sports/' + (l.sport || 'soccer') + '/all/scoreboard?dates=' + espnDate(pick.kickoff);
+        return fetch(url, { cache: 'no-store' }).then(function (r) { return r.json(); })
+          .then(function (j) { return findEvent(j.events, l, pick.kickoff); }).catch(function () { return null; });
+      })).then(function (found) {
+        if (found.some(function (f) { return !f; })) { timer = setTimeout(poll, 120000); return; }
+        var states = found.map(function (f) { return f.e.status.type.state; });
+        if (states.every(function (s) { return s === 'pre'; })) { timer = setTimeout(poll, 60000); return; }
+        var phase = states.some(function (s) { return s === 'in'; }) ? 'in' : (states.every(function (s) { return s === 'post'; }) ? 'post' : 'in');
+        var live = found.filter(function (f) { return f.e.status.type.state === 'in'; })[0] || found[0];
+        var st = live.e.status, clock = st.type.state === 'in' ? (st.type.shortDetail || st.displayClock) : '';
+        if (/^(HT|Halftime)$/i.test(clock)) clock = 'Entretiempo';
+        var rows = found.map(function (f, i) { return { home: pick.legs[i].home, away: pick.legs[i].away, h: Number(f.home.score), a: Number(f.away.score) }; });
+        boxes.forEach(function (b) { renderLive(b, pick, rows, phase, clock); });
+        if (onPhase) onPhase(phase, clock);
+        if (phase === 'in') timer = setTimeout(poll, 30000);
+      });
+    }
+    poll();
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && timer) { clearTimeout(timer); poll(); } });
+  }
+
   fetch('historial.json', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (data) {
     var s = data.summary || {};
     if (s.picks) {
@@ -498,7 +617,7 @@
     var picks = data.picks || [];
     if (picks.length) {
       document.getElementById('history-body').innerHTML = picks.map(function (p) {
-        var match = p.legs.map(function (l) { return esc(l.home) + ' vs ' + esc(l.away) + '<br><span class="muted" style="font-size:13px">' + esc(l.league) + '</span>'; }).join('<br>');
+        var match = p.legs.map(function (l) { return esc(l.home) + (l.score ? ' <b class="mono">' + l.score[0] + '-' + l.score[1] + '</b> ' : ' vs ') + esc(l.away) + '<br><span class="muted" style="font-size:13px">' + esc(l.league) + '</span>'; }).join('<br>');
         var market = p.legs.map(function (l) { return '<strong>' + esc(label(l)) + '</strong>'; }).join('<br>');
         var r = RES[p.result] || ['⏳ En juego', 'P'];
         function cell(label, html, cls) { return '<td' + (cls ? ' class="' + cls + '"' : '') + ' data-label="' + label + '"><span class="v">' + html + '</span></td>'; }
@@ -512,7 +631,7 @@
     // Tarjeta principal: el pick gratis más relevante (el próximo por jugar; si no hay, el último).
     var frees = picks.filter(function (p) { return p.free; });
     var now = Date.now();
-    var upcoming = frees.filter(function (p) { return !p.result && new Date(p.kickoff).getTime() + 2.5 * 36e5 > now; })
+    var upcoming = frees.filter(function (p) { return !p.result && new Date(p.kickoff).getTime() + 3 * 36e5 > now; })
       .sort(function (a, b) { return new Date(a.kickoff) - new Date(b.kickoff); });
     var hero = upcoming[0] || frees[0];
     if (hero) {
@@ -529,17 +648,22 @@
         document.getElementById('hp-prob').textContent = Math.round(hero.prob * 100) + '%';
         document.getElementById('hp-probbar').style.width = Math.round(hero.prob * 100) + '%';
       } else { document.getElementById('hp-prob').parentNode.parentNode.style.display = 'none'; }
-      var st = document.getElementById('hp-status'), cta = document.getElementById('hp-cta');
+      var st = document.getElementById('hp-status'), cta = document.getElementById('hp-cta'), livePhase = null;
       function tick() {
         var ms = new Date(hero.kickoff).getTime() - Date.now();
         st.className = 'hp-status';
         if (hero.result && RES[hero.result]) { st.textContent = RES[hero.result][0]; st.classList.add(hero.result); cta.textContent = 'Recibe el próximo gratis en Telegram'; }
-        else if (ms > 0) {
+        else if (livePhase === 'post') { st.textContent = 'Finalizado'; cta.textContent = 'Recibe el próximo gratis en Telegram'; }
+        else if (ms > 0 && livePhase !== 'in') {
           var h = Math.floor(ms / 36e5), m = Math.floor(ms % 36e5 / 6e4);
           st.textContent = 'Empieza en ' + (h ? h + ' h ' : '') + m + ' min'; cta.textContent = 'Síguelo en vivo en Telegram';
-        } else { st.textContent = '● En juego'; st.classList.add('live'); cta.textContent = 'Síguelo en vivo en Telegram'; }
+        } else { st.textContent = '● En vivo'; st.classList.add('live'); cta.textContent = 'Síguelo en vivo en Telegram'; }
       }
       tick(); setInterval(tick, 30000);
+      setTimeout(function () {   // espera a que exista también el bloque de la sección "Pick gratis"
+        trackLive(hero, [document.getElementById('hp-live'), document.getElementById('fp-live')].filter(Boolean),
+          function (phase) { livePhase = phase; tick(); });
+      }, 0);
     } else {
       document.getElementById('hp-status').textContent = 'Ejemplo';
     }
@@ -553,7 +677,7 @@
         return '<div class="leg"><div class="league">' + esc(l.league) + '</div><div class="match">' + esc(l.home) + ' vs ' + esc(l.away) +
           '</div><div class="muted" style="font-size:14px">' + fmtDate(free.kickoff) + '</div></div>';
       }).join('');
-      document.getElementById('free-pick').innerHTML = legs +
+      document.getElementById('free-pick').innerHTML = legs + '<div class="live-box" id="fp-live" hidden aria-live="polite"></div>' +
         '<div class="chips"><div class="chip"><small>Mercado</small><strong>' + free.legs.map(function (l) { return esc(label(l)); }).join(' + ') + '</strong></div>' +
         '<div class="chip"><small>Cuota</small><b>' + free.price.toFixed(2) + '</b></div><div class="chip"><small>Stake</small><b>' + free.stake + '/10</b></div></div>' +
         (free.analysis ? '<p class="lead" style="white-space:pre-line">' + esc(free.analysis) + '</p>' : '') +

@@ -192,6 +192,9 @@ def _auto_result(state: dict, p: dict, owner, now, last_kick) -> None:
     except Exception:
         traceback.print_exc()
         res, scores, finished = None, [], False
+    for l, sc in zip(p["legs"], scores):
+        if sc:
+            l["score"] = list(sc)   # marcador final para la web
     if res:
         _settle(state, p, res)
         p["auto_result"] = True
