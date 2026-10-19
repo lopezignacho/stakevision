@@ -36,8 +36,8 @@ oddspapi.upcoming_fixtures = lambda frm, to: [fx]
 oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "f1", "bookmakerOdds": {
     "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
     "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}}]
-oddspapi.scores = lambda fid: {"scores": {"0": {"participant1Score": 2, "participant2Score": 1}}}
 apifootball.context = lambda *a: None
+apifootball.final_score = lambda *a: (2, 1)
 
 OWNER, VIP = 111, -100222
 

@@ -44,6 +44,29 @@ def account():
     return _get("/account")
 
 
+def quota_text() -> str:
+    """Resume solo los números de uso del plan (nunca la clave)."""
+    found = {}
+
+    def walk(d, prefix=""):
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if "key" in k.lower():
+                    continue
+                if isinstance(v, (dict, list)):
+                    walk(v, f"{prefix}{k}.")
+                elif any(w in k.lower() for w in ("limit", "count", "request", "reset")):
+                    found[prefix + k] = v
+        elif isinstance(d, list):
+            for i, x in enumerate(d[:3]):
+                walk(x, f"{prefix}{i}.")
+    try:
+        walk(account())
+    except Exception as e:
+        return f"No se pudo leer la cuenta: {type(e).__name__}"
+    return ", ".join(f"{k}={v}" for k, v in found.items()) or "sin datos de uso"
+
+
 def markets(force: bool = False) -> dict:
     """Mapa marketId -> info del mercado. Se descarga una vez y queda en data/markets.json."""
     if not force and os.path.exists(config.MARKETS_CACHE):
@@ -76,24 +99,26 @@ def upcoming_fixtures(frm: str, to: str) -> list[dict]:
 
 
 def odds_by_tournaments(tournament_ids: list[int]) -> list[dict]:
-    """Cuotas de Betano y Pinnacle para varios torneos: una consulta por casa (2 en total),
-    combinadas por partido en el mismo formato de /odds (bookmakerOdds por casa)."""
-    ids = ",".join(str(t) for t in tournament_ids)
+    """Cuotas de Betano y Pinnacle. OddsPapi acepta 1 casa y hasta 5 ligas por consulta,
+    así que se pide por grupos y se combinan por partido (bookmakerOdds por casa)."""
     merged: dict[str, dict] = {}
-    for slug in (config.BOOK, config.REFERENCE):
-        time.sleep(2.1)  # cooldown entre llamadas
-        data = _get("/odds-by-tournaments", tournamentIds=ids, bookmaker=slug)
-        rows = data if isinstance(data, list) else data.get("data", [])
-        for row in rows:
-            fid = row.get("fixtureId")
-            if not fid:
-                continue
-            target = merged.setdefault(fid, {"fixtureId": fid, "bookmakerOdds": {}})
-            books = row.get("bookmakerOdds") or {}
-            if slug in books:
-                target["bookmakerOdds"][slug] = books[slug]
-            elif books:  # por si la respuesta no viene indexada por casa
-                target["bookmakerOdds"][slug] = next(iter(books.values()))
+    step = config.MAX_TOURNAMENTS_PER_CALL
+    for i in range(0, len(tournament_ids), step):
+        ids = ",".join(str(t) for t in tournament_ids[i:i + step])
+        for slug in (config.BOOK, config.REFERENCE):
+            time.sleep(2.1)  # cooldown entre llamadas
+            data = _get("/odds-by-tournaments", tournamentIds=ids, bookmaker=slug)
+            rows = data if isinstance(data, list) else data.get("data", [])
+            for row in rows:
+                fid = row.get("fixtureId")
+                if not fid:
+                    continue
+                target = merged.setdefault(fid, {"fixtureId": fid, "bookmakerOdds": {}})
+                books = row.get("bookmakerOdds") or {}
+                if slug in books:
+                    target["bookmakerOdds"][slug] = books[slug]
+                elif books:
+                    target["bookmakerOdds"][slug] = next(iter(books.values()))
     print(f"Cuotas recibidas: {len(merged)} partidos "
           f"({sum(1 for r in merged.values() if len(r['bookmakerOdds']) == 2)} con ambas casas)")
     return list(merged.values())

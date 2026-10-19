@@ -42,12 +42,21 @@ def scan() -> None:
     print(f"Partidos con cuotas de Betano en la ventana: {len(by_id)}")
 
     counts: dict[int, int] = {}
+    names: dict[int, str] = {}
     for f in fixtures:
         t = f["tournamentId"]
         if config.TOURNAMENT_WHITELIST and t not in config.TOURNAMENT_WHITELIST:
             continue
         counts[t] = counts.get(t, 0) + 1
-    tournaments = sorted(counts, key=counts.get, reverse=True)[:config.MAX_TOURNAMENTS_PER_CALL]
+        names[t] = f"{f.get('categoryName', '')} {f.get('tournamentName', '')}".strip()
+
+    def priority(t):
+        n = names[t].lower()
+        hit = next((i for i, k in enumerate(config.PRIORITY_LEAGUES) if all(w in n for w in k.split())), None)
+        return (0, hit) if hit is not None else (1, -counts[t])
+
+    tournaments = sorted(counts, key=priority)[:config.MAX_TOURNAMENTS_PER_CALL * config.ODDS_BATCHES]
+    print("Ligas analizadas hoy: " + "; ".join(f"{names[t]} ({counts[t]})" for t in tournaments))
     if not tournaments:
         telegram.send(state["owner_chat"], "🔎 Escaneo de hoy: no hay partidos con cuotas en la ventana.")
         return
@@ -92,34 +101,34 @@ def scan() -> None:
 
 # ---------------------------------------------------------------- resultados
 def _suggest(pick: dict) -> str | None:
-    """Sugiere verde/roja solo para mercados que sabemos leer. Siempre lo confirmas tú."""
-    markets = oddspapi.markets()
+    """Sugiere verde/roja con el marcador de 90' de API-Football (no gasta OddsPapi).
+    Solo para mercados que sabemos leer. Siempre lo confirmas tú."""
     results = []
     for l in pick["legs"]:
-        try:
-            sc = oddspapi.scores(l["fixture_id"]).get("scores") or {}
-        except Exception:
+        sc = apifootball.final_score(l["home"], l["away"], l["kickoff"])
+        if not sc:
             return None
-        period = sc.get("0") or {}
-        h, a = period.get("participant1Score"), period.get("participant2Score")
-        if h is None or a is None:
-            return None
-        meta = markets.get(l["market_id"], {})
-        name = str(meta.get("outcomes", {}).get(l["outcome_id"], l["outcome"])).lower()
-        mname = str(meta.get("name", l["market"])).lower()
-        line = meta.get("handicap")
-        if l["market_id"] == "101":
-            won = {"101": h > a, "102": h == a, "103": h < a}.get(l["outcome_id"])
-        elif "ambos" in mname or "both" in mname:
-            won = (h > 0 and a > 0) == (name in ("yes", "sí", "si"))
-        elif line is not None and ("over" in name or "más" in name or "under" in name or "menos" in name):
-            total = h + a
-            if total == float(line):
+        h, a = sc
+        t, o, line = l.get("mtype", ""), str(l.get("outcome", "")).lower(), l.get("handicap")
+        won = None
+        if t == "1x2":
+            won = {"1": h > a, "x": h == a, "2": h < a}.get(o)
+        elif t == "bothteamsscore":
+            won = (h > 0 and a > 0) == o.startswith("s")
+        elif t in ("totals", "teamtotals-team1", "teamtotals-team2") and line is not None:
+            goals = h + a if t == "totals" else (h if t.endswith("1") else a)
+            if goals == float(line):
                 results.append("V")
                 continue
-            won = total > float(line) if ("over" in name or "más" in name) else total < float(line)
-        else:
-            return None
+            won = goals > float(line) if o.startswith("m\u00e1s") or o.startswith("mas") else goals < float(line)
+        elif t in ("toscore-team1", "toscore-team2"):
+            goals = h if t.endswith("1") else a
+            won = (goals > 0) == o.startswith("s")
+        elif t == "drawnobet":
+            if h == a:
+                results.append("V")
+                continue
+            won = (h > a) if o == "1" else (a > h)
         if won is None:
             return None
         results.append("W" if won else "L")
@@ -237,12 +246,7 @@ def _status_text(state: dict) -> str:
     live = sum(1 for p in ps if p["status"] == "published")
     w = sum(1 for p in ps if p.get("result") == "W")
     l = sum(1 for p in ps if p.get("result") == "L")
-    quota = ""
-    try:
-        acc = oddspapi.account()
-        quota = f"\nOddsPapi: {acc.get('request_count')} de {acc.get('request_limit')} consultas usadas."
-    except Exception:
-        pass
+    quota = "\nOddsPapi: " + oddspapi.quota_text()
     return (f"📊 Candidatos por aprobar: {pend}\nPublicados en juego: {live}\n"
             f"Historial: {w} verdes, {l} rojas.{quota}")
 
@@ -281,8 +285,7 @@ def poll() -> None:
 def setup() -> None:
     m = oddspapi.markets(force=True)
     print(f"Mercados de fútbol guardados: {len(m)}")
-    acc = oddspapi.account()
-    print(f"Consultas OddsPapi usadas: {acc.get('request_count')} de {acc.get('request_limit')}")
+    print("Uso OddsPapi:", oddspapi.quota_text())
 
 
 if __name__ == "__main__":

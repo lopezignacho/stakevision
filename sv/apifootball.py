@@ -82,3 +82,16 @@ def context(home: str, away: str, kickoff_iso: str) -> dict | None:
     if not h and not a:
         return None
     return {"home": h, "away": a}
+
+
+def final_score(home: str, away: str, kickoff_iso: str):
+    """Marcador al minuto 90 (sin prórroga) si el partido terminó; si no, None."""
+    _day_cache.pop(kickoff_iso[:10], None)  # refrescar: queremos el estado actual
+    fx = find_fixture(home, away, kickoff_iso[:10])
+    if not fx or fx.get("fixture", {}).get("status", {}).get("short") not in ("FT", "AET", "PEN"):
+        return None
+    ft = (fx.get("score") or {}).get("fulltime") or {}
+    h, a = ft.get("home"), ft.get("away")
+    if h is None or a is None:
+        h, a = fx["goals"]["home"], fx["goals"]["away"]
+    return (h, a) if h is not None and a is not None else None
