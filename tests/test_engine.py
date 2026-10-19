@@ -60,11 +60,27 @@ def test_value_and_filters():
 
     picks = build_picks(sels)
     # 1 de 2.00 vs justa ~2.04 => sin valor. Ambos marcan Sí 1.95 vs justa ~1.88 => +3,6% => válido.
-    assert len(picks) == 1, picks
-    p = picks[0]
+    valor = [p for p in picks if p.tier == "valor"]
+    assert len(valor) == 1, picks
+    assert all(p.tier == "justa" and p.stake == 1 for p in picks if p not in valor)
+    p = valor[0]
     assert p.kind == "simple" and p.legs[0].market_id == "104"
     assert 1.65 <= p.price <= 2.0 and p.edge >= config.MIN_EDGE
     assert 1 <= p.stake <= config.MAX_STAKE
+
+
+def test_fallback_fills_daily_minimum():
+    fxs = [fixture(f"x{i}", f"L{i}", f"V{i}") for i in range(4)]
+    sels = []
+    for i, fx in enumerate(fxs):
+        odds = {"bookmakerOdds": {
+            "pinnacle": book({"104": {"104": 1.80, "105": 2.05}}),
+            "betano": book({"104": {"104": 1.86 - i * 0.02, "105": 1.95}})}}   # -1% ... -4%
+        sels += selections_for_fixture(fx, odds, MARKETS)
+    picks = build_picks(sels)
+    assert len(picks) == 1  # solo la de -1% está dentro del piso de -2%
+    assert all(p.tier == "justa" and p.edge >= config.FALLBACK_MIN_EDGE for p in picks)
+    assert len({p.legs[0].fixture_id for p in picks}) == len(picks)
 
 
 def test_doubles_only_when_each_leg_has_value():

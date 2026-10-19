@@ -41,6 +41,7 @@ class Selection:
 class Pick:
     kind: str                       # "simple" | "doble"
     legs: list[Selection] = field(default_factory=list)
+    tier: str = "valor"             # "valor" (edge >= MIN_EDGE) | "justa" (cerca de la cuota justa)
 
     @property
     def price(self) -> float:
@@ -63,6 +64,8 @@ class Pick:
     @property
     def stake(self) -> int:
         """Cuarto de Kelly expresado como ~% del bankroll, de 1 a MAX_STAKE (escala /10)."""
+        if self.tier == "justa":
+            return 1
         b = self.price - 1
         kelly = max(0.0, (self.prob * self.price - 1) / b) if b > 0 else 0
         return max(1, min(config.MAX_STAKE, round(kelly * 0.25 * 100)))
@@ -74,6 +77,7 @@ class Pick:
     def to_dict(self) -> dict:
         return {
             "kind": self.kind,
+            "tier": self.tier,
             "price": self.price,
             "prob": round(self.prob, 4),
             "edge": round(self.edge, 4),
@@ -182,4 +186,18 @@ def build_picks(selections: list[Selection]) -> list[Pick]:
         used |= fids
         if len(chosen) >= config.MAX_CANDIDATES:
             break
+
+    # Si no alcanza el mínimo diario, completar con simples en rango cercanas a la cuota justa.
+    if len(chosen) < config.MIN_DAILY_CANDIDATES:
+        near = [s for s in selections
+                if config.ODDS_MIN <= s.price <= config.ODDS_MAX
+                and config.FALLBACK_MIN_EDGE <= s.edge < config.MIN_EDGE]
+        near.sort(key=lambda s: s.edge, reverse=True)
+        for s in near:
+            if s.fixture_id in used:
+                continue
+            chosen.append(Pick("simple", [s], tier="justa"))
+            used.add(s.fixture_id)
+            if len(chosen) >= config.MIN_DAILY_CANDIDATES:
+                break
     return chosen

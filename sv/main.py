@@ -83,9 +83,12 @@ def scan() -> None:
         store.save(state)
         return
 
+    n_val = sum(1 for p in picks if p.tier == "valor")
     telegram.send(state["owner_chat"],
-                  f"🔎 Escaneo listo: {len(tournaments)} ligas, {analyzed} partidos, {len(selections)} cuotas comparadas. "
-                  f"Te envío {len(picks)} candidatos. Revisa cada cuota en tu app antes de aprobar.")
+                  f"🔎 Escaneo listo: {len(tournaments)} ligas, {analyzed} partidos, {len(selections)} cuotas comparadas.\n"
+                  f"Te envío {len(picks)} candidatos: {n_val} 🟢 con valor y {len(picks) - n_val} ⚖️ de cuota justa.\n"
+                  f"Sugerencia: 1 para el canal gratis (✅ VIP + Gratis) y hasta 3 para el VIP. "
+                  f"Revisa cada cuota en tu app antes de aprobar.")
     for p in picks:
         d = p.to_dict()
         for leg in d["legs"]:

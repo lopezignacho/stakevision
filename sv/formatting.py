@@ -63,8 +63,8 @@ def analysis(pick: dict) -> str:
     parts = []
     for l in pick["legs"]:
         line = (f"{escape(outcome_label(l))} ({escape(l['market'])}) en {escape(l['home'])} vs {escape(l['away'])}: "
-                f"cuota justa estimada {odds(l['fair_odds'])}, cuota disponible {odds(l['price'])} "
-                f"(+{pct(l['edge'])} de valor).")
+                f"cuota justa estimada {odds(l['fair_odds'])}, cuota disponible {odds(l['price'])}"
+                + (f" (+{pct(l['edge'])} de valor)." if l['edge'] >= 0 else " (en línea con la cuota justa)."))
         ctx = l.get("context")
         if ctx:
             bits = []
@@ -101,9 +101,12 @@ def channel_post(pick: dict) -> str:
 
 
 def owner_candidate(pick: dict) -> str:
-    return (f"🆕 <b>Candidato #{pick['id']}</b> ({pick['kind']})\n\n"
+    tag = ("🟢 <b>Con valor</b>" if pick.get("tier", "valor") == "valor"
+           else "⚖️ <b>Cuota justa</b> (sin ventaja medida: decide según tu lectura del partido)")
+    sign = "+" if pick["edge"] >= 0 else ""
+    return (f"🆕 <b>Candidato #{pick['id']}</b> ({pick['kind']})\n{tag}\n\n"
             f"{_legs_block(pick)}\n\n"
-            f"📈 Cuota: <b>{odds(pick['price'])}</b> · Valor: <b>+{pct(pick['edge'])}</b> · "
+            f"📈 Cuota: <b>{odds(pick['price'])}</b> · Valor: <b>{sign}{pct(pick['edge'])}</b> · "
             f"Stake sugerido: {pick['stake']}/10\n\n"
             f"<i>{pick['analysis']}</i>\n\n"
             f"Verifica la cuota en tu app antes de aprobar.")
