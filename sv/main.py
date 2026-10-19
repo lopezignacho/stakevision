@@ -41,19 +41,30 @@ def scan() -> None:
     by_id = {f["fixtureId"]: f for f in fixtures}
     print(f"Partidos con cuotas de Betano en la ventana: {len(by_id)}")
 
+    import unicodedata
+
+    def _n(x: str) -> str:
+        return unicodedata.normalize("NFKD", x).encode("ascii", "ignore").decode().lower().strip()
+
     counts: dict[int, int] = {}
     names: dict[int, str] = {}
+    keys: dict[int, str] = {}
     for f in fixtures:
         t = f["tournamentId"]
         if config.TOURNAMENT_WHITELIST and t not in config.TOURNAMENT_WHITELIST:
             continue
         counts[t] = counts.get(t, 0) + 1
-        names[t] = f"{f.get('categoryName', '')} {f.get('tournamentName', '')}".strip()
+        names[t] = f"{f.get('categoryName', '')} · {f.get('tournamentName', '')}"
+        keys[t] = _n(f"{f.get('categoryName', '')}|{f.get('tournamentName', '')}")
+
+    pri = {_n(k): i for i, k in enumerate(config.PRIORITY_LEAGUES)}
 
     def priority(t):
-        n = names[t].lower()
-        hit = next((i for i, k in enumerate(config.PRIORITY_LEAGUES) if all(w in n for w in k.split())), None)
-        return (0, hit) if hit is not None else (1, -counts[t])
+        hit = pri.get(keys[t])
+        if hit is not None:
+            return (0, hit)
+        minor = any(w in keys[t] for w in ("amateur", "u19", "u20", "u21", "u23", "reserve", "youth", "friendl"))
+        return (2 if minor else 1, -counts[t])
 
     tournaments = sorted(counts, key=priority)[:config.MAX_TOURNAMENTS_PER_CALL * config.ODDS_BATCHES]
     print("Ligas analizadas hoy: " + "; ".join(f"{names[t]} ({counts[t]})" for t in tournaments))
@@ -62,10 +73,11 @@ def scan() -> None:
         return
 
     odds_rows = oddspapi.odds_by_tournaments(tournaments)
-    selections = []
+    selections, analyzed = [], 0
     for row in odds_rows:
         fx = by_id.get(row.get("fixtureId"))
-        if fx:
+        if fx and len(row.get("bookmakerOdds") or {}) == 2:
+            analyzed += 1
             selections += selections_for_fixture(fx, row, markets)
 
     already = {(l["fixture_id"], l["market_id"], l["outcome_id"])
@@ -75,14 +87,15 @@ def scan() -> None:
 
     if not picks:
         telegram.send(state["owner_chat"],
-                      f"🔎 Escaneo de hoy: revisé {len(by_id)} partidos y {len(selections)} cuotas. "
+                      f"🔎 Escaneo de hoy: {len(tournaments)} ligas, {analyzed} partidos con cuotas de ambas casas, "
+                      f"{len(selections)} cuotas comparadas. "
                       f"Ninguna cumple valor ≥ {formatting.pct(config.MIN_EDGE)} dentro de "
                       f"{config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f}. Hoy no hay picks.")
         store.save(state)
         return
 
     telegram.send(state["owner_chat"],
-                  f"🔎 Escaneo listo: {len(by_id)} partidos, {len(selections)} cuotas comparadas. "
+                  f"🔎 Escaneo listo: {len(tournaments)} ligas, {analyzed} partidos, {len(selections)} cuotas comparadas. "
                   f"Te envío {len(picks)} candidatos. Revisa cada cuota en tu app antes de aprobar.")
     for p in picks:
         d = p.to_dict()

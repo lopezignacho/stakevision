@@ -30,13 +30,15 @@ ALLOWED_MARKET_TYPES = {"1x2", "totals", "bothteamsscore", "spreads", "drawnobet
 # Ligas: si la lista está vacía se analizan todas las que tengan cuotas de Betano y Pinnacle.
 # Puedes limitarla con IDs de torneo de OddsPapi (ver data/tournaments.json).
 TOURNAMENT_WHITELIST: list[int] = []
-# Ligas preferidas (texto que aparece en "país + liga"). Tienen prioridad al elegir las 5 ligas
-# del día, porque ahí la referencia de Pinnacle es más precisa. El resto se ordena por cantidad de partidos.
+# Ligas preferidas, en orden ("País|Liga" exacto como lo nombra OddsPapi). Tienen prioridad al
+# elegir las ligas del día porque ahí la referencia de Pinnacle es más precisa.
 PRIORITY_LEAGUES = [
-    "england premier league", "spain laliga", "italy serie a", "germany bundesliga", "france ligue 1",
-    "uefa champions league", "uefa europa league", "conference league", "copa libertadores",
-    "copa sudamericana", "chile primera", "brazil serie a", "argentina liga profesional",
-    "netherlands eredivisie", "portugal primeira", "england championship", "usa mls", "mexico liga mx",
+    "England|Premier League", "Spain|LaLiga", "Italy|Serie A", "Germany|Bundesliga", "France|Ligue 1",
+    "International Clubs|UEFA Champions League", "International Clubs|UEFA Europa League",
+    "International Clubs|UEFA Conference League", "International Clubs|CONMEBOL Libertadores",
+    "International Clubs|CONMEBOL Sudamericana", "Chile|Primera Division", "Chile|Liga de Primera",
+    "Brazil|Brasileiro Serie A", "Argentina|Liga Profesional", "Netherlands|Eredivisie",
+    "Portugal|Liga Portugal", "England|Championship", "USA|MLS", "Mexico|Liga MX",
 ]
 MAX_TOURNAMENTS_PER_CALL = 5     # límite de OddsPapi
 ODDS_BATCHES = 1                 # grupos de 5 ligas por escaneo; cada grupo cuesta 2 consultas
