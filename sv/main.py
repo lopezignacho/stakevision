@@ -557,6 +557,16 @@ def poll() -> None:
     try:
         from . import instagram
         if instagram.enabled(state):
+            ig = state.setdefault("ig", {})
+            fp = instagram._fp(config.INSTAGRAM_TOKEN)
+            if ig.get("checked") != fp and state.get("owner_chat"):
+                try:
+                    me = instagram._call("GET", "me", state, fields="username")
+                    telegram.send(state["owner_chat"], f"📸 Instagram conectado: @{formatting.escape(me.get('username', '?'))}. "
+                                  "Los verdes te llegarán con el botón para publicarlos.")
+                except instagram.InstagramError as e:
+                    telegram.send(state["owner_chat"], f"⚠️ El token de Instagram no funcionó: {formatting.escape(str(e))}")
+                ig["checked"] = fp
             instagram.refresh_token(state)
             _instagram_queue(state, now)
     except Exception:
