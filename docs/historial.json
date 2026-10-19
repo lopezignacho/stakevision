@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-19T21:55:19.221346+00:00",
+ "updated_at": "2026-10-19T22:00:29.917590+00:00",
  "summary": {
   "picks": 1,
   "wins": 1,
@@ -10,6 +10,33 @@
   "units": 2.46
  },
  "picks": [
+  {
+   "id": "2",
+   "published_at": "2026-10-19T07:34:20Z",
+   "kickoff": "2026-10-19T22:00:00.000Z",
+   "kind": "simple",
+   "price": 1.87,
+   "stake": 3,
+   "prob": null,
+   "free": false,
+   "result": null,
+   "legs": [
+    {
+     "home": "Newell's Old Boys",
+     "away": "CA Central Cordoba SE",
+     "league": "Argentina · Primera LPF",
+     "market": "Más/Menos Tiempo Completo",
+     "outcome": "Más",
+     "price": 1.87,
+     "label": "Más de 2 goles",
+     "mtype": "totals",
+     "handicap": 2.0,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": null
+  },
   {
    "id": "1",
    "published_at": "2026-10-19T07:32:08Z",
