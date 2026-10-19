@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-19T14:57:43.441343+00:00",
+ "updated_at": "2026-10-19T15:10:41.625141+00:00",
  "summary": {
   "picks": 0,
   "wins": 0,
@@ -16,7 +16,8 @@
    "kickoff": "2026-10-19T18:45:00.000Z",
    "kind": "simple",
    "price": 1.82,
-   "stake": 1,
+   "stake": 3,
+   "prob": 0.5541,
    "free": true,
    "result": null,
    "legs": [
