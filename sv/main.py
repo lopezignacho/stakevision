@@ -161,15 +161,34 @@ def _grade(pick: dict) -> tuple[str | None, list, bool]:
     return "W", scores, True
 
 
+def _post(chat, text: str, image: bytes | None) -> int:
+    """Publica el pick con su imagen. Si el texto cabe, va como pie de foto; si no,
+    foto y luego el texto. Si la imagen falla, sale solo el texto."""
+    if image:
+        try:
+            if formatting.caption_fits(text):
+                return telegram.send_photo(chat, image, caption=text)["message_id"]
+            telegram.send_photo(chat, image)
+        except Exception as e:
+            print(f"No se pudo enviar la imagen: {e}")
+    return telegram.send(chat, text)["message_id"]
+
+
 def _publish(state: dict, p: dict, free: bool) -> None:
     text = formatting.channel_post(p)
+    try:
+        from . import postimage
+        image = postimage.render(p)
+    except Exception:
+        traceback.print_exc()
+        image = None
     p["channel_msgs"] = {}
     vip = state.get("vip_chat")
     if vip:
-        p["channel_msgs"]["vip"] = telegram.send(vip, text)["message_id"]
+        p["channel_msgs"]["vip"] = _post(vip, text, image)
     if free:
-        p["channel_msgs"]["free"] = telegram.send(config.FREE_CHANNEL, text)["message_id"]
-    p.update(status="published", free=free, published_at=_iso(store.now_utc()))
+        p["channel_msgs"]["free"] = _post(config.FREE_CHANNEL, text, image)
+    p.update(status="published", free=free, published_at=_iso(store.now_utc()), has_photo=bool(image))
 
 
 def _settle(state: dict, p: dict, result: str) -> None:
@@ -182,6 +201,27 @@ def _settle(state: dict, p: dict, result: str) -> None:
             p["result_msgs"][where] = telegram.send(chat, text, reply_to=mid)["message_id"]
         except telegram.TelegramError as e:
             print(f"No se pudo publicar resultado en {where}: {e}")
+
+
+def _remind(state: dict, p: dict, now) -> None:
+    """Aviso en los canales cuando faltan ~30 minutos para el partido."""
+    if p["status"] != "published" or p.get("reminded"):
+        return
+    kick = store.parse_ts(p["kickoff"])
+    start = kick - timedelta(minutes=config.REMINDER_BEFORE_MIN)
+    if not (start <= now < kick):
+        return
+    p["reminded"] = True
+    pub = p.get("published_at")
+    if pub and store.parse_ts(pub) > start - timedelta(minutes=5):
+        return  # se publicó a última hora: el pick recién salió, no hace falta recordarlo
+    text = formatting.pre_kickoff(p, int((kick - now).total_seconds() // 60))
+    for where, mid in (p.get("channel_msgs") or {}).items():
+        chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
+        try:
+            telegram.send(chat, text, reply_to=mid)
+        except telegram.TelegramError as e:
+            print(f"No se pudo enviar el aviso en {where}: {e}")
 
 
 def _auto_result(state: dict, p: dict, owner, now, last_kick) -> None:
@@ -417,6 +457,7 @@ def poll() -> None:
             p["status"] = "expired"
             if owner and p.get("owner_msg"):
                 telegram.edit_buttons_off(owner, p["owner_msg"], "⌛ Sin aprobar a tiempo")
+        _remind(state, p, now)
         last_kick = max(store.parse_ts(l["kickoff"]) for l in p["legs"])
         if (p["status"] == "published" and not p.get("result_asked") and owner
                 and now >= last_kick + timedelta(minutes=config.RESULT_CHECK_AFTER_MIN)

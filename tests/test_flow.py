@@ -26,6 +26,17 @@ def fake_send(chat, text, buttons=None, reply_to=None):
 
 
 telegram.send = fake_send
+photos = []
+
+
+def fake_photo(chat, photo, caption=None, reply_to=None):
+    assert photo[:2] == b"\xff\xd8"  # JPEG real
+    photos.append((chat, caption))
+    sent.append((chat, caption or "[foto]", None, reply_to))
+    return {"message_id": len(sent)}
+
+
+telegram.send_photo = fake_photo
 telegram.edit_buttons_off = lambda *a, **k: None
 telegram.answer = lambda *a, **k: None
 telegram._call = lambda *a, **k: True
@@ -73,6 +84,21 @@ assert p["status"] == "published" and p["free"] is True
 assert set(p["channel_msgs"]) == {"vip", "free"}
 posted_chats = [c for c, *_ in sent]
 assert VIP in posted_chats and config.FREE_CHANNEL in posted_chats
+assert len(photos) == 2 and all(c and "STAKEVISION" in c for _, c in photos)   # imagen con el texto como pie
+
+# 3b) aviso 30 min antes del partido, como respuesta al pick en ambos canales
+st = store.load()
+p = st["picks"][pid]
+p["kickoff"] = (datetime.now(timezone.utc) + timedelta(minutes=28)).strftime("%Y-%m-%dT%H:%M:%SZ")
+p["legs"][0]["kickoff"] = p["kickoff"]
+p["published_at"] = (datetime.now(timezone.utc) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+store.save(st)
+n = len(sent)
+main.poll()
+rem = sent[n:]
+assert len(rem) == 2 and all("está por comenzar" in t and r for _, t, _, r in rem), rem
+main.poll()
+assert len(sent) == n + 2   # solo una vez
 
 # 4) el partido termina -> pide resultado con sugerencia -> dueño confirma verde
 p["kickoff"] = (datetime.now(timezone.utc) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")

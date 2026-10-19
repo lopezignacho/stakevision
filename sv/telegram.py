@@ -42,6 +42,23 @@ def edit_buttons_off(chat_id, message_id: int, note: str) -> None:
         pass
 
 
+def send_photo(chat_id, photo: bytes, caption: str | None = None, reply_to: int | None = None) -> dict:
+    import json
+    if not config.TELEGRAM_TOKEN:
+        raise TelegramError("Falta TELEGRAM_TOKEN")
+    data = {"chat_id": chat_id}
+    if caption:
+        data.update(caption=caption, parse_mode="HTML")
+    if reply_to:
+        data["reply_parameters"] = json.dumps({"message_id": reply_to, "allow_sending_without_reply": True})
+    r = requests.post(f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/sendPhoto",
+                      data=data, files={"photo": ("pick.jpg", photo, "image/jpeg")}, timeout=60)
+    res = r.json()
+    if not res.get("ok"):
+        raise TelegramError(f"sendPhoto: {res.get('description')}")
+    return res["result"]
+
+
 def set_buttons(chat_id, message_id: int, buttons: list[list[tuple[str, str]]]) -> None:
     try:
         _call("editMessageReplyMarkup", chat_id=chat_id, message_id=message_id,

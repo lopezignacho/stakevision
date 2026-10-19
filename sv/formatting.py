@@ -154,3 +154,21 @@ def owner_auto_result(pick: dict, scores: list) -> str:
 
 def result_correction(pick: dict) -> str:
     return result_post(pick) + "\n<i>(resultado corregido)</i>"
+
+
+def pre_kickoff(pick: dict, minutes: int) -> str:
+    when = "en unos minutos" if minutes < 5 else f"en {minutes} minutos"
+    emoji = {"soccer": "⚽", "tennis": "🎾", "basketball": "🏀"}
+    matches = "\n".join(f"{emoji.get(l.get('sport') or 'soccer', '🏟')} {escape(l['home'])} vs {escape(l['away'])}" for l in pick["legs"])
+    return (f"⏰ <b>¡Nuestro pronóstico está por comenzar!</b>\n\n"
+            f"{matches}\n"
+            f"🎯 {escape(' + '.join(outcome_label(l) for l in pick['legs']))} @ <b>{odds(pick['price'])}</b>\n\n"
+            f"Arranca {when}. Ojos en la cancha 👁\n"
+            f"🔞 +18 · Apuesta con responsabilidad")
+
+
+def caption_fits(text: str) -> bool:
+    """Telegram permite 1024 caracteres visibles en el texto de una foto."""
+    import html as _h
+    import re as _re
+    return len(_h.unescape(_re.sub(r"<[^>]+>", "", text))) <= 1000
