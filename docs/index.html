@@ -107,8 +107,19 @@
   .sc-row .t.r { text-align: right; }
   .sc-row b { font: 700 32px/1 'JetBrains Mono', monospace; min-width: 1ch; text-align: center; }
   .sc-row i { color: var(--muted); font-style: normal; }
+  #hp-cta { text-align: center; }
+  @media (max-width: 480px) {
+    .sc-row { gap: 8px; }
+    .sc-row .t { white-space: normal; overflow: visible; font-size: 14px; overflow-wrap: anywhere; }
+    .sc-row b { font-size: 28px; }
+  }
   .sc-row b.bump { animation: sc-bump .9s ease-out; }
   @keyframes sc-bump { 0% { transform: scale(1.5); color: var(--accent-text); } 100% { transform: none; } }
+  .live-final { display: inline-flex; align-items: center; gap: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--accent-text); }
+  .live-final svg { width: 22px; height: 22px; fill: var(--accent-text); }
+  .live-final.L { color: var(--loss); } .live-final.L svg { fill: var(--loss); }
+  .live-final.V { color: var(--soft); } .live-final.V svg { fill: var(--muted); }
+  .live-box.final { background: color-mix(in srgb, var(--accent) 6%, transparent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); padding: 18px 20px; }
   .live-verdict { font-size: 13px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--chip); color: var(--soft); white-space: nowrap; }
   .live-verdict.W { background: var(--win); color: #000; } .live-verdict.L { background: var(--loss); color: #fff; }
   .hp-match { font: 800 28px/1.15 'Poppins', sans-serif; margin-top: 4px; }
@@ -193,7 +204,6 @@
     .stat b { font-size: 30px; }
     .price { font-size: 34px; }
     .help { padding: 20px; }
-    #pick-gratis { padding-top: 56px !important; }
     /* Historial como tarjetas en vez de tabla */
     .table-box { border: 0; background: transparent; overflow: visible; }
     table, thead, tbody, tr, td { display: block; min-width: 0; width: 100%; }
@@ -217,7 +227,6 @@
   <div class="wrap nav">
     <a class="brand" href="#inicio"><img src="assets/eyes-transparent.png" alt="">Stakevision</a>
     <nav class="nav-links" aria-label="Principal">
-      <a href="#pick-gratis">Pick gratis</a>
       <a href="#como-funciona">Cómo funciona</a>
       <a href="#historial">Historial</a>
       <a href="#planes">Planes</a>
@@ -245,7 +254,6 @@
     </button>
   </div>
   <nav class="drawer-links" aria-label="Menú móvil">
-    <a href="#pick-gratis">Pick gratis</a>
     <a href="#como-funciona">Cómo funciona</a>
     <a href="#historial">Historial</a>
     <a href="#planes">Planes</a>
@@ -279,7 +287,6 @@
       <div class="hp-match" id="hp-match">Local <span>vs</span> Visita</div>
       <div class="hp-when" id="hp-when">Hoy · 15:45 p. m.</div>
     </div>
-    <div class="live-box" id="hp-live" hidden aria-live="polite"></div>
     <div class="hp-bet">
       <div><small>Nuestra selección</small><strong id="hp-sel">Ambos marcan: Sí</strong></div>
       <div class="hp-odds"><small>Cuota</small><b id="hp-odds">1.85</b></div>
@@ -288,6 +295,7 @@
       <div><div class="hp-mlabel"><span>Stake</span><b id="hp-stake">5/10</b></div><div class="hp-seg" id="hp-seg" aria-hidden="true"></div></div>
       <div><div class="hp-mlabel"><span>Probabilidad estimada</span><b id="hp-prob">55%</b></div><div class="hp-bar" aria-hidden="true"><i id="hp-probbar" style="width:55%"></i></div></div>
     </div>
+    <div class="live-box" id="hp-live" hidden aria-live="polite"></div>
     <a class="btn primary" href="https://t.me/stakevision" id="hp-cta">Recibe el próximo gratis en Telegram</a>
     <p class="muted" style="font-size:13px; margin:0">Publicado antes del partido · queda en el historial, gane o pierda</p>
   </article>
@@ -303,18 +311,6 @@
     </div>
     <p class="muted" style="font-size:14px; margin-top:20px">Cifras calculadas automáticamente desde el historial público. <span id="s-updated"></span></p>
   </div>
-</section>
-
-<section id="pick-gratis" class="wrap" style="padding-top:96px">
-  <div class="head">
-    <div class="eyebrow">El pick gratis de hoy</div>
-    <h2>No te lo contamos: te lo mostramos.</h2>
-    <p class="lead">Un pick completo, con el mismo análisis que reciben los miembros VIP.</p>
-  </div>
-  <article class="card" id="free-pick" style="display:flex; flex-direction:column; gap:16px">
-    <p class="muted">Aún no hay pick gratis publicado hoy. Llega primero al canal de Telegram.</p>
-    <a class="btn primary" style="align-self:flex-start" href="https://t.me/stakevision">Recíbelo en Telegram</a>
-  </article>
 </section>
 
 <section id="como-funciona" class="wrap section">
@@ -560,14 +556,21 @@
     // rows: [{home, away, h, a}] · phase: 'in' | 'post' | 'settled'
     var res = phase === 'settled' ? pick.result : combine(rows.map(function (r, i) { return gradeLeg(pick.legs[i], r.h, r.a); }));
     var txt = { W: phase === 'in' ? '✅ Se está cumpliendo' : '✅ Se cumplió', L: phase === 'in' ? 'Por ahora no se cumple' : '❌ No se cumplió', V: phase === 'in' ? '↩️ Por ahora, se devuelve' : '↩️ Se devuelve' }[res];
-    var label = phase === 'in' ? (clock || 'En vivo') : 'Final';
-    box.innerHTML = '<div class="live-top"><span class="live-clock' + (phase === 'in' ? '' : ' ended') + '"><span class="rec"></span>' + esc(label) + '</span>' +
-      (txt ? '<span class="live-verdict ' + res + '">' + txt + '</span>' : '') + '</div>' +
+    var top;
+    if (phase === 'in') {
+      top = '<span class="live-clock"><span class="rec"></span>' + esc(clock || 'En vivo') + '</span>' +
+        (txt ? '<span class="live-verdict ' + res + '">' + txt + '</span>' : '');
+    } else {
+      var icon = { W: '<path d="M7 12.5l3.2 3.2L17 9"/>', L: '<path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/>', V: '<path d="M9 9H5V5M5.5 9A8 8 0 1 1 4 13"/>' }[res];
+      top = '<span class="live-final ' + (res || '') + '">' + (icon ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><g fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' + icon + '</g></svg>' : '') + 'Resultado final</span>';
+    }
+    box.innerHTML = '<div class="live-top">' + top + '</div>' +
       rows.map(function (r, i) {
         var key = box.id + i, prev = lastShown[key] || {}, bh = prev.h != null && prev.h !== r.h, ba = prev.a != null && prev.a !== r.a;
         lastShown[key] = { h: r.h, a: r.a };
         return '<div class="sc-row"><span class="t">' + esc(r.home) + '</span><b' + (bh ? ' class="bump"' : '') + '>' + r.h + '</b><i>–</i><b' + (ba ? ' class="bump"' : '') + '>' + r.a + '</b><span class="t r">' + esc(r.away) + '</span></div>';
       }).join('');
+    box.classList.toggle('final', phase !== 'in');
     box.hidden = false;
   }
   function trackLive(pick, boxes, onPhase) {
@@ -660,30 +663,13 @@
         } else { st.textContent = '● En vivo'; st.classList.add('live'); cta.textContent = 'Síguelo en vivo en Telegram'; }
       }
       tick(); setInterval(tick, 30000);
-      setTimeout(function () {   // espera a que exista también el bloque de la sección "Pick gratis"
-        trackLive(hero, [document.getElementById('hp-live'), document.getElementById('fp-live')].filter(Boolean),
-          function (phase) { livePhase = phase; tick(); });
-      }, 0);
+      trackLive(hero, [document.getElementById('hp-live')], function (phase) { livePhase = phase; tick(); });
     } else {
       document.getElementById('hp-status').textContent = 'Ejemplo';
     }
     var seg = document.getElementById('hp-seg'), stakeN = hero ? hero.stake : 5;
     seg.innerHTML = Array.from({ length: 10 }, function (_, i) { return '<i' + (i < stakeN ? ' class="on"' : '') + '></i>'; }).join('');
 
-    var free = hero;
-    if (free) {
-      var r = RES[free.result];
-      var legs = free.legs.map(function (l) {
-        return '<div class="leg"><div class="league">' + esc(l.league) + '</div><div class="match">' + esc(l.home) + ' vs ' + esc(l.away) +
-          '</div><div class="muted" style="font-size:14px">' + fmtDate(free.kickoff) + '</div></div>';
-      }).join('');
-      document.getElementById('free-pick').innerHTML = legs + '<div class="live-box" id="fp-live" hidden aria-live="polite"></div>' +
-        '<div class="chips"><div class="chip"><small>Mercado</small><strong>' + free.legs.map(function (l) { return esc(label(l)); }).join(' + ') + '</strong></div>' +
-        '<div class="chip"><small>Cuota</small><b>' + free.price.toFixed(2) + '</b></div><div class="chip"><small>Stake</small><b>' + free.stake + '/10</b></div></div>' +
-        (free.analysis ? '<p class="lead" style="white-space:pre-line">' + esc(free.analysis) + '</p>' : '') +
-        (r ? '<p class="res ' + r[1] + '">' + r[0] + '</p>' : '') +
-        '<a class="btn primary" style="align-self:flex-start" href="https://t.me/stakevision">Recibe el de mañana en Telegram</a>';
-    }
   }).catch(function () {});
 })();
 </script>
