@@ -27,22 +27,29 @@ ONLY_FULLTIME = True
 ALLOWED_MARKET_TYPES = {"1x2", "totals", "bothteamsscore", "spreads", "drawnobet",
                         "teamtotals-team1", "teamtotals-team2", "toscore-team1", "toscore-team2"}
 
-# Ligas: si la lista está vacía se analizan todas las que tengan cuotas de Betano y Pinnacle.
-# Puedes limitarla con IDs de torneo de OddsPapi (ver data/tournaments.json).
-TOURNAMENT_WHITELIST: list[int] = []
-# Ligas preferidas, en orden ("País|Liga" exacto como lo nombra OddsPapi). Tienen prioridad al
-# elegir las ligas del día porque ahí la referencia de Pinnacle es más precisa.
-PRIORITY_LEAGUES = [
-    "England|Premier League", "Spain|LaLiga", "Italy|Serie A", "Germany|Bundesliga", "France|Ligue 1",
-    "International Clubs|UEFA Champions League", "International Clubs|UEFA Europa League",
-    "International Clubs|UEFA Conference League", "International Clubs|CONMEBOL Libertadores",
-    "International Clubs|CONMEBOL Sudamericana", "Chile|Primera Division", "Chile|Liga de Primera",
-    "Brazil|Brasileiro Serie A", "Argentina|Liga Profesional", "Netherlands|Eredivisie",
-    "Portugal|Liga Portugal", "England|Championship", "USA|MLS", "Mexico|Liga MX",
-]
+# Ligas que se analizan (ID de torneo de OddsPapi -> nombre). Solo primera división y torneos
+# internacionales importantes: nada de ascenso, amateur, juveniles, reservas ni femenino.
+# El orden es la prioridad cuando hay más ligas con partidos que grupos disponibles.
+TOURNAMENTS: dict[int, str] = {
+    # Selecciones
+    16: "Mundial", 24660: "Mundial", 20434: "Repechaje Mundial",
+    295: "Eliminatorias CONMEBOL", 11: "Eliminatorias UEFA",
+    133: "Copa América", 1: "Eurocopa", 27: "Clasificatorias Eurocopa",
+    23755: "UEFA Nations League", 36497: "Finalissima",
+    # Clubes internacionales
+    7: "Champions League", 384: "Copa Libertadores", 679: "Europa League",
+    480: "Copa Sudamericana", 34480: "Conference League", 490: "Recopa Sudamericana",
+    357: "Mundial de Clubes", 44289: "Copa Intercontinental FIFA", 465: "Supercopa de Europa",
+    # Ligas de primera división
+    27665: "Chile · Primera División", 244: "Chile · Primera División",
+    27518: "Chile · Primera División (Apertura)", 27520: "Chile · Primera División (Clausura)",
+    325: "Brasil · Serie A", 155: "Argentina · Liga Profesional", 28538: "Argentina · Copa de la Liga",
+    17: "Inglaterra · Premier League", 34: "Francia · Ligue 1",
+}
 MAX_TOURNAMENTS_PER_CALL = 5     # límite de OddsPapi
-ODDS_BATCHES = 1                 # grupos de 5 ligas por escaneo; cada grupo cuesta 2 consultas
-# Con el plan gratis: 1 consulta de partidos + 2 por grupo = 3 consultas/día (~90 al mes).
+ODDS_BATCHES = 3                 # máximo de grupos de 5 ligas por escaneo; cada grupo cuesta 2 consultas
+# Solo se consultan las ligas que tienen partidos en las próximas 30 h, así que la mayoría de los
+# días se usa 1 grupo (3 consultas) y los fines de semana 2 (5 consultas).
 
 # --- Horarios y zona -----------------------------------------------------
 TIMEZONE = "America/Santiago"

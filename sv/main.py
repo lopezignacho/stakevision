@@ -41,35 +41,18 @@ def scan() -> None:
     by_id = {f["fixtureId"]: f for f in fixtures}
     print(f"Partidos con cuotas de Betano en la ventana: {len(by_id)}")
 
-    import unicodedata
-
-    def _n(x: str) -> str:
-        return unicodedata.normalize("NFKD", x).encode("ascii", "ignore").decode().lower().strip()
-
     counts: dict[int, int] = {}
-    names: dict[int, str] = {}
-    keys: dict[int, str] = {}
     for f in fixtures:
         t = f["tournamentId"]
-        if config.TOURNAMENT_WHITELIST and t not in config.TOURNAMENT_WHITELIST:
-            continue
-        counts[t] = counts.get(t, 0) + 1
-        names[t] = f"{f.get('categoryName', '')} · {f.get('tournamentName', '')}"
-        keys[t] = _n(f"{f.get('categoryName', '')}|{f.get('tournamentName', '')}")
-
-    pri = {_n(k): i for i, k in enumerate(config.PRIORITY_LEAGUES)}
-
-    def priority(t):
-        hit = pri.get(keys[t])
-        if hit is not None:
-            return (0, hit)
-        minor = any(w in keys[t] for w in ("amateur", "u19", "u20", "u21", "u23", "reserve", "youth", "friendl"))
-        return (2 if minor else 1, -counts[t])
-
-    tournaments = sorted(counts, key=priority)[:config.MAX_TOURNAMENTS_PER_CALL * config.ODDS_BATCHES]
+        if t in config.TOURNAMENTS:
+            counts[t] = counts.get(t, 0) + 1
+    order = list(config.TOURNAMENTS)
+    tournaments = sorted(counts, key=order.index)[:config.MAX_TOURNAMENTS_PER_CALL * config.ODDS_BATCHES]
+    names = {t: config.TOURNAMENTS[t] for t in tournaments}
     print("Ligas analizadas hoy: " + "; ".join(f"{names[t]} ({counts[t]})" for t in tournaments))
     if not tournaments:
-        telegram.send(state["owner_chat"], "🔎 Escaneo de hoy: no hay partidos con cuotas en la ventana.")
+        telegram.send(state["owner_chat"], "🔎 Escaneo de hoy: ninguna de tus ligas tiene partidos en las "
+                      "próximas 30 horas. Hoy no hay picks.")
         return
 
     odds_rows = oddspapi.odds_by_tournaments(tournaments)

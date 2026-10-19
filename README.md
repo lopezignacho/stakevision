@@ -45,7 +45,7 @@ Nunca pegues estas claves en el código ni en un chat.
 - `/estado` al bot: candidatos pendientes, picks en juego, historial y consultas de OddsPapi usadas.
 
 ## Ajustes
-Todo en `sv/config.py`: rango de cuotas, valor mínimo, cantidad de candidatos, ligas, stake máximo.
+Todo en `sv/config.py`: rango de cuotas, valor mínimo, cantidad de candidatos, stake máximo y la lista `TOURNAMENTS` de ligas (IDs en `data/tournaments.json`).
 
 ## Límites del plan gratis
 - OddsPapi: cada escaneo usa 2 consultas; cada resultado, 1 por partido.
