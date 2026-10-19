@@ -42,7 +42,9 @@ Nunca pegues estas claves en el código ni en un chat.
 
 ## Uso diario
 - Revisa la cuota de cada candidato en tu app antes de aprobar.
+- `/buscar` al bot: analiza en ese momento y te manda el top 3 (`/buscar 40` mira 40 horas adelante). Máximo 4 al día.
 - `/estado` al bot: candidatos pendientes, picks en juego, historial y consultas de OddsPapi usadas.
+- `/ayuda`: lista de comandos.
 
 ## Ajustes
 Todo en `sv/config.py`: rango de cuotas, valor mínimo, cantidad de candidatos, stake máximo y la lista `TOURNAMENTS` de ligas (IDs en `data/tournaments.json`).

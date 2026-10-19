@@ -28,6 +28,7 @@ def fake_send(chat, text, buttons=None, reply_to=None):
 telegram.send = fake_send
 telegram.edit_buttons_off = lambda *a, **k: None
 telegram.answer = lambda *a, **k: None
+telegram._call = lambda *a, **k: True
 telegram.updates = lambda offset: [u for u in updates_q if u["update_id"] >= offset]
 
 fx = te.fixture("f1", "Colo-Colo", "U. de Chile", hours=5)
@@ -90,3 +91,24 @@ import json  # noqa: E402
 pub = json.load(open(config.PUBLIC_HISTORY))
 assert pub["summary"]["wins"] == 1 and pub["picks"][0]["result"] == "W"
 print("OK flujo completo:", len(sent), "mensajes simulados")
+
+# 5) /buscar: el dueño pide una búsqueda manual -> top 3 (aquí 1 partido disponible)
+fx2 = te.fixture("f2", "Cobreloa", "Everton", hours=6)
+oddspapi.upcoming_fixtures = lambda frm, to: [fx2]
+oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "f2", "bookmakerOdds": {
+    "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
+    "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}}]
+n_before = len(sent)
+updates_q.append({"update_id": 7, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/buscar 40"}})
+main.poll()
+texts = [t for _, t, *_ in sent[n_before:]]
+assert any("Buscando" in t for t in texts) and any("Búsqueda manual (40 h)" in t for t in texts), texts
+st = store.load()
+assert any(p["legs"][0]["fixture_id"] == "f2" and p["status"] == "candidate" for p in st["picks"].values())
+assert "scan_request" not in st and st["manual"]["n"] == 1
+# tope diario
+config.MANUAL_SEARCHES_PER_DAY = 1
+updates_q.append({"update_id": 8, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/buscar"}})
+main.poll()
+assert "Ya hiciste" in sent[-1][1]
+print("OK /buscar")

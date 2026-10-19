@@ -27,13 +27,15 @@ def _iso(dt) -> str:
 
 
 # ---------------------------------------------------------------- escaneo diario
-def scan() -> None:
+def scan(hours: int | None = None, top: int | None = None, manual: bool = False) -> None:
     state = store.load()
     if not state["owner_chat"]:
         print("Aún no está vinculado tu chat. Escribe al bot: /vincular <tu código>")
         return
     now = store.now_utc()
-    frm, to = now + timedelta(hours=config.WINDOW_START_H), now + timedelta(hours=min(config.WINDOW_END_H, 47))
+    hours = min(hours or config.WINDOW_END_H, 47)
+    title = f"🔎 Búsqueda manual ({hours} h)" if manual else "🔎 Escaneo de hoy"
+    frm, to = now + timedelta(hours=config.WINDOW_START_H), now + timedelta(hours=hours)
 
     markets = oddspapi.markets()
     fixtures = oddspapi.upcoming_fixtures(_iso(frm), _iso(to))
@@ -51,8 +53,8 @@ def scan() -> None:
     names = {t: config.TOURNAMENTS[t] for t in tournaments}
     print("Ligas analizadas hoy: " + "; ".join(f"{names[t]} ({counts[t]})" for t in tournaments))
     if not tournaments:
-        telegram.send(state["owner_chat"], "🔎 Escaneo de hoy: ninguna de tus ligas tiene partidos en las "
-                      "próximas 30 horas. Hoy no hay picks.")
+        telegram.send(state["owner_chat"], f"{title}: ninguna de tus ligas tiene partidos en las "
+                      f"próximas {hours} horas.")
         return
 
     odds_rows = oddspapi.odds_by_tournaments(tournaments)
@@ -67,7 +69,7 @@ def scan() -> None:
     busy = {l["fixture_id"] for p in state["picks"].values()
             if p["status"] in ("candidate", "published") for l in p["legs"]}
     selections = [x for x in selections if x.fixture_id not in busy]
-    picks = build_picks(selections)
+    picks = build_picks(selections, max_n=top, min_n=top)
 
     in_range = sorted((x for x in selections if config.ODDS_MIN <= x.price <= config.ODDS_MAX),
                       key=lambda x: x.edge, reverse=True)[:3]
@@ -77,17 +79,18 @@ def scan() -> None:
         if best:
             best = "\n\nLo más cercano dentro del rango (valor frente a la cuota justa):\n" + best
         telegram.send(state["owner_chat"],
-                      f"🔎 Escaneo de hoy: {len(tournaments)} ligas, {analyzed} partidos con cuotas de ambas casas, "
+                      f"{title}: {len(tournaments)} ligas, {analyzed} partidos con cuotas de ambas casas, "
                       f"{len(selections)} cuotas comparadas. "
                       f"Ninguna cumple valor ≥ {formatting.pct(config.MIN_EDGE)} dentro de "
-                      f"{config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f}. Hoy no hay picks." + best)
+                      f"{config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f}. No hay picks para proponer." + best)
         store.save(state)
         return
 
     n_val = sum(1 for p in picks if p.tier == "valor")
     telegram.send(state["owner_chat"],
-                  f"🔎 Escaneo listo: {len(tournaments)} ligas, {analyzed} partidos, {len(selections)} cuotas comparadas.\n"
-                  f"Te envío {len(picks)} candidatos: {n_val} 🟢 con valor y {len(picks) - n_val} ⚖️ de cuota justa.\n"
+                  f"{title}: {len(tournaments)} ligas, {analyzed} partidos, {len(selections)} cuotas comparadas.\n"
+                  f"{'Tu top ' + str(len(picks)) if manual else 'Te envío ' + str(len(picks)) + ' candidatos'}: "
+                  f"{n_val} 🟢 con valor y {len(picks) - n_val} ⚖️ de cuota justa.\n"
                   f"Sugerencia: 1 para el canal gratis (✅ VIP + Gratis) y hasta 3 para el VIP. "
                   f"Revisa cada cuota en tu app antes de aprobar.")
     for p in picks:
@@ -192,6 +195,10 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith("/buscar"):
+            _request_search(state, text)
+        elif chat == owner and text.lower().startswith(("/ayuda", "/start", "/help")):
+            telegram.send(chat, HELP_TEXT)
         return
 
     post = u.get("channel_post")
@@ -246,6 +253,42 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.answer(cb["id"], "Resultado guardado")
 
 
+HELP_TEXT = (
+    "👁 <b>Comandos de Stakevision</b>\n\n"
+    "/buscar · analiza ahora los partidos de las próximas 30 h y te manda el top 3\n"
+    "/buscar 40 · igual, pero mirando 40 horas hacia adelante (máximo 47)\n"
+    "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
+    "/ayuda · esta lista\n\n"
+    "El escaneo automático sigue saliendo todos los días a las 09:07."
+)
+
+
+def _request_search(state: dict, text: str) -> None:
+    from zoneinfo import ZoneInfo
+    owner = state["owner_chat"]
+    parts = text.split()
+    hours = config.WINDOW_END_H
+    if len(parts) > 1:
+        try:
+            hours = max(2, min(47, int(parts[1])))
+        except ValueError:
+            telegram.send(owner, "Usa /buscar o /buscar 40 (horas hacia adelante, máximo 47).")
+            return
+    today = store.now_utc().astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat()
+    m = state.get("manual") or {}
+    if m.get("date") != today:
+        m = {"date": today, "n": 0}
+    if m["n"] >= config.MANUAL_SEARCHES_PER_DAY:
+        telegram.send(owner, f"⚠️ Ya hiciste {m['n']} búsquedas hoy (máximo {config.MANUAL_SEARCHES_PER_DAY}, "
+                             f"para no agotar el plan gratis de OddsPapi). Mañana se reinicia.")
+        return
+    m["n"] += 1
+    state["manual"] = m
+    state["scan_request"] = hours
+    telegram.send(owner, f"🔎 Buscando los mejores picks de las próximas {hours} horas… "
+                         f"te llegan en un par de minutos. (Búsqueda {m['n']} de {config.MANUAL_SEARCHES_PER_DAY} hoy)")
+
+
 def _status_text(state: dict) -> str:
     ps = list(state["picks"].values())
     pend = sum(1 for p in ps if p["status"] == "candidate")
@@ -293,6 +336,15 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
+    if owner and state.get("cmds_v") != 1:
+        try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
+            telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
+                {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
+                {"command": "estado", "description": "Pendientes, picks en juego e historial"},
+                {"command": "ayuda", "description": "Lista de comandos"}])
+            state["cmds_v"] = 1
+        except Exception as e:
+            print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)
     for p in state["picks"].values():
         if p["status"] == "candidate" and store.parse_ts(p["kickoff"]) <= now:
@@ -305,7 +357,10 @@ def poll() -> None:
             sug = _suggest(p)
             telegram.send(owner, formatting.owner_result_request(p, sug), RESULT_BUTTONS(p["id"]))
             p["result_asked"] = True
+    request = state.pop("scan_request", None)
     store.save(state)
+    if request:
+        scan(hours=request, top=config.MANUAL_TOP, manual=True)
 
 
 def setup() -> None:

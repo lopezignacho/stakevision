@@ -167,8 +167,10 @@ def selections_for_fixture(fx: dict, odds: dict, markets: dict) -> list[Selectio
     return out
 
 
-def build_picks(selections: list[Selection]) -> list[Pick]:
+def build_picks(selections: list[Selection], max_n: int | None = None, min_n: int | None = None) -> list[Pick]:
     """Simples con valor en 1.65-2.00 primero; dobles solo si cada selección tiene valor."""
+    max_n = max_n or config.MAX_CANDIDATES
+    min_n = min(min_n or config.MIN_DAILY_CANDIDATES, max_n)
     good = [s for s in selections if config.MIN_EDGE <= s.edge <= config.MAX_EDGE]
     singles = [Pick("simple", [s]) for s in good if config.ODDS_MIN <= s.price <= config.ODDS_MAX]
 
@@ -194,11 +196,11 @@ def build_picks(selections: list[Selection]) -> list[Pick]:
             continue
         chosen.append(p)
         used |= fids
-        if len(chosen) >= config.MAX_CANDIDATES:
+        if len(chosen) >= max_n:
             break
 
     # Si no alcanza el mínimo diario, completar con simples en rango cercanas a la cuota justa.
-    if len(chosen) < config.MIN_DAILY_CANDIDATES:
+    if len(chosen) < min_n:
         near = [s for s in selections
                 if config.ODDS_MIN <= s.price <= config.ODDS_MAX
                 and config.FALLBACK_MIN_EDGE <= s.edge < config.MIN_EDGE]
@@ -207,7 +209,7 @@ def build_picks(selections: list[Selection]) -> list[Pick]:
         types_used = {l.mtype for p in chosen for l in p.legs}
         for allow_repeat in (False, True):
             for s in near:
-                if len(chosen) >= config.MIN_DAILY_CANDIDATES:
+                if len(chosen) >= min_n:
                     break
                 if s.fixture_id in used or (not allow_repeat and s.mtype in types_used):
                     continue
