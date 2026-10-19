@@ -4,7 +4,12 @@ on:
   schedule:
     # 12:07 UTC = 09:07 en Chile (horario de verano, UTC-3)
     - cron: "7 12 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      horas:
+        description: "Horas hacia adelante a analizar (30 normal, máx. 47)"
+        required: false
+        default: "30"
 
 permissions:
   contents: write
@@ -31,6 +36,7 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           STATE_KEY: ${{ secrets.STATE_KEY }}
           LINK_CODE: ${{ secrets.LINK_CODE }}
+          SCAN_HOURS: ${{ github.event.inputs.horas }}
         run: python -m sv.main scan
       - name: Guardar estado
         run: |

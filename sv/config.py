@@ -16,7 +16,7 @@ MAX_STAKE = 5              # stake máximo (escala /10, ~% del bankroll)
 
 # Ventana de partidos a analizar (horas desde ahora)
 WINDOW_START_H = 1
-WINDOW_END_H = 30
+WINDOW_END_H = int(os.environ.get("SCAN_HOURS") or 30)  # se puede ampliar al lanzar a mano (máx. 47)
 
 # --- Casas ---------------------------------------------------------------
 BOOK = "betano"            # donde se apuesta

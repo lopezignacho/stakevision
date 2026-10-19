@@ -33,7 +33,7 @@ def scan() -> None:
         print("Aún no está vinculado tu chat. Escribe al bot: /vincular <tu código>")
         return
     now = store.now_utc()
-    frm, to = now + timedelta(hours=config.WINDOW_START_H), now + timedelta(hours=config.WINDOW_END_H)
+    frm, to = now + timedelta(hours=config.WINDOW_START_H), now + timedelta(hours=min(config.WINDOW_END_H, 47))
 
     markets = oddspapi.markets()
     fixtures = oddspapi.upcoming_fixtures(_iso(frm), _iso(to))
@@ -63,10 +63,11 @@ def scan() -> None:
             analyzed += 1
             selections += selections_for_fixture(fx, row, markets)
 
-    already = {(l["fixture_id"], l["market_id"], l["outcome_id"])
-               for p in state["picks"].values() for l in p["legs"]}
-    picks = [p for p in build_picks(selections)
-             if not any((l.fixture_id, l.market_id, l.outcome_id) in already for l in p.legs)]
+    # No repetir partidos que ya tienen un candidato pendiente o un pick publicado.
+    busy = {l["fixture_id"] for p in state["picks"].values()
+            if p["status"] in ("candidate", "published") for l in p["legs"]}
+    selections = [x for x in selections if x.fixture_id not in busy]
+    picks = build_picks(selections)
 
     in_range = sorted((x for x in selections if config.ODDS_MIN <= x.price <= config.ODDS_MAX),
                       key=lambda x: x.edge, reverse=True)[:3]
