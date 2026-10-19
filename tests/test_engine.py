@@ -144,6 +144,25 @@ def test_messages_render():
     assert L({"outcome": "1", "mtype": "spreads", "handicap": -1.0, "home": "A", "away": "B"}) == "A -1 (hándicap asiático; si empata en la línea, se devuelve)"
 
 
+
+
+def test_grade_leg():
+    from sv.main import grade_leg as g
+    leg = lambda t, o, h=None: {"mtype": t, "outcome": o, "handicap": h}  # noqa: E731
+    assert g(leg("totals", "Más", 2.0), 2, 1) == "W"
+    assert g(leg("totals", "Más", 2.0), 1, 1) == "V"
+    assert g(leg("totals", "Más", 2.0), 1, 0) == "L"
+    assert g(leg("totals", "Menos", 2.5), 1, 1) == "W"
+    assert g(leg("1x2", "X"), 1, 1) == "W" and g(leg("1x2", "1"), 0, 1) == "L"
+    assert g(leg("bothteamsscore", "Sí"), 1, 1) == "W" and g(leg("bothteamsscore", "No"), 1, 1) == "L"
+    assert g(leg("drawnobet", "2"), 2, 2) == "V" and g(leg("drawnobet", "2"), 0, 1) == "W"
+    assert g(leg("spreads", "1", -1.0), 2, 1) == "V" and g(leg("spreads", "1", -1.0), 3, 1) == "W"
+    assert g(leg("spreads", "2", -0.5), 1, 1) == "W" and g(leg("spreads", "2", -1.5), 3, 1) == "L"
+    assert g(leg("teamtotals-team2", "Más", 0.5), 3, 1) == "W"
+    assert g(leg("toscore-team1", "No"), 0, 2) == "W"
+    assert g(leg("corners", "Más", 9.5), 1, 1) is None
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

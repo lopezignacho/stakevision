@@ -81,16 +81,59 @@ for l in p["legs"]:
 store.save(st)
 main.poll()
 req = sent[-1]
-assert "Resultado del pick" in req[1] and "VERDE" in req[1]   # 2-1: ambos marcan -> verde
-updates_q.append({"update_id": 6, "callback_query": {"id": "z", "data": f"W:{pid}",
-                                                     "message": {"chat": {"id": OWNER}, "message_id": 9}}})
-main.poll()
+# 2-1: ambos marcan -> el bot lo califica solo como verde y lo publica
+assert "Resultado automático" in req[1] and "VERDE" in req[1] and "2-1" in req[1], req[1]
 st = store.load()
-assert st["picks"][pid]["result"] == "W"
+assert st["picks"][pid]["result"] == "W" and st["picks"][pid]["auto_result"]
+assert set(st["picks"][pid]["result_msgs"]) == {"vip", "free"}
 import json  # noqa: E402
 pub = json.load(open(config.PUBLIC_HISTORY))
 assert pub["summary"]["wins"] == 1 and pub["picks"][0]["result"] == "W"
+
+# 4b) el dueño corrige: Corregir -> Roja
+edited = []
+telegram.edit_text = lambda chat, mid, text: edited.append((chat, mid, text))
+updates_q += [
+    {"update_id": 6, "callback_query": {"id": "z", "data": f"c:{pid}",
+                                        "message": {"chat": {"id": OWNER}, "message_id": 9}}},
+    {"update_id": 61, "callback_query": {"id": "z2", "data": f"L:{pid}",
+                                         "message": {"chat": {"id": OWNER}, "message_id": 9}}},
+]
+main.poll()
+st = store.load()
+assert st["picks"][pid]["result"] == "L" and len(edited) == 2 and "corregido" in edited[0][2]
+pub = json.load(open(config.PUBLIC_HISTORY))
+assert pub["summary"]["losses"] == 1 and pub["summary"]["wins"] == 0
 print("OK flujo completo:", len(sent), "mensajes simulados")
+
+# 4c) marcador aún no disponible -> reintenta más tarde, sin preguntar
+fx3 = te.fixture("f3", "Palestino", "Huachipato", hours=5)
+oddspapi.upcoming_fixtures = lambda frm, to: [fx3]
+oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "f3", "bookmakerOdds": {
+    "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
+    "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}}]
+main.scan()
+st = store.load()
+pid3 = next(p["id"] for p in st["picks"].values() if p["legs"][0]["fixture_id"] == "f3")
+updates_q.append({"update_id": 62, "callback_query": {"id": "q", "data": f"a:{pid3}",
+                                                      "message": {"chat": {"id": OWNER}, "message_id": 20}}})
+main.poll()
+st = store.load()
+p3 = st["picks"][pid3]
+p3["kickoff"] = (datetime.now(timezone.utc) - timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+p3["legs"][0]["kickoff"] = p3["kickoff"]
+store.save(st)
+apifootball.final_score = lambda *a: None
+n = len(sent)
+main.poll()
+st = store.load()
+assert st["picks"][pid3]["status"] == "published" and st["picks"][pid3].get("next_check") and len(sent) == n
+apifootball.final_score = lambda *a: (0, 0)   # 0-0: "Ambos marcan: Sí" pierde
+st["picks"][pid3]["next_check"] = None
+store.save(st)
+main.poll()
+assert store.load()["picks"][pid3]["result"] == "L" and "ROJA" in sent[-1][1]
+print("OK resultado automático")
 
 # 5) /buscar: el dueño pide una búsqueda manual -> top 3 (aquí 1 partido disponible)
 fx2 = te.fixture("f2", "Cobreloa", "Everton", hours=6)
@@ -99,7 +142,7 @@ oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "f2", "bookmakerOdds":
     "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
     "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}}]
 n_before = len(sent)
-updates_q.append({"update_id": 7, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/buscar 40"}})
+updates_q.append({"update_id": 70, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/buscar 40"}})
 main.poll()
 texts = [t for _, t, *_ in sent[n_before:]]
 assert any("Buscando" in t for t in texts) and any("Búsqueda manual (40 h)" in t for t in texts), texts
@@ -108,7 +151,7 @@ assert any(p["legs"][0]["fixture_id"] == "f2" and p["status"] == "candidate" for
 assert "scan_request" not in st and st["manual"]["n"] == 1
 # tope diario
 config.MANUAL_SEARCHES_PER_DAY = 1
-updates_q.append({"update_id": 8, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/buscar"}})
+updates_q.append({"update_id": 80, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/buscar"}})
 main.poll()
 assert "Ya hiciste" in sent[-1][1]
 print("OK /buscar")

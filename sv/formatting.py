@@ -129,7 +129,28 @@ def result_post(pick: dict) -> str:
     return f"{RESULT_LABEL[pick['result']]}\n{escape(names)} @ {odds(pick['price'])}"
 
 
-def owner_result_request(pick: dict, suggestion: str | None) -> str:
+def _scores_block(pick: dict, scores: list) -> str:
+    rows = []
+    for l, sc in zip(pick["legs"], scores):
+        if sc:
+            rows.append(f"⚽ {escape(l['home'])} <b>{sc[0]}-{sc[1]}</b> {escape(l['away'])}")
+    return "\n".join(rows)
+
+
+def owner_result_request(pick: dict, suggestion: str | None, scores: list | None = None) -> str:
+    sc = _scores_block(pick, scores or [])
+    sc = f"\n\nMarcador final (90'):\n{sc}" if sc else "\n\nNo encontré el marcador final."
     sug = f"\nSugerencia según el marcador: <b>{RESULT_LABEL[suggestion]}</b>" if suggestion else ""
-    return (f"🏁 <b>Resultado del pick #{pick['id']}</b>\n\n{_legs_block(pick)}{sug}\n\n"
+    return (f"🏁 <b>Resultado del pick #{pick['id']}</b>\n\n{_legs_block(pick)}{sc}{sug}\n\n"
             f"Confirma el resultado:")
+
+
+def owner_auto_result(pick: dict, scores: list) -> str:
+    return (f"🤖 <b>Resultado automático · pick #{pick['id']}</b>\n\n{_legs_block(pick)}\n\n"
+            f"Marcador final (90'):\n{_scores_block(pick, scores)}\n\n"
+            f"Resultado: <b>{RESULT_LABEL[pick['result']]}</b>\n"
+            f"Ya quedó publicado en los canales y en la web. Si algo no cuadra, toca Corregir.")
+
+
+def result_correction(pick: dict) -> str:
+    return result_post(pick) + "\n<i>(resultado corregido)</i>"

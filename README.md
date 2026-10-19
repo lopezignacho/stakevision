@@ -6,7 +6,7 @@ Sistema automático de pronósticos de fútbol:
 2. Se queda con picks de **valor ≥ 3%** y **cuota final entre 1.65 y 2.00**: simples primero; dobles solo si cada selección tiene valor por sí sola.
 3. Te los manda por privado en Telegram con botones: **✅ Solo VIP**, **✅ VIP + Gratis** o **❌ Descartar**.
 4. Lo aprobado se publica solo en los canales (revisión cada 5 minutos, todo el día).
-5. Después del partido te pide el resultado (con una sugerencia según el marcador) y lo publica como respuesta al pick.
+5. Unas 2 h 15 min después del inicio, busca el marcador final (90') y **califica solo** el pick: ✅ verde, ❌ roja o ↩️ nula (devuelta). Lo publica como respuesta al pick y te avisa con un botón **✏️ Corregir** por si algo no cuadra. Si el marcador aún no está, reintenta cada 20 min; si a las 6 h no aparece, o el mercado no se puede leer, te pregunta a ti.
 6. La web (`docs/`) muestra el historial y las cifras, calculadas automáticamente. Los picks VIP aparecen en la web recién cuando su partido empieza.
 
 Todo corre gratis en GitHub Actions + GitHub Pages. El estado privado se guarda **cifrado** en `data/state.enc`.

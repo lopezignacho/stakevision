@@ -42,6 +42,15 @@ def edit_buttons_off(chat_id, message_id: int, note: str) -> None:
         pass
 
 
+def set_buttons(chat_id, message_id: int, buttons: list[list[tuple[str, str]]]) -> None:
+    try:
+        _call("editMessageReplyMarkup", chat_id=chat_id, message_id=message_id,
+              reply_markup={"inline_keyboard": [
+                  [{"text": t, "callback_data": d} for t, d in row] for row in buttons]})
+    except TelegramError:
+        pass
+
+
 def answer(callback_id: str, text: str = "") -> None:
     try:
         _call("answerCallbackQuery", callback_query_id=callback_id, text=text)

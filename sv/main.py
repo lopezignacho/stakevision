@@ -109,43 +109,56 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False)
 
 
 # ---------------------------------------------------------------- resultados
-def _suggest(pick: dict) -> str | None:
-    """Sugiere verde/roja con el marcador de 90' de API-Football (no gasta OddsPapi).
-    Solo para mercados que sabemos leer. Siempre lo confirmas tú."""
-    results = []
+def grade_leg(l: dict, h: int, a: int) -> str | None:
+    """Compara la apuesta con el marcador de 90': 'W' verde, 'L' roja, 'V' nula, None si no sé leerla."""
+    t, o, line = l.get("mtype", ""), str(l.get("outcome", "")).strip().lower(), l.get("handicap")
+    if t == "1x2":
+        won = {"1": h > a, "x": h == a, "2": h < a}.get(o)
+    elif t == "bothteamsscore":
+        won = (h > 0 and a > 0) == o.startswith(("s", "y"))
+    elif t in ("totals", "teamtotals-team1", "teamtotals-team2") and line is not None:
+        goals = h + a if t == "totals" else (h if t.endswith("1") else a)
+        diff = goals - float(line)
+        if diff == 0:
+            return "V"
+        won = diff > 0 if o.startswith(("más", "mas", "over")) else diff < 0
+    elif t in ("toscore-team1", "toscore-team2"):
+        goals = h if t.endswith("1") else a
+        won = (goals > 0) == o.startswith(("s", "y"))
+    elif t == "drawnobet" and o in ("1", "2"):
+        if h == a:
+            return "V"
+        won = (h > a) if o == "1" else (a > h)
+    elif t == "spreads" and line is not None and o in ("1", "2"):
+        # la línea viene expresada para el local; las de cuarto (x.25/x.75) no se usan
+        diff = (h - a + float(line)) if o == "1" else (a - h - float(line))
+        if diff == 0:
+            return "V"
+        won = diff > 0
+    else:
+        won = None
+    if won is None:
+        return None
+    return "W" if won else "L"
+
+
+def _grade(pick: dict) -> tuple[str | None, list, bool]:
+    """Busca el marcador final de cada partido y califica el pick.
+    Devuelve (resultado, marcadores, todos_terminados). Una doble es roja si falla
+    una selección; nula si ambas se devuelven; verde en otro caso."""
+    scores, results = [], []
     for l in pick["legs"]:
         sc = apifootball.final_score(l["home"], l["away"], l["kickoff"])
-        if not sc:
-            return None
-        h, a = sc
-        t, o, line = l.get("mtype", ""), str(l.get("outcome", "")).lower(), l.get("handicap")
-        won = None
-        if t == "1x2":
-            won = {"1": h > a, "x": h == a, "2": h < a}.get(o)
-        elif t == "bothteamsscore":
-            won = (h > 0 and a > 0) == o.startswith("s")
-        elif t in ("totals", "teamtotals-team1", "teamtotals-team2") and line is not None:
-            goals = h + a if t == "totals" else (h if t.endswith("1") else a)
-            if goals == float(line):
-                results.append("V")
-                continue
-            won = goals > float(line) if o.startswith("m\u00e1s") or o.startswith("mas") else goals < float(line)
-        elif t in ("toscore-team1", "toscore-team2"):
-            goals = h if t.endswith("1") else a
-            won = (goals > 0) == o.startswith("s")
-        elif t == "drawnobet":
-            if h == a:
-                results.append("V")
-                continue
-            won = (h > a) if o == "1" else (a > h)
-        if won is None:
-            return None
-        results.append("W" if won else "L")
+        scores.append(sc)
+        results.append(grade_leg(l, *sc) if sc else None)
+    finished = all(scores)
+    if not finished or None in results:
+        return None, scores, finished
     if "L" in results:
-        return "L"
+        return "L", scores, True
     if all(r == "V" for r in results):
-        return "V"
-    return "W"
+        return "V", scores, True
+    return "W", scores, True
 
 
 def _publish(state: dict, p: dict, free: bool) -> None:
@@ -162,12 +175,46 @@ def _publish(state: dict, p: dict, free: bool) -> None:
 def _settle(state: dict, p: dict, result: str) -> None:
     p.update(result=result, status="settled", settled_at=_iso(store.now_utc()))
     text = formatting.result_post(p)
+    p["result_msgs"] = {}
     for where, mid in (p.get("channel_msgs") or {}).items():
         chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
         try:
-            telegram.send(chat, text, reply_to=mid)
+            p["result_msgs"][where] = telegram.send(chat, text, reply_to=mid)["message_id"]
         except telegram.TelegramError as e:
             print(f"No se pudo publicar resultado en {where}: {e}")
+
+
+def _auto_result(state: dict, p: dict, owner, now, last_kick) -> None:
+    """Califica solo el pick con el marcador final y lo publica. Si el marcador aún no
+    está, reintenta cada RESULT_RETRY_MIN; si no se puede leer, te lo pregunta."""
+    try:
+        res, scores, finished = _grade(p)
+    except Exception:
+        traceback.print_exc()
+        res, scores, finished = None, [], False
+    if res:
+        _settle(state, p, res)
+        p["auto_result"] = True
+        telegram.send(owner, formatting.owner_auto_result(p, scores), [[("✏️ Corregir", f"c:{p['id']}")]])
+        return
+    gave_up = now >= last_kick + timedelta(minutes=config.RESULT_GIVE_UP_MIN)
+    if finished or gave_up:  # terminó pero el mercado no se sabe leer, o nunca apareció el marcador
+        telegram.send(owner, formatting.owner_result_request(p, None, scores), RESULT_BUTTONS(p["id"]))
+        p["result_asked"] = True
+    else:
+        p["next_check"] = _iso(now + timedelta(minutes=config.RESULT_RETRY_MIN))
+
+
+def _correct(state: dict, p: dict, result: str) -> None:
+    """Cambia el resultado de un pick ya cerrado y corrige el mensaje en los canales."""
+    p.update(result=result, corrected_at=_iso(store.now_utc()))
+    text = formatting.result_correction(p)
+    for where, mid in (p.get("result_msgs") or {}).items():
+        chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
+        try:
+            telegram.edit_text(chat, mid, text)
+        except telegram.TelegramError as e:
+            print(f"No se pudo corregir el resultado en {where}: {e}")
 
 
 # ---------------------------------------------------------------- botones y mensajes
@@ -244,13 +291,29 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.edit_buttons_off(owner, cb["message"]["message_id"], note)
         telegram.answer(cb["id"], "Publicado")
 
-    elif action in ("W", "L", "V"):
-        if p["status"] != "published":
-            telegram.answer(cb["id"], "Ya estaba cerrado")
+    elif action == "c":  # corregir un resultado automático: mostrar las 3 opciones
+        if p["status"] != "settled":
+            telegram.answer(cb["id"])
             return
-        _settle(state, p, action)
-        telegram.edit_buttons_off(owner, cb["message"]["message_id"], formatting.RESULT_LABEL[action])
-        telegram.answer(cb["id"], "Resultado guardado")
+        telegram.set_buttons(owner, cb["message"]["message_id"], RESULT_BUTTONS(pid))
+        telegram.answer(cb["id"], "Elige el resultado correcto")
+
+    elif action in ("W", "L", "V"):
+        mid = cb["message"]["message_id"]
+        if p["status"] == "published":
+            _settle(state, p, action)
+            telegram.edit_buttons_off(owner, mid, formatting.RESULT_LABEL[action])
+            telegram.answer(cb["id"], "Resultado guardado")
+        elif p["status"] == "settled":
+            if p.get("result") != action:
+                _correct(state, p, action)
+                telegram.answer(cb["id"], "Resultado corregido")
+            else:
+                telegram.answer(cb["id"], "Sin cambios")
+            telegram.set_buttons(owner, mid, [[(formatting.RESULT_LABEL[action], "noop")],
+                                              [("✏️ Corregir", f"c:{pid}")]])
+        else:
+            telegram.answer(cb["id"], "Ya estaba cerrado")
 
 
 HELP_TEXT = (
@@ -353,10 +416,9 @@ def poll() -> None:
                 telegram.edit_buttons_off(owner, p["owner_msg"], "⌛ Sin aprobar a tiempo")
         last_kick = max(store.parse_ts(l["kickoff"]) for l in p["legs"])
         if (p["status"] == "published" and not p.get("result_asked") and owner
-                and now >= last_kick + timedelta(minutes=config.RESULT_CHECK_AFTER_MIN)):
-            sug = _suggest(p)
-            telegram.send(owner, formatting.owner_result_request(p, sug), RESULT_BUTTONS(p["id"]))
-            p["result_asked"] = True
+                and now >= last_kick + timedelta(minutes=config.RESULT_CHECK_AFTER_MIN)
+                and not (p.get("next_check") and now < store.parse_ts(p["next_check"]))):
+            _auto_result(state, p, owner, now, last_kick)
     request = state.pop("scan_request", None)
     store.save(state)
     if request:
