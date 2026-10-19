@@ -39,6 +39,7 @@ def scan() -> None:
     fixtures = oddspapi.upcoming_fixtures(_iso(frm), _iso(to))
     fixtures = [f for f in fixtures if frm <= store.parse_ts(f["startTime"]) <= to]
     by_id = {f["fixtureId"]: f for f in fixtures}
+    print(f"Partidos con cuotas de Betano en la ventana: {len(by_id)}")
 
     counts: dict[int, int] = {}
     for f in fixtures:

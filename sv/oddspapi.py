@@ -76,12 +76,27 @@ def upcoming_fixtures(frm: str, to: str) -> list[dict]:
 
 
 def odds_by_tournaments(tournament_ids: list[int]) -> list[dict]:
-    """Cuotas de Betano y Pinnacle para varios torneos en UNA consulta."""
+    """Cuotas de Betano y Pinnacle para varios torneos: una consulta por casa (2 en total),
+    combinadas por partido en el mismo formato de /odds (bookmakerOdds por casa)."""
     ids = ",".join(str(t) for t in tournament_ids)
-    time.sleep(2.1)  # cooldown del endpoint de partidos
-    data = _get("/odds-by-tournaments", tournamentIds=ids,
-                bookmakers=f"{config.BOOK},{config.REFERENCE}")
-    return data if isinstance(data, list) else data.get("data", [])
+    merged: dict[str, dict] = {}
+    for slug in (config.BOOK, config.REFERENCE):
+        time.sleep(2.1)  # cooldown entre llamadas
+        data = _get("/odds-by-tournaments", tournamentIds=ids, bookmaker=slug)
+        rows = data if isinstance(data, list) else data.get("data", [])
+        for row in rows:
+            fid = row.get("fixtureId")
+            if not fid:
+                continue
+            target = merged.setdefault(fid, {"fixtureId": fid, "bookmakerOdds": {}})
+            books = row.get("bookmakerOdds") or {}
+            if slug in books:
+                target["bookmakerOdds"][slug] = books[slug]
+            elif books:  # por si la respuesta no viene indexada por casa
+                target["bookmakerOdds"][slug] = next(iter(books.values()))
+    print(f"Cuotas recibidas: {len(merged)} partidos "
+          f"({sum(1 for r in merged.values() if len(r['bookmakerOdds']) == 2)} con ambas casas)")
+    return list(merged.values())
 
 
 def scores(fixture_id: str) -> dict:
