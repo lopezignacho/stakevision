@@ -152,6 +152,15 @@ def _settle(state: dict, p: dict, result: str) -> None:
 
 
 # ---------------------------------------------------------------- botones y mensajes
+def _norm_code(x: str) -> str:
+    return x.strip().strip("<>\"'`").strip().lower()
+
+
+def _code_ok(text: str) -> bool:
+    parts = text.split(maxsplit=1)
+    return bool(config.LINK_CODE) and len(parts) == 2 and _norm_code(parts[1]) == _norm_code(config.LINK_CODE)
+
+
 def _handle_update(state: dict, u: dict) -> None:
     owner = state.get("owner_chat")
 
@@ -159,9 +168,12 @@ def _handle_update(state: dict, u: dict) -> None:
     if msg and msg.get("chat", {}).get("type") == "private":
         text = (msg.get("text") or "").strip()
         chat = msg["chat"]["id"]
-        if text.startswith("/vincular") and config.LINK_CODE and text.split()[-1] == config.LINK_CODE:
-            state["owner_chat"] = chat
-            telegram.send(chat, "🔗 Listo, este chat quedó vinculado como dueño de Stakevision.")
+        if text.lower().startswith("/vincular") and not text.lower().startswith("/vincular_vip"):
+            if _code_ok(text):
+                state["owner_chat"] = chat
+                telegram.send(chat, "🔗 Listo, este chat quedó vinculado como dueño de Stakevision.")
+            else:
+                telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
         return
@@ -169,7 +181,7 @@ def _handle_update(state: dict, u: dict) -> None:
     post = u.get("channel_post")
     if post:
         text = (post.get("text") or "").strip()
-        if text.startswith("/vincular_vip") and config.LINK_CODE and text.split()[-1] == config.LINK_CODE:
+        if text.lower().startswith("/vincular_vip") and _code_ok(text):
             state["vip_chat"] = post["chat"]["id"]
             if owner:
                 telegram.send(owner, "🔗 Canal VIP vinculado. Ya puedes borrar el mensaje /vincular_vip del canal.")
@@ -237,6 +249,10 @@ def _status_text(state: dict) -> str:
 def poll() -> None:
     state = store.load()
     ups = telegram.updates(state["tg_offset"])
+    kinds = [k for u in ups for k in ("message", "channel_post", "callback_query") if k in u]
+    print(f"Actualizaciones recibidas: {len(ups)} ({', '.join(sorted(set(kinds))) or 'ninguna'}); "
+          f"dueño vinculado: {'sí' if state.get('owner_chat') else 'no'}; "
+          f"VIP vinculado: {'sí' if state.get('vip_chat') else 'no'}")
     for u in ups:
         state["tg_offset"] = u["update_id"] + 1
         try:
