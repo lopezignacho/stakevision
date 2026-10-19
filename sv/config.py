@@ -82,6 +82,7 @@ RESULT_GIVE_UP_MIN = 360       # 6 h después del inicio sin marcador: te lo pre
 
 # --- Canales -------------------------------------------------------------
 FREE_CHANNEL = "@stakevision"  # canal público
+PUBLIC_SITE = "https://lopezignacho.github.io/stakevision"  # web pública (GitHub Pages)
 
 # --- Secretos (vienen de GitHub Secrets; nunca escribirlos aquí) -------------
 ODDSPAPI_KEY = os.environ.get("ODDSPAPI_KEY", "")
@@ -89,6 +90,7 @@ APIFOOTBALL_KEY = os.environ.get("APIFOOTBALL_KEY", "")
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 STATE_KEY = os.environ.get("STATE_KEY", "")
 LINK_CODE = os.environ.get("LINK_CODE", "")
+INSTAGRAM_TOKEN = os.environ.get("INSTAGRAM_TOKEN", "")
 
 # --- Rutas ---------------------------------------------------------------
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

@@ -185,3 +185,27 @@ updates_q.append({"update_id": 80, "message": {"chat": {"id": OWNER, "type": "pr
 main.poll()
 assert "Ya hiciste" in sent[-1][1]
 print("OK /buscar")
+
+# 6) Instagram conectado: vista previa con botón -> se publica cuando la imagen ya está en la web
+from sv import instagram  # noqa: E402
+config.INSTAGRAM_TOKEN = "token-de-prueba"
+config.ROOT = tmp
+posted = []
+instagram.image_live = lambda pid: True
+instagram.publish = lambda state, pid, caption: posted.append((pid, caption)) or "https://instagram.com/p/x"
+instagram.refresh_token = lambda state: None
+st = store.load()
+pw = next(p for p in st["picks"].values() if p["legs"][0]["fixture_id"] == "f3")
+pw.update(status="published", result=None, ig_kit_sent=False)
+store.save(st)
+main._settle(st, pw, "W")
+store.save(st)
+btn = sent[-1]
+assert btn[2] and btn[2][0][0][1] == f"ig:{pw['id']}", btn
+assert os.path.exists(os.path.join(tmp, "docs", "ig", f"pick-{pw['id']}.jpg"))
+updates_q.append({"update_id": 90, "callback_query": {"id": "i", "data": f"ig:{pw['id']}",
+                                                      "message": {"chat": {"id": OWNER}, "message_id": 50}}})
+main.poll()
+assert posted and posted[0][0] == pw["id"] and "#Stakevision" in posted[0][1]
+assert store.load()["picks"][pw["id"]]["ig_status"] == "posted" and "Publicado en Instagram" in sent[-1][1]
+print("OK Instagram")

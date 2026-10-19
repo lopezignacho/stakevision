@@ -264,21 +264,58 @@ def _streak(state: dict, p: dict) -> int:
 
 
 def _instagram_kit(state: dict, p: dict) -> None:
-    """Pick verde: te manda por privado la imagen de celebración y el texto para Instagram."""
+    """Pick verde: imagen de celebración + texto para Instagram.
+    Con Instagram conectado, te llega la vista previa con un botón para publicar;
+    sin conexión, te llega el material para subirlo a mano."""
     owner = state.get("owner_chat")
     if not owner or p.get("ig_kit_sent") or p.get("result") != "W":
         return
     p["ig_kit_sent"] = True
     try:
-        from . import postimage
+        from . import instagram, postimage
         streak = _streak(state, p)
         image = postimage.render_win(p, streak)
-        telegram.send_photo(owner, image, caption=(
-            f"📸 <b>Para Instagram</b> · pick #{p['id']} ✅\n"
-            "Guarda la imagen y copia el texto de abajo (tócalo para copiarlo)."))
-        telegram.send(owner, f"<pre>{formatting.escape(formatting.instagram_caption(p, streak))}</pre>")
+        caption = formatting.instagram_caption(p, streak)
+        p["ig_caption"] = caption
+        p["ig_kit_mode"] = "api" if instagram.enabled(state) else "manual"
+        if instagram.enabled(state):
+            instagram.save_image(p["id"], image)   # la web la sirve para que Instagram la descargue
+            telegram.send_photo(owner, image, caption=(
+                f"📸 <b>Celebración para Instagram</b> · pick #{p['id']} ✅\n"
+                "Este es el texto que se publicará (abajo). ¿Lo subo a Instagram?"))
+            telegram.send(owner, f"<pre>{formatting.escape(caption)}</pre>",
+                          [[("📸 Publicar en Instagram", f"ig:{p['id']}"), ("No publicar", f"ign:{p['id']}")]])
+        else:
+            telegram.send_photo(owner, image, caption=(
+                f"📸 <b>Para Instagram</b> · pick #{p['id']} ✅\n"
+                "Guarda la imagen y copia el texto de abajo (tócalo para copiarlo)."))
+            telegram.send(owner, f"<pre>{formatting.escape(caption)}</pre>")
     except Exception:
         traceback.print_exc()
+
+
+def _instagram_queue(state: dict, now) -> None:
+    """Publica en Instagram los verdes que aprobaste, cuando la imagen ya está en la web."""
+    from . import instagram
+    owner = state.get("owner_chat")
+    for p in state["picks"].values():
+        if p.get("ig_status") != "queued":
+            continue
+        if not instagram.image_live(p["id"]):
+            continue   # la web aún no la publica; se reintenta en la próxima revisión
+        try:
+            link = instagram.publish(state, p["id"], p.get("ig_caption") or "")
+            p["ig_status"] = "posted"
+            if owner:
+                telegram.send(owner, f"✅ Publicado en Instagram (pick #{p['id']})" + (f"\n{link}" if link else ""))
+        except instagram.InstagramError as e:
+            p["ig_tries"] = p.get("ig_tries", 0) + 1
+            print(f"Instagram falló (pick {p['id']}): {e}")
+            if p["ig_tries"] >= 3:
+                p["ig_status"] = "failed"
+                if owner:
+                    telegram.send(owner, f"⚠️ No pude publicar en Instagram el pick #{p['id']}: "
+                                         f"{formatting.escape(str(e))}\nPuedes subirlo a mano con la imagen que te mandé.")
 
 
 def _correct(state: dict, p: dict, result: str) -> None:
@@ -367,6 +404,19 @@ def _handle_update(state: dict, u: dict) -> None:
         note = "✅ Publicado en VIP + Gratis" if action == "f" else "✅ Publicado en VIP"
         telegram.edit_buttons_off(owner, cb["message"]["message_id"], note)
         telegram.answer(cb["id"], "Publicado")
+
+    elif action in ("ig", "ign"):  # publicar (o no) la celebración en Instagram
+        if p.get("ig_status") in ("queued", "posted"):
+            telegram.answer(cb["id"], "Ya estaba en proceso")
+            return
+        if action == "ign":
+            p["ig_status"] = "skipped"
+            telegram.edit_buttons_off(owner, cb["message"]["message_id"], "No se publica en Instagram")
+            telegram.answer(cb["id"], "Listo, no se publica")
+        else:
+            p["ig_status"] = "queued"
+            telegram.edit_buttons_off(owner, cb["message"]["message_id"], "⏳ Se publica en Instagram en unos minutos")
+            telegram.answer(cb["id"], "Se publica en unos minutos")
 
     elif action == "c":  # corregir un resultado automático: mostrar las 3 opciones
         if p["status"] != "settled":
@@ -492,14 +542,25 @@ def poll() -> None:
             if owner and p.get("owner_msg"):
                 telegram.edit_buttons_off(owner, p["owner_msg"], "⌛ Sin aprobar a tiempo")
         _remind(state, p, now)
-        if (p["status"] == "settled" and p.get("result") == "W" and not p.get("ig_kit_sent")
-                and p.get("settled_at") and now - store.parse_ts(p["settled_at"]) < timedelta(hours=24)):
-            _instagram_kit(state, p)   # verdes recientes que se cerraron antes de existir esta función
+        if (p["status"] == "settled" and p.get("result") == "W" and p.get("settled_at")
+                and now - store.parse_ts(p["settled_at"]) < timedelta(hours=48)):
+            from . import instagram
+            if p.get("ig_kit_sent") and p.get("ig_kit_mode") != "api" and instagram.enabled(state) and not p.get("ig_status"):
+                p["ig_kit_sent"] = False   # Instagram recién conectado: ofrecer publicar los verdes recientes
+            if not p.get("ig_kit_sent"):
+                _instagram_kit(state, p)
         last_kick = max(store.parse_ts(l["kickoff"]) for l in p["legs"])
         if (p["status"] == "published" and not p.get("result_asked") and owner
                 and now >= last_kick + timedelta(minutes=config.RESULT_CHECK_AFTER_MIN)
                 and not (p.get("next_check") and now < store.parse_ts(p["next_check"]))):
             _auto_result(state, p, owner, now, last_kick)
+    try:
+        from . import instagram
+        if instagram.enabled(state):
+            instagram.refresh_token(state)
+            _instagram_queue(state, now)
+    except Exception:
+        traceback.print_exc()
     request = state.pop("scan_request", None)
     store.save(state)
     if request:
