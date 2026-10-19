@@ -201,6 +201,7 @@ def _settle(state: dict, p: dict, result: str) -> None:
             p["result_msgs"][where] = telegram.send(chat, text, reply_to=mid)["message_id"]
         except telegram.TelegramError as e:
             print(f"No se pudo publicar resultado en {where}: {e}")
+    _instagram_kit(state, p)
 
 
 def _remind(state: dict, p: dict, now) -> None:
@@ -248,6 +249,38 @@ def _auto_result(state: dict, p: dict, owner, now, last_kick) -> None:
         p["next_check"] = _iso(now + timedelta(minutes=config.RESULT_RETRY_MIN))
 
 
+def _streak(state: dict, p: dict) -> int:
+    """Verdes seguidos terminando en este pick (las nulas no cortan la racha)."""
+    done = sorted((x for x in state["picks"].values() if x.get("status") == "settled"),
+                  key=lambda x: (x.get("settled_at") or "", x["kickoff"]))
+    n = 0
+    for x in reversed(done[:done.index(p) + 1] if p in done else done):
+        if x.get("result") == "V":
+            continue
+        if x.get("result") != "W":
+            break
+        n += 1
+    return max(n, 1)
+
+
+def _instagram_kit(state: dict, p: dict) -> None:
+    """Pick verde: te manda por privado la imagen de celebración y el texto para Instagram."""
+    owner = state.get("owner_chat")
+    if not owner or p.get("ig_kit_sent") or p.get("result") != "W":
+        return
+    p["ig_kit_sent"] = True
+    try:
+        from . import postimage
+        streak = _streak(state, p)
+        image = postimage.render_win(p, streak)
+        telegram.send_photo(owner, image, caption=(
+            f"📸 <b>Para Instagram</b> · pick #{p['id']} ✅\n"
+            "Guarda la imagen y copia el texto de abajo (tócalo para copiarlo)."))
+        telegram.send(owner, f"<pre>{formatting.escape(formatting.instagram_caption(p, streak))}</pre>")
+    except Exception:
+        traceback.print_exc()
+
+
 def _correct(state: dict, p: dict, result: str) -> None:
     """Cambia el resultado de un pick ya cerrado y corrige el mensaje en los canales."""
     p.update(result=result, corrected_at=_iso(store.now_utc()))
@@ -258,6 +291,7 @@ def _correct(state: dict, p: dict, result: str) -> None:
             telegram.edit_text(chat, mid, text)
         except telegram.TelegramError as e:
             print(f"No se pudo corregir el resultado en {where}: {e}")
+    _instagram_kit(state, p)
 
 
 # ---------------------------------------------------------------- botones y mensajes
@@ -458,6 +492,9 @@ def poll() -> None:
             if owner and p.get("owner_msg"):
                 telegram.edit_buttons_off(owner, p["owner_msg"], "⌛ Sin aprobar a tiempo")
         _remind(state, p, now)
+        if (p["status"] == "settled" and p.get("result") == "W" and not p.get("ig_kit_sent")
+                and p.get("settled_at") and now - store.parse_ts(p["settled_at"]) < timedelta(hours=24)):
+            _instagram_kit(state, p)   # verdes recientes que se cerraron antes de existir esta función
         last_kick = max(store.parse_ts(l["kickoff"]) for l in p["legs"])
         if (p["status"] == "published" and not p.get("result_asked") and owner
                 and now >= last_kick + timedelta(minutes=config.RESULT_CHECK_AFTER_MIN)

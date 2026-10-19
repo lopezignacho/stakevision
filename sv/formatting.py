@@ -172,3 +172,53 @@ def caption_fits(text: str) -> bool:
     import html as _h
     import re as _re
     return len(_h.unescape(_re.sub(r"<[^>]+>", "", text))) <= 1000
+
+
+# ---------------------------------------------------------------- Instagram (picks verdes)
+_IG_OPENERS = [
+    "✅ ¡VERDE! 🔥",
+    "💚 ¡Otra verde para la cuenta!",
+    "👁 Lo vimos antes del pitazo… y se cumplió. ✅",
+    "✅ ¡Cobrada! 💚",
+]
+_IG_MIDDLES = [
+    "Análisis, datos y paciencia: así se construye cada pick.",
+    "Leer el partido antes de que empiece: ese es el trabajo.",
+    "Cada pick se publica antes del partido y queda en el historial, gane o pierda.",
+    "Seguimos sumando con números, no con corazonadas.",
+]
+_SPORT_TAG = {"soccer": "#Futbol", "tennis": "#Tenis", "basketball": "#Basquetbol"}
+
+
+def _tag(text: str) -> str:
+    import re
+    import unicodedata
+    t = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    t = "".join(w[:1].upper() + w[1:] for w in re.split(r"[^A-Za-z0-9]+", t) if w)
+    return f"#{t}" if len(t) >= 3 else ""
+
+
+def instagram_caption(pick: dict, streak: int = 1) -> str:
+    """Texto listo para pegar en Instagram cuando un pick sale verde (texto plano)."""
+    k = int(pick.get("id") or 0)
+    lines = [_IG_OPENERS[k % len(_IG_OPENERS)], ""]
+    for l in pick["legs"]:
+        sc = l.get("score")
+        e = {"soccer": "⚽", "tennis": "🎾", "basketball": "🏀"}.get(l.get("sport") or "soccer", "🏟")
+        lines.append(f"{e} {l['home']} {sc[0]}-{sc[1]} {l['away']}" if sc else f"{e} {l['home']} vs {l['away']}")
+        sel = outcome_label(l)
+        lines.append(f"🎯 {sel[:sel.index(' (')] if ' (' in sel else sel}")
+    lines.append(f"📈 Cuota {odds(pick['price'])} · Stake {pick['stake']}/10")
+    if streak >= 2:
+        lines += ["", f"🔥 ¡{streak} verdes seguidos!"]
+    lines += ["", _IG_MIDDLES[k % len(_IG_MIDDLES)], "",
+              "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio).",
+              "🔞 +18 · Juega con responsabilidad. Apostar implica riesgo de pérdida.", ""]
+    tags = ["#Stakevision", "#PronosticosDeportivos", "#Verde"]
+    for l in pick["legs"]:
+        for t in (_SPORT_TAG.get(l.get("sport") or "soccer", ""),
+                  _tag((l.get("league") or "").split("·")[-1]), _tag(l["home"]), _tag(l["away"])):
+            if t and t not in tags:
+                tags.append(t)
+    lines.append(" ".join(tags[:12]))
+    return "\n".join(lines)

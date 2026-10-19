@@ -112,6 +112,10 @@ assert "Resultado automático" in req[1] and "VERDE" in req[1] and "2-1" in req[
 st = store.load()
 assert st["picks"][pid]["result"] == "W" and st["picks"][pid]["auto_result"]
 assert set(st["picks"][pid]["result_msgs"]) == {"vip", "free"}
+# kit de Instagram al dueño: imagen de celebración + texto para copiar
+assert any(c and "Para Instagram" in c for ch, c in photos if ch == OWNER)
+ig = [t for ch, t, *_ in sent if ch == OWNER and t.startswith("<pre>")]
+assert len(ig) == 1 and "Stakevision" in ig[0] and "+18" in ig[0], ig
 import json  # noqa: E402
 pub = json.load(open(config.PUBLIC_HISTORY))
 assert pub["summary"]["wins"] == 1 and pub["picks"][0]["result"] == "W"

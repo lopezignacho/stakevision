@@ -205,3 +205,151 @@ def render(pick: dict) -> bytes:
     out = io.BytesIO()
     im.convert("RGB").save(out, "JPEG", quality=92, optimize=True)
     return out.getvalue()
+
+
+# ---------------------------------------------------------------- celebración (verde)
+def _confetti(im: Image.Image, area: tuple[int, int, int, int], n: int, seed: int) -> None:
+    import random
+    rnd = random.Random(seed)
+    colors = [(124, 255, 90), (90, 220, 70), (200, 255, 170), (255, 255, 255), (60, 190, 60)]
+    x0, y0, x1, y1 = area
+    placed = 0
+    while placed < n:
+        px, py = rnd.randint(x0, x1), rnd.randint(y0, y1)
+        if 200 < px < 860:          # el centro queda libre para el logo y el titular
+            continue
+        placed += 1
+        w, h = rnd.randint(8, 18), rnd.randint(16, 34)
+        piece = Image.new("RGBA", (w, h), rnd.choice(colors) + (rnd.randint(150, 255),))
+        piece = piece.rotate(rnd.randint(0, 179), expand=True, resample=Image.BICUBIC)
+        im.alpha_composite(piece, (px, py))
+
+
+def _check_badge(size: int) -> Image.Image:
+    s = size * 4
+    b = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(b)
+    d.ellipse((0, 0, s - 1, s - 1), fill=(58, 190, 58))
+    w = s // 11
+    d.line([(s * 0.28, s * 0.52), (s * 0.44, s * 0.68), (s * 0.73, s * 0.36)], fill="white", width=w, joint="curve")
+    for x, y in ((s * 0.28, s * 0.52), (s * 0.44, s * 0.68), (s * 0.73, s * 0.36)):
+        d.ellipse((x - w / 2, y - w / 2, x + w / 2, y + w / 2), fill="white")
+    return b.resize((size, size), Image.LANCZOS)
+
+
+def render_win(pick: dict, streak: int = 1) -> bytes:
+    """Imagen 1080x1350 (formato vertical de Instagram) para celebrar un pick verde."""
+    H = 1350
+    im = _background(H).convert("RGBA")
+    d = ImageDraw.Draw(im)
+
+    # resplandor verde detrás del titular
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).ellipse((W / 2 - 420, 250, W / 2 + 420, 640), fill=(90, 255, 60, 60))
+    im.alpha_composite(glow.filter(ImageFilter.GaussianBlur(90)))
+    legs = pick["legs"]
+    compact = len(legs) > 1
+    _confetti(im, (30, 120, W - 50, 660 if not compact else 480), 46, seed=int(pick.get("id") or 0) * 7 + 3)
+
+    logo = Image.open(LOGO).convert("RGBA")
+    lw = 330 if not compact else 260
+    logo = logo.resize((lw, round(logo.height * lw / logo.width)), Image.LANCZOS)
+    im.alpha_composite(logo, ((W - lw) // 2, 50))
+
+    # titular
+    y = 50 + logo.height + (40 if not compact else 10)
+    if not compact:
+        badge = _check_badge(120)
+        im.alpha_composite(badge, ((W - 120) // 2, y))
+        y += 140
+    title = "¡VERDE!"
+    ft = _font("Bold", 150 if not compact else 120)
+    tw = d.textlength(title, font=ft)
+    tglow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(tglow).text(((W - tw) / 2, y), title, font=ft, fill=(110, 255, 80, 255))
+    im.alpha_composite(tglow.filter(ImageFilter.GaussianBlur(18)))
+    d = ImageDraw.Draw(im)
+    d.text(((W - tw) / 2, y), title, font=ft, fill=(150, 255, 110))
+    y += 190 if not compact else 155
+    sub = f"{streak} verdes seguidos 🔥".replace(" 🔥", "") if streak >= 2 else "Lo vimos antes del pitazo"
+    fs = _font("Medium", 40)
+    d.text(((W - d.textlength(sub, font=fs)) / 2, y), sub, font=fs, fill=(235, 235, 235))
+    y += 90 if not compact else 72
+
+    # tarjeta con el resultado
+    card_x, card_w, pad = 90, W - 180, 44
+    leg_h = 250
+    card_h = pad + leg_h * len(legs) + 30 * (len(legs) - 1) + 96
+    card_y = y
+    shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(shadow).rounded_rectangle((card_x, card_y + 14, card_x + card_w, card_y + card_h + 14), 34, fill=(0, 0, 0, 150))
+    im.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(22)))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle((card_x, card_y, card_x + card_w, card_y + card_h), 34, fill=(255, 255, 255))
+    x0, x1 = card_x + pad, card_x + card_w - pad
+    cy = card_y + pad
+    for i, l in enumerate(legs):
+        if i:
+            d.line((x0, cy - 16, x1, cy - 16), fill=LINE, width=2)
+        sport = l.get("sport") or "soccer"
+        im.alpha_composite(_icon(sport, 40, SPORT_COLOR.get(sport, INK)), (x0, cy + 2))
+        league, fl = _fit(d, l.get("league") or "", "Medium", 28, x1 - x0 - 56)
+        d.text((x0 + 56, cy + 2), league, font=fl, fill=MUTED)
+        cy += 62
+        # marcador: Local  0 - 3  Visita
+        sc = l.get("score")
+        fteam = _font("Bold", 36)
+        mid = W // 2
+        if sc:
+            score = f"{sc[0]} - {sc[1]}"
+            fsc = _font("Bold", 64)
+            sw = d.textlength(score, font=fsc)
+            d.text((mid - sw / 2, cy - 8), score, font=fsc, fill=INK)
+            home, fh = _fit(d, l["home"], "Bold", 36, mid - sw / 2 - 30 - x0)
+            away, fa = _fit(d, l["away"], "Bold", 36, x1 - (mid + sw / 2 + 30))
+            d.text((x0, cy + 6), home, font=fh, fill=INK)
+            d.text((x1 - d.textlength(away, font=fa), cy + 6), away, font=fa, fill=INK)
+        else:
+            m, fm = _fit(d, f"{l['home']} vs {l['away']}", "Bold", 36, x1 - x0)
+            d.text((x0, cy + 6), m, font=fm, fill=INK)
+        cy += 92
+        sel = formatting.outcome_label(l)
+        if " (" in sel:
+            sel = sel[:sel.index(" (")]
+        sel, fsel = _fit(d, sel, "Bold", 36, x1 - x0 - 230)
+        d.rounded_rectangle((x0, cy, x1, cy + 72), 18, fill=(236, 249, 234))
+        d.text((x0 + 22, cy + 13), sel, font=fsel, fill=(30, 110, 30))
+        ok = "Acertado"
+        fok = _font("Bold", 28)
+        okw = d.textlength(ok, font=fok)
+        d.text((x1 - 22 - okw, cy + 20), ok, font=fok, fill=(46, 150, 46))
+        im.alpha_composite(_check_badge(30), (int(x1 - 22 - okw - 40), int(cy + 22)))
+        d = ImageDraw.Draw(im)
+        cy += 72 + 24 + 30
+    by = card_y + card_h - 96
+    d.rounded_rectangle((card_x, by, card_x + card_w, card_y + card_h), 34, fill=(243, 244, 246))
+    d.rectangle((card_x, by, card_x + card_w, by + 34), fill=(243, 244, 246))
+    fl, fv = _font("Medium", 26), _font("Bold", 40)
+    lab = "CUOTA TOTAL" if len(legs) > 1 else "CUOTA"
+    total = formatting.odds(pick["price"])
+    d.text((x0, by + 32), lab, font=fl, fill=MUTED)
+    d.text((x0 + d.textlength(lab, font=fl) + 16, by + 22), total, font=fv, fill=GREEN)
+    st = f"STAKE {pick['stake']}/10"
+    d.text((x1 - d.textlength(st, font=fl), by + 32), st, font=fl, fill=MUTED)
+
+    # pie
+    ff = _font("Medium", 32)
+    ig = Image.open(os.path.join(POST, "instagram.png")).convert("RGBA").resize((42, 42), Image.LANCZOS)
+    tw = d.textlength(INSTAGRAM, font=ff)
+    fx = (W - (42 + 14 + tw)) // 2
+    fy = H - 130
+    im.alpha_composite(ig, (int(fx), fy))
+    d = ImageDraw.Draw(im)
+    d.text((fx + 56, fy - 2), INSTAGRAM, font=ff, fill=(240, 240, 240))
+    note = "+18 · Juega con responsabilidad"
+    fn = _font("Regular", 24)
+    d.text(((W - d.textlength(note, font=fn)) / 2, H - 70), note, font=fn, fill=(150, 150, 155))
+
+    out = io.BytesIO()
+    im.convert("RGB").save(out, "JPEG", quality=92, optimize=True)
+    return out.getvalue()

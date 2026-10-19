@@ -8,7 +8,8 @@ Sistema automático de pronósticos de fútbol:
 4. Lo aprobado se publica solo en los canales (revisión cada 5 minutos, todo el día).
 5. Cada pick sale a los canales con su imagen (logo, cupón con las selecciones e ícono del deporte) y 30 minutos antes del partido el bot avisa que está por comenzar.
 6. Unas 2 h 15 min después del inicio, busca el marcador final (90') y **califica solo** el pick: ✅ verde, ❌ roja o ↩️ nula (devuelta). Lo publica como respuesta al pick y te avisa con un botón **✏️ Corregir** por si algo no cuadra. Si el marcador aún no está, reintenta cada 20 min; si a las 6 h no aparece, o el mercado no se puede leer, te pregunta a ti.
-7. La web (`docs/`) muestra el historial y las cifras, calculadas automáticamente. Los picks VIP aparecen en la web recién cuando su partido empieza.
+7. Cuando un pick sale **verde**, el bot te manda por privado una imagen de celebración (formato Instagram) y el texto listo para copiar y publicar.
+8. La web (`docs/`) muestra el historial y las cifras, calculadas automáticamente. Los picks VIP aparecen en la web recién cuando su partido empieza.
 
 Todo corre gratis en GitHub Actions + GitHub Pages. El estado privado se guarda **cifrado** en `data/state.enc`.
 
