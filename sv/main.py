@@ -68,12 +68,18 @@ def scan() -> None:
     picks = [p for p in build_picks(selections)
              if not any((l.fixture_id, l.market_id, l.outcome_id) in already for l in p.legs)]
 
+    in_range = sorted((x for x in selections if config.ODDS_MIN <= x.price <= config.ODDS_MAX),
+                      key=lambda x: x.edge, reverse=True)[:3]
+    best = "\n".join(f"• {formatting.outcome_label({**x.__dict__})} ({x.home} vs {x.away}) @ {x.price:.2f}: "
+                     f"{'+' if x.edge >= 0 else ''}{formatting.pct(x.edge)}" for x in in_range)
     if not picks:
+        if best:
+            best = "\n\nLo más cercano dentro del rango (valor frente a la cuota justa):\n" + best
         telegram.send(state["owner_chat"],
                       f"🔎 Escaneo de hoy: {len(tournaments)} ligas, {analyzed} partidos con cuotas de ambas casas, "
                       f"{len(selections)} cuotas comparadas. "
                       f"Ninguna cumple valor ≥ {formatting.pct(config.MIN_EDGE)} dentro de "
-                      f"{config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f}. Hoy no hay picks.")
+                      f"{config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f}. Hoy no hay picks." + best)
         store.save(state)
         return
 
