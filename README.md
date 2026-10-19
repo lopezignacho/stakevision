@@ -48,7 +48,7 @@ Nunca pegues estas claves en el código ni en un chat.
 Todo en `sv/config.py`: rango de cuotas, valor mínimo, cantidad de candidatos, stake máximo y la lista `TOURNAMENTS` de ligas (IDs en `data/tournaments.json`).
 
 ## Límites del plan gratis
-- OddsPapi: cada escaneo usa 1 consulta de partidos + 2 por cada grupo de 5 ligas con partidos ese día (normalmente 3, fines de semana ~5). Los resultados no gastan OddsPapi.
+- OddsPapi: cada escaneo usa 1 consulta de partidos + 2 por cada grupo de 5 ligas con partidos ese día (entre 3 y 9 al día según cuántas ligas jueguen; tope de 20 ligas por escaneo). Los resultados no gastan OddsPapi.
 - API-Football: el sistema usa como máximo 40 consultas por ejecución (el plan da 100 al día). Si no responde, el pick sale sin el contexto de forma reciente.
 
 +18 · Juega con responsabilidad.

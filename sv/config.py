@@ -36,20 +36,36 @@ TOURNAMENTS: dict[int, str] = {
     295: "Eliminatorias CONMEBOL", 11: "Eliminatorias UEFA",
     133: "Copa América", 1: "Eurocopa", 27: "Clasificatorias Eurocopa",
     23755: "UEFA Nations League", 36497: "Finalissima",
+    140: "Copa Oro CONCACAF", 27420: "CONCACAF Nations League",
     # Clubes internacionales
     7: "Champions League", 384: "Copa Libertadores", 679: "Europa League",
     480: "Copa Sudamericana", 34480: "Conference League", 490: "Recopa Sudamericana",
     357: "Mundial de Clubes", 44289: "Copa Intercontinental FIFA", 465: "Supercopa de Europa",
-    # Ligas de primera división
+    498: "CONCACAF Champions Cup",
+    # Europa: las 5 grandes
+    17: "Inglaterra · Premier League", 8: "España · LaLiga", 23: "Italia · Serie A",
+    35: "Alemania · Bundesliga", 34: "Francia · Ligue 1",
+    # Sudamérica principal
     27665: "Chile · Primera División", 244: "Chile · Primera División",
     27518: "Chile · Primera División (Apertura)", 27520: "Chile · Primera División (Clausura)",
     325: "Brasil · Serie A", 155: "Argentina · Liga Profesional", 28538: "Argentina · Copa de la Liga",
-    17: "Inglaterra · Premier League", 34: "Francia · Ligue 1",
+    # Norteamérica
+    27464: "México · Liga MX (Apertura)", 27466: "México · Liga MX (Clausura)", 242: "EE.UU. · MLS",
+    # Europa: otras primeras divisiones
+    238: "Portugal · Liga Portugal", 37: "Países Bajos · Eredivisie", 38: "Bélgica · Pro League",
+    52: "Turquía · Süper Lig", 36: "Escocia · Premiership", 215: "Suiza · Super League",
+    45: "Austria · Bundesliga", 185: "Grecia · Super League", 39: "Dinamarca · Superliga",
+    # Sudamérica: otras primeras divisiones
+    27070: "Colombia · Liga DIMAYOR", 241: "Colombia · Primera A", 27072: "Colombia · Primera A (Clausura)",
+    278: "Uruguay · Primera División", 240: "Ecuador · LigaPro", 406: "Perú · Liga 1",
+    27098: "Paraguay · División de Honor", 27100: "Paraguay · División de Honor (Clausura)",
+    693: "Paraguay · Primera División", 33980: "Bolivia · División Profesional",
+    27871: "Bolivia · División Profesional (Clausura)", 231: "Venezuela · Primera División",
 }
 MAX_TOURNAMENTS_PER_CALL = 5     # límite de OddsPapi
-ODDS_BATCHES = 3                 # máximo de grupos de 5 ligas por escaneo; cada grupo cuesta 2 consultas
-# Solo se consultan las ligas que tienen partidos en las próximas 30 h, así que la mayoría de los
-# días se usa 1 grupo (3 consultas) y los fines de semana 2 (5 consultas).
+ODDS_BATCHES = 4                 # máximo de grupos de 5 ligas por escaneo (20 ligas); cada grupo = 2 consultas
+# Solo se consultan las ligas con partidos en las próximas 30 h. Si un día hay más de 20,
+# se toman las primeras según el orden de arriba (prioridad).
 
 # --- Horarios y zona -----------------------------------------------------
 TIMEZONE = "America/Santiago"
