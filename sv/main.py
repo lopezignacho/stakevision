@@ -97,7 +97,7 @@ def scan() -> None:
             leg["context"] = apifootball.context(leg["home"], leg["away"], leg["kickoff"])
         state["seq"] += 1
         pid = str(state["seq"])
-        d.update(id=pid, status="candidate", created_at=_iso(now))
+        d.update(id=pid, status="candidate", created_at=_iso(now), stake_v=2)
         d["analysis"] = formatting.analysis(d)
         msg = telegram.send(state["owner_chat"], formatting.owner_candidate(d), CANDIDATE_BUTTONS(pid))
         d["owner_msg"] = msg["message_id"]
@@ -257,6 +257,25 @@ def _status_text(state: dict) -> str:
             f"Historial: {w} verdes, {l} rojas.{quota}")
 
 
+def _migrate_stakes(state: dict, now) -> None:
+    """Escala de stake v2: recalcula picks que aún no empiezan y corrige sus mensajes."""
+    from .value import stake_for
+    for p in state["picks"].values():
+        if p.get("stake_v") == 2:
+            continue
+        if p["status"] in ("candidate", "published") and store.parse_ts(p["kickoff"]) > now:
+            p["stake"] = stake_for(p.get("tier", "valor"), p["kind"], p["price"], p["edge"])
+            if p["status"] == "published":
+                text = formatting.channel_post(p)
+                for where, mid in (p.get("channel_msgs") or {}).items():
+                    chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
+                    try:
+                        telegram.edit_text(chat, mid, text)
+                    except telegram.TelegramError as e:
+                        print(f"No se pudo editar el pick {p['id']} en {where}: {e}")
+        p["stake_v"] = 2
+
+
 def poll() -> None:
     state = store.load()
     ups = telegram.updates(state["tg_offset"])
@@ -274,6 +293,7 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
+    _migrate_stakes(state, now)
     for p in state["picks"].values():
         if p["status"] == "candidate" and store.parse_ts(p["kickoff"]) <= now:
             p["status"] = "expired"

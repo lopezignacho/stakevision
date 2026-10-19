@@ -37,6 +37,20 @@ class Selection:
         return self.fair_prob * self.price - 1
 
 
+def stake_for(tier: str, kind: str, price: float, edge: float) -> int:
+    """Confianza de 1 a 10 (1 punto = 0,5% del bankroll).
+    - Cuota justa (sin ventaja medida): 3, o 4 si la cuota es baja (más probable).
+    - Con valor: 5 a 8 según cuánto paga Betano por sobre la cuota justa (STAKE_BY_EDGE).
+    - Las dobles bajan 1 punto por tener más riesgo."""
+    if tier == "justa":
+        base = 4 if price <= 1.75 else 3
+    else:
+        base = next(st for lim, st in config.STAKE_BY_EDGE if edge < lim)
+    if kind == "doble":
+        base -= 1
+    return max(1, min(config.MAX_STAKE, base))
+
+
 @dataclass
 class Pick:
     kind: str                       # "simple" | "doble"
@@ -63,12 +77,7 @@ class Pick:
 
     @property
     def stake(self) -> int:
-        """Cuarto de Kelly expresado como ~% del bankroll, de 1 a MAX_STAKE (escala /10)."""
-        if self.tier == "justa":
-            return 1
-        b = self.price - 1
-        kelly = max(0.0, (self.prob * self.price - 1) / b) if b > 0 else 0
-        return max(1, min(config.MAX_STAKE, round(kelly * 0.25 * 100)))
+        return stake_for(self.tier, self.kind, self.price, self.edge)
 
     @property
     def kickoff(self) -> str:

@@ -12,7 +12,7 @@ TZ = ZoneInfo(config.TIMEZONE)
 
 def local_time(iso: str) -> str:
     dt = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(TZ)
-    return dt.strftime("%d/%m %H:%M")
+    return dt.strftime("%d/%m %H:%M") + (" a. m." if dt.hour < 12 else " p. m.")
 
 
 def pct(x: float) -> str:
@@ -95,12 +95,16 @@ def _legs_block(pick: dict) -> str:
     return "\n\n".join(rows)
 
 
+def _bank(stake: int) -> str:
+    return f"{stake * 0.5:g}%".replace(".", ",")
+
+
 def channel_post(pick: dict) -> str:
     title = "COMBINADA DOBLE" if pick["kind"] == "doble" else "PICK DEL DÍA"
     return (f"👁 <b>STAKEVISION · {title}</b>\n\n"
             f"{_legs_block(pick)}\n\n"
             f"📈 Cuota total: <b>{odds(pick['price'])}</b>\n"
-            f"💰 Stake: <b>{pick['stake']}/10</b>\n\n"
+            f"💰 Stake: <b>{pick['stake']}/10</b> ({_bank(pick['stake'])} del bankroll)\n\n"
             f"🧠 <i>{pick['analysis']}</i>\n\n"
             f"🔞 +18 · Apuesta con responsabilidad")
 

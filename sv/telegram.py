@@ -52,3 +52,8 @@ def answer(callback_id: str, text: str = "") -> None:
 def updates(offset: int) -> list[dict]:
     return _call("getUpdates", offset=offset, timeout=0,
                  allowed_updates=["message", "callback_query", "channel_post"])
+
+
+def edit_text(chat_id, message_id: int, text: str) -> None:
+    _call("editMessageText", chat_id=chat_id, message_id=message_id, text=text,
+          parse_mode="HTML", disable_web_page_preview=True)

@@ -12,7 +12,9 @@ MAX_REF_MARGIN = 0.08      # si el margen de Pinnacle en ese mercado supera 8%, 
 MAX_CANDIDATES = 6         # candidatos que te llegan cada día para aprobar
 MIN_DAILY_CANDIDATES = 3   # si hay menos picks con valor, se completan con cuotas cercanas a la justa
 FALLBACK_MIN_EDGE = -0.02  # piso para esas propuestas: como máximo 2% bajo la cuota justa
-MAX_STAKE = 5              # stake máximo (escala /10, ~% del bankroll)
+MAX_STAKE = 8              # nunca 9 ni 10: ninguna apuesta es segura
+# Stake con valor según el edge: (edge menor que, stake). 1 punto = 0,5% del bankroll.
+STAKE_BY_EDGE = [(0.05, 5), (0.08, 6), (0.12, 7), (9.99, 8)]
 
 # Ventana de partidos a analizar (horas desde ahora)
 WINDOW_START_H = 1

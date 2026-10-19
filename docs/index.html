@@ -59,7 +59,7 @@
   .nav-links a { color: var(--soft); text-decoration: none; }
   .nav-links a:hover { color: var(--text); }
   .nav-actions { display: flex; align-items: center; gap: 10px; }
-  .menu-btn { display: none; }
+  .icon-btn.menu-btn { display: none; }
   footer nav { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
   footer nav a { color: var(--soft); text-decoration: none; }
 
@@ -83,6 +83,33 @@
   .actions { display: flex; flex-wrap: wrap; gap: 12px; }
 
   .pick-card { flex: 1 1 360px; min-width: 0; max-width: 460px; display: flex; flex-direction: column; gap: 16px; }
+  .hero-pick { gap: 18px; border: 1.5px solid color-mix(in srgb, var(--accent) 55%, var(--line-strong));
+               box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 10%, transparent), 0 24px 60px -30px color-mix(in srgb, var(--accent) 60%, transparent); }
+  .hp-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .hp-badge { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-text); }
+  .hp-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 var(--accent); animation: hp-pulse 1.8s infinite; }
+  @keyframes hp-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 70%, transparent); } 70% { box-shadow: 0 0 0 10px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+  @media (prefers-reduced-motion: reduce) { .hp-dot { animation: none; } }
+  .hp-status { font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 999px; background: var(--chip); color: var(--soft); }
+  .hp-status.live { background: var(--accent); color: #000; }
+  .hp-status.W { background: var(--win); color: #000; } .hp-status.L { background: var(--loss); color: #fff; }
+  .hp-match { font: 800 28px/1.15 'Poppins', sans-serif; margin-top: 4px; }
+  .hp-match span { color: var(--muted); font-weight: 600; font-size: .7em; }
+  .hp-when { color: var(--soft); font-size: 15px; margin-top: 6px; }
+  .hp-bet { display: flex; justify-content: space-between; align-items: center; gap: 16px; background: var(--chip); border-radius: 16px; padding: 16px 18px; }
+  .hp-bet small, .hp-odds small { display: block; font-size: 12px; color: var(--muted); }
+  .hp-bet strong { font: 700 19px/1.3 'Poppins', sans-serif; }
+  .hp-odds { text-align: right; flex-shrink: 0; }
+  .hp-note { display: block; font: 400 13px/1.4 'DM Sans', sans-serif; font-style: normal; color: var(--muted); margin-top: 4px; }
+  .hp-odds b { font: 700 34px/1 'JetBrains Mono', monospace; color: var(--accent-text); }
+  .hp-meters { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .hp-mlabel { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .hp-mlabel b { color: var(--text); font-family: 'JetBrains Mono', monospace; }
+  .hp-seg { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; }
+  .hp-seg i { height: 8px; border-radius: 2px; background: var(--line-strong); }
+  .hp-seg i.on { background: var(--accent); }
+  .hp-bar { height: 8px; border-radius: 999px; background: var(--line-strong); overflow: hidden; }
+  .hp-bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
   .pick-top { display: flex; justify-content: space-between; align-items: center; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
   .chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   .chip { background: var(--chip); border-radius: 12px; padding: 12px; }
@@ -125,7 +152,7 @@
   /* Tablet */
   @media (max-width: 960px) {
     .nav-links, .cta-desktop { display: none; }
-    .menu-btn { display: inline-flex; }
+    .icon-btn.menu-btn { display: inline-flex; }
     .hero { gap: 40px; padding-top: 56px; padding-bottom: 56px; }
     .pick-card { max-width: none; }
   }
@@ -141,6 +168,9 @@
     .brand img { height: 32px; width: 66px; }
     .card { padding: 20px; border-radius: 16px; }
     .match { font-size: 20px; }
+    .hp-match { font-size: 23px; }
+    .hp-odds b { font-size: 28px; }
+    .hp-meters { grid-template-columns: 1fr; }
     .stats { grid-template-columns: 1fr 1fr; gap: 20px 12px; }
     .stat b { font-size: 30px; }
     .price { font-size: 34px; }
@@ -221,17 +251,27 @@
     </div>
     <p class="muted" style="font-size:14px">+18 · Juega con responsabilidad · Las apuestas implican riesgo de pérdida</p>
   </div>
-  <div class="card pick-card" aria-label="Ejemplo de pick">
-    <div class="pick-top"><span>Así se ve cada pick</span></div>
-    <div><div class="league">Fútbol · Liga</div><div class="match">Local vs Visita</div></div>
-    <div class="chips">
-      <div class="chip"><small>Mercado</small><strong>Ambos marcan</strong></div>
-      <div class="chip"><small>Cuota</small><b>1.85</b></div>
-      <div class="chip"><small>Stake</small><b>2/10</b></div>
+  <article class="card pick-card hero-pick" id="hero-pick" aria-label="Pick gratis de hoy">
+    <div class="hp-top">
+      <span class="hp-badge"><span class="hp-dot" aria-hidden="true"></span>Pick gratis de hoy</span>
+      <span class="hp-status" id="hp-status">Así se ve cada pick</span>
     </div>
-    <p class="lead" style="font-size:15px"><strong style="color:var(--text)">Por qué:</strong> cuota justa estimada contra cuota disponible, forma reciente y el dato clave del partido.</p>
-    <p class="muted" style="font-size:13px; border-top:1px solid var(--line-strong); padding-top:14px">Publicado antes del partido · registrado en el historial</p>
-  </div>
+    <div>
+      <div class="league" id="hp-league">Fútbol · Liga</div>
+      <div class="hp-match" id="hp-match">Local <span>vs</span> Visita</div>
+      <div class="hp-when" id="hp-when">Hoy · 15:45 p. m.</div>
+    </div>
+    <div class="hp-bet">
+      <div><small>Nuestra selección</small><strong id="hp-sel">Ambos marcan: Sí</strong></div>
+      <div class="hp-odds"><small>Cuota</small><b id="hp-odds">1.85</b></div>
+    </div>
+    <div class="hp-meters">
+      <div><div class="hp-mlabel"><span>Stake</span><b id="hp-stake">5/10</b></div><div class="hp-seg" id="hp-seg" aria-hidden="true"></div></div>
+      <div><div class="hp-mlabel"><span>Probabilidad estimada</span><b id="hp-prob">55%</b></div><div class="hp-bar" aria-hidden="true"><i id="hp-probbar" style="width:55%"></i></div></div>
+    </div>
+    <a class="btn primary" href="https://t.me/stakevision" id="hp-cta">Recibe el próximo gratis en Telegram</a>
+    <p class="muted" style="font-size:13px; margin:0">Publicado antes del partido · queda en el historial, gane o pierda</p>
+  </article>
 </section>
 
 <section class="alt" aria-label="Resumen del historial">
@@ -362,7 +402,7 @@
   <div style="display:flex; flex-direction:column; gap:12px">
     <details><summary>¿Qué deportes cubren?</summary><p>Partimos con fútbol, donde hay mejores datos. Más adelante sumaremos tenis y básquet.</p></details>
     <details><summary>¿Cuántos picks recibo en el VIP?</summary><p>3 picks diarios en promedio. Si una jornada no tiene partidos con valor, publicamos menos: no rellenamos para cumplir una cuota.</p></details>
-    <details><summary>¿Qué significa el stake?</summary><p>Es la parte de tu bankroll que sugerimos para cada pick, en una escala de 1 a 10 (aprox. % del bankroll). Más stake no significa "más seguro", sino mayor confianza relativa.</p></details>
+    <details><summary>¿Qué significa el stake?</summary><p>Es nuestro nivel de confianza en una escala de 1 a 10. Cada punto equivale a 0,5% de tu bankroll: un stake 6/10 es apostar el 3%. Nuestros picks van de 3 a 8; nunca usamos 9 ni 10, porque ninguna apuesta es segura.</p></details>
     <details><summary>¿Cuándo abre el VIP?</summary><p>Estamos en etapa de prueba, construyendo el historial público. Únete al canal gratis para enterarte primero.</p></details>
     <details><summary>¿Puedo cancelar? ¿Hay reembolso?</summary><p>Sí, cuando quieras; conservas el acceso hasta el final del período pagado. Si es tu primera suscripción y no te convence, te devolvemos el 100% si lo pides dentro de 10 días desde la compra. No hay reembolsos por resultados de las apuestas: vendemos análisis, no ganancias.</p></details>
     <details><summary>¿Stakevision es una casa de apuestas?</summary><p>No. Entregamos análisis y opiniones; no recibimos apuestas ni manejamos tu dinero.</p></details>
@@ -419,7 +459,21 @@
   }, 60000);
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
-  function fmtDate(iso) { var d = new Date(iso); return d.toLocaleString('es-CL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+  var TZ = 'America/Santiago';
+  function parts(d) {
+    var o = {}; new Intl.DateTimeFormat('es-CL', { timeZone: TZ, year: 'numeric', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(d).forEach(function (p) { o[p.type] = p.value; });
+    return o;
+  }
+  function fmtTime(iso) { var p = parts(new Date(iso)); return p.hour + ':' + p.minute + (Number(p.hour) < 12 ? ' a. m.' : ' p. m.'); }
+  function fmtDate(iso) { var p = parts(new Date(iso)); return p.day + '/' + p.month + ' ' + fmtTime(iso); }
+  function dayLabel(iso) {
+    var k = function (d) { var p = parts(d); return p.year + p.month + p.day; };
+    var d = new Date(iso), now = new Date(), tom = new Date(now.getTime() + 864e5);
+    if (k(d) === k(now)) return 'Hoy';
+    if (k(d) === k(tom)) return 'Mañana';
+    var p = parts(d); return p.day + '/' + p.month;
+  }
   function pct(x) { return (x * 100).toFixed(1).replace('.', ',') + '%'; }
   function label(l) {
     if (l.label) return l.label;
@@ -445,7 +499,7 @@
     if (picks.length) {
       document.getElementById('history-body').innerHTML = picks.map(function (p) {
         var match = p.legs.map(function (l) { return esc(l.home) + ' vs ' + esc(l.away) + '<br><span class="muted" style="font-size:13px">' + esc(l.league) + '</span>'; }).join('<br>');
-        var market = p.legs.map(function (l) { return esc(l.market) + ': <strong>' + esc(label(l)) + '</strong>'; }).join('<br>');
+        var market = p.legs.map(function (l) { return '<strong>' + esc(label(l)) + '</strong>'; }).join('<br>');
         var r = RES[p.result] || ['⏳ En juego', 'P'];
         function cell(label, html, cls) { return '<td' + (cls ? ' class="' + cls + '"' : '') + ' data-label="' + label + '"><span class="v">' + html + '</span></td>'; }
         return '<tr>' + cell('Fecha', fmtDate(p.kickoff), 'mono') + cell('Partido', match) +
@@ -455,7 +509,44 @@
       }).join('');
     }
 
-    var free = picks.filter(function (p) { return p.free; })[0];
+    // Tarjeta principal: el pick gratis más relevante (el próximo por jugar; si no hay, el último).
+    var frees = picks.filter(function (p) { return p.free; });
+    var now = Date.now();
+    var upcoming = frees.filter(function (p) { return !p.result && new Date(p.kickoff).getTime() + 2.5 * 36e5 > now; })
+      .sort(function (a, b) { return new Date(a.kickoff) - new Date(b.kickoff); });
+    var hero = upcoming[0] || frees[0];
+    if (hero) {
+      var L0 = hero.legs[0];
+      document.getElementById('hp-league').textContent = hero.legs.map(function (l) { return l.league; }).join(' + ');
+      document.getElementById('hp-match').innerHTML = hero.legs.map(function (l) { return esc(l.home) + ' <span>vs</span> ' + esc(l.away); }).join('<br>');
+      document.getElementById('hp-when').textContent = dayLabel(hero.kickoff) + ' · ' + fmtTime(hero.kickoff) + ' (hora de Chile)';
+      var sel = hero.legs.map(label).join(' + '), cut = sel.indexOf(' (');
+      document.getElementById('hp-sel').innerHTML = cut > 0
+        ? esc(sel.slice(0, cut)) + '<em class="hp-note">' + esc(sel.slice(cut + 2, -1)) + '</em>' : esc(sel);
+      document.getElementById('hp-odds').textContent = hero.price.toFixed(2);
+      document.getElementById('hp-stake').textContent = hero.stake + '/10';
+      if (hero.prob) {
+        document.getElementById('hp-prob').textContent = Math.round(hero.prob * 100) + '%';
+        document.getElementById('hp-probbar').style.width = Math.round(hero.prob * 100) + '%';
+      } else { document.getElementById('hp-prob').parentNode.parentNode.style.display = 'none'; }
+      var st = document.getElementById('hp-status'), cta = document.getElementById('hp-cta');
+      function tick() {
+        var ms = new Date(hero.kickoff).getTime() - Date.now();
+        st.className = 'hp-status';
+        if (hero.result && RES[hero.result]) { st.textContent = RES[hero.result][0]; st.classList.add(hero.result); cta.textContent = 'Recibe el próximo gratis en Telegram'; }
+        else if (ms > 0) {
+          var h = Math.floor(ms / 36e5), m = Math.floor(ms % 36e5 / 6e4);
+          st.textContent = 'Empieza en ' + (h ? h + ' h ' : '') + m + ' min'; cta.textContent = 'Síguelo en vivo en Telegram';
+        } else { st.textContent = '● En juego'; st.classList.add('live'); cta.textContent = 'Síguelo en vivo en Telegram'; }
+      }
+      tick(); setInterval(tick, 30000);
+    } else {
+      document.getElementById('hp-status').textContent = 'Ejemplo';
+    }
+    var seg = document.getElementById('hp-seg'), stakeN = hero ? hero.stake : 5;
+    seg.innerHTML = Array.from({ length: 10 }, function (_, i) { return '<i' + (i < stakeN ? ' class="on"' : '') + '></i>'; }).join('');
+
+    var free = hero;
     if (free) {
       var r = RES[free.result];
       var legs = free.legs.map(function (l) {

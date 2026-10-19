@@ -75,6 +75,7 @@ def export_public(state: dict) -> None:
             "kind": p["kind"],
             "price": p["price"],
             "stake": p["stake"],
+            "prob": p.get("prob") if p.get("free") else None,
             "free": bool(p.get("free")),
             "result": p.get("result"),          # "W" | "L" | "V" | None
             "legs": [{"home": l["home"], "away": l["away"], "league": l["league"],
