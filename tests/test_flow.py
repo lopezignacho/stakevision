@@ -84,7 +84,8 @@ assert p["status"] == "published" and p["free"] is True
 assert set(p["channel_msgs"]) == {"vip", "free"}
 posted_chats = [c for c, *_ in sent]
 assert VIP in posted_chats and config.FREE_CHANNEL in posted_chats
-assert len(photos) == 2 and all(c and "STAKEVISION" in c for _, c in photos)   # imagen con el texto como pie
+chan = [(ch, c) for ch, c in photos if ch != OWNER]
+assert len(chan) == 2 and all(c and "STAKEVISION" in c for _, c in chan)   # imagen con el texto como pie
 
 # 3b) aviso 30 min antes del partido, como respuesta al pick en ambos canales
 st = store.load()
@@ -275,3 +276,26 @@ assert any("EN VIVO" in t for _, t, *_ in sent[-3:])
 main.poll()
 assert store.load()["picks"][p5["id"]]["status"] == "candidate"   # no vence por haber empezado
 print("OK /envivo")
+
+# 9) pick aprobado con el flujo antiguo -> se ofrece la imagen para compartir; /compartir N la reenvía
+fx6 = te.fixture("f6", "Porto", "PSV", hours=10)
+oddspapi.upcoming_fixtures = lambda frm, to: [fx6]
+oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "f6", "bookmakerOdds": {
+    "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
+    "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}}]
+main.scan()
+st = store.load()
+p6 = next(p for p in st["picks"].values() if p["legs"][0]["fixture_id"] == "f6")
+updates_q.append({"update_id": 110, "callback_query": {"id": "o1", "data": f"f:{p6['id']}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 80}}})
+n_ph = len(photos)
+main.poll()   # publica con el flujo antiguo
+main.poll()   # y ofrece la imagen con destinos
+p6s = store.load()["picks"][p6["id"]]
+assert p6s["status"] == "published" and p6s.get("share_msg")
+assert buttons_set[-1][0][0][1] == "noop" and buttons_set[-1][1][0][1] == f"pi:{p6['id']}"
+n = len(photos)
+updates_q.append({"update_id": 111, "message": {"chat": {"id": OWNER, "type": "private"}, "text": f"/compartir {p6['id']}"}})
+main.poll()
+assert len(photos) == n + 1 and "listo para compartir" in photos[-1][1]
+print("OK /compartir")

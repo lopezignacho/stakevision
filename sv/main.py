@@ -38,6 +38,44 @@ def SHARE_BUTTONS(p: dict) -> list:
     return rows
 
 
+def _share_panel(state: dict, p: dict) -> None:
+    """Te manda la imagen del pick con los botones de destino (VIP, VIP + Gratis, Instagram)."""
+    owner = state.get("owner_chat")
+    if not owner:
+        return
+    image = _pick_image(p)
+    caption = (f"🖼 <b>Pick #{p['id']} listo para compartir</b>\n"
+               "Elige dónde publicarlo (puedes usar varios botones):")
+    msg = telegram.send_photo(owner, image, caption=caption) if image else telegram.send(owner, caption)
+    p["share_msg"] = msg["message_id"]
+    telegram.set_buttons(owner, p["share_msg"], SHARE_BUTTONS(p))
+
+
+def _share_command(state: dict, text: str) -> None:
+    owner = state["owner_chat"]
+    parts = text.split()
+    pid = parts[1].lstrip("#") if len(parts) > 1 else ""
+    p = state["picks"].get(pid)
+    if not p:
+        recent = [x for x in state["picks"].values() if x["status"] in ("selected", "published", "settled")]
+        recent.sort(key=lambda x: int(x["id"]), reverse=True)
+        lista = "\n".join(f"#{x['id']} · {formatting.escape(x['legs'][0]['home'])} vs "
+                           f"{formatting.escape(x['legs'][0]['away'])}" for x in recent[:6])
+        telegram.send(owner, "Usa /compartir y el número del pick, por ejemplo /compartir 8"
+                      + (f"\n\nÚltimos picks:\n{lista}" if lista else ""))
+        return
+    if p["status"] in ("selected", "published"):
+        _share_panel(state, p)
+    elif p["status"] == "settled" and p.get("result") == "W":
+        p["ig_kit_sent"] = False
+        if p.get("ig_status") not in ("queued", "posted"):
+            p.pop("ig_status", None)
+        _instagram_kit(state, p)
+    else:
+        telegram.send(owner, f"El pick #{pid} no se puede compartir ({p['status']}"
+                      + (f", resultado {p.get('result')}" if p.get("result") else "") + ").")
+
+
 def _expires(p: dict):
     """Un candidato en vivo vence a los 20 minutos (las cuotas cambian); uno normal, al empezar el partido."""
     if p.get("live"):
@@ -439,6 +477,8 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith("/compartir"):
+            _share_command(state, text)
         elif chat == owner and text.lower().startswith(("/envivo", "/vivo")):
             _request_search(state, text, live=True)
         elif chat == owner and text.lower().startswith("/buscar"):
@@ -477,14 +517,9 @@ def _handle_update(state: dict, u: dict) -> None:
             telegram.edit_buttons_off(owner, cb["message"]["message_id"], "⌛ Ya no está vigente")
             telegram.answer(cb["id"], "Llegó tarde")
             return
-        image = _pick_image(p)
         p["status"] = "selected"
         telegram.edit_buttons_off(owner, cb["message"]["message_id"], "🖼 Elegido: imagen generada abajo")
-        caption = (f"🖼 <b>Pick #{p['id']} listo para compartir</b>\n"
-                   "Elige dónde publicarlo (puedes usar varios botones):")
-        msg = (telegram.send_photo(owner, image, caption=caption) if image else telegram.send(owner, caption))
-        p["share_msg"] = msg["message_id"]
-        telegram.set_buttons(owner, p["share_msg"], SHARE_BUTTONS(p))
+        _share_panel(state, p)
         telegram.answer(cb["id"], "Imagen generada")
         return
 
@@ -587,6 +622,7 @@ HELP_TEXT = (
     "/buscar · analiza ahora los partidos de las próximas 30 h y te manda el top 3\n"
     "/buscar 40 · igual, pero mirando 40 horas hacia adelante (máximo 47)\n"
     "/envivo · busca valor en partidos que se están jugando ahora\n"
+    "/compartir 8 · vuelve a mandarte la imagen del pick #8 para publicarlo (VIP, Gratis o Instagram)\n"
     "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
     "/ayuda · esta lista\n\n"
     "El escaneo automático sigue saliendo todos los días a las 09:07."
@@ -673,17 +709,26 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
-    if owner and state.get("cmds_v") != 2:
+    if owner and state.get("cmds_v") != 3:
         try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
             telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
                 {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
                 {"command": "envivo", "description": "Buscar valor en partidos que se están jugando"},
+                {"command": "compartir", "description": "Imagen de un pick para VIP, Gratis o Instagram"},
                 {"command": "estado", "description": "Pendientes, picks en juego e historial"},
                 {"command": "ayuda", "description": "Lista de comandos"}])
-            state["cmds_v"] = 2
+            state["cmds_v"] = 3
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)
+    for p in state["picks"].values():   # picks aprobados con el flujo antiguo: ofrecer la imagen para compartir
+        if (owner and p["status"] == "published" and not p.get("share_msg") and not p.get("share_offered")
+                and store.parse_ts(p["kickoff"]) > now):
+            p["share_offered"] = True
+            try:
+                _share_panel(state, p)
+            except Exception:
+                traceback.print_exc()
     for p in state["picks"].values():
         if p["status"] in ("candidate", "selected") and _expires(p) <= now:
             was = p["status"]
