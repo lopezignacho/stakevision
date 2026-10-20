@@ -123,6 +123,10 @@ assert pub["summary"]["wins"] == 1 and pub["picks"][0]["result"] == "W"
 # 4b) el dueño corrige: Corregir -> Roja
 edited = []
 telegram.edit_text = lambda chat, mid, text: edited.append((chat, mid, text))
+telegram.edit_caption = lambda chat, mid, text: edited.append((chat, mid, text))
+# el verde salió a los canales con imagen (celebración) como respuesta al pick
+assert sum(1 for ch, c in photos if ch in (VIP, config.FREE_CHANNEL) and c and "VERDE" in c) == 2
+n_before_fix = len(sent)
 updates_q += [
     {"update_id": 6, "callback_query": {"id": "z", "data": f"c:{pid}",
                                         "message": {"chat": {"id": OWNER}, "message_id": 9}}},
@@ -132,6 +136,8 @@ updates_q += [
 main.poll()
 st = store.load()
 assert st["picks"][pid]["result"] == "L" and len(edited) == 2 and "corregido" in edited[0][2]
+# la roja corregida sale como texto nuevo en ambos canales
+assert sum(1 for ch, t, *_ in sent[n_before_fix:] if ch in (VIP, config.FREE_CHANNEL) and "ROJA" in t) == 2
 pub = json.load(open(config.PUBLIC_HISTORY))
 assert pub["summary"]["losses"] == 1 and pub["summary"]["wins"] == 0
 print("OK flujo completo:", len(sent), "mensajes simulados")

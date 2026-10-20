@@ -237,19 +237,33 @@ def _check_badge(size: int) -> Image.Image:
     return b.resize((size, size), Image.LANCZOS)
 
 
-def render_win(pick: dict, streak: int = 1) -> bytes:
-    """Imagen 1080x1350 (formato vertical de Instagram) para celebrar un pick verde."""
+def _return_badge(size: int) -> Image.Image:
+    s = size * 4
+    b = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    d = ImageDraw.Draw(b)
+    d.ellipse((0, 0, s - 1, s - 1), fill=(150, 156, 166))
+    w = s // 12
+    d.arc((s * 0.26, s * 0.26, s * 0.74, s * 0.74), 200, 520, fill="white", width=w)
+    d.polygon([(s * 0.22, s * 0.30), (s * 0.40, s * 0.30), (s * 0.27, s * 0.47)], fill="white")
+    return b.resize((size, size), Image.LANCZOS)
+
+
+def render_win(pick: dict, streak: int = 1, result: str = "W") -> bytes:
+    """Imagen 1080x1350 (formato vertical de Instagram) para un pick verde o nulo."""
+    nula = result == "V"
     H = 1350
     im = _background(H).convert("RGBA")
     d = ImageDraw.Draw(im)
 
     # resplandor verde detrás del titular
     glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(glow).ellipse((W / 2 - 420, 250, W / 2 + 420, 640), fill=(90, 255, 60, 60))
+    ImageDraw.Draw(glow).ellipse((W / 2 - 420, 250, W / 2 + 420, 640),
+                                 fill=(180, 186, 196, 40) if nula else (90, 255, 60, 60))
     im.alpha_composite(glow.filter(ImageFilter.GaussianBlur(90)))
     legs = pick["legs"]
     compact = len(legs) > 1
-    _confetti(im, (30, 120, W - 50, 660 if not compact else 480), 46, seed=int(pick.get("id") or 0) * 7 + 3)
+    if not nula:
+        _confetti(im, (30, 120, W - 50, 660 if not compact else 480), 46, seed=int(pick.get("id") or 0) * 7 + 3)
 
     logo = Image.open(LOGO).convert("RGBA")
     lw = 330 if not compact else 260
@@ -259,19 +273,21 @@ def render_win(pick: dict, streak: int = 1) -> bytes:
     # titular
     y = 50 + logo.height + (40 if not compact else 10)
     if not compact:
-        badge = _check_badge(120)
+        badge = _return_badge(120) if nula else _check_badge(120)
         im.alpha_composite(badge, ((W - 120) // 2, y))
         y += 140
-    title = "¡VERDE!"
+    title = "NULA" if nula else "¡VERDE!"
     ft = _font("Bold", 150 if not compact else 120)
     tw = d.textlength(title, font=ft)
     tglow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(tglow).text(((W - tw) / 2, y), title, font=ft, fill=(110, 255, 80, 255))
+    ImageDraw.Draw(tglow).text(((W - tw) / 2, y), title, font=ft,
+                               fill=(200, 205, 215, 255) if nula else (110, 255, 80, 255))
     im.alpha_composite(tglow.filter(ImageFilter.GaussianBlur(18)))
     d = ImageDraw.Draw(im)
-    d.text(((W - tw) / 2, y), title, font=ft, fill=(150, 255, 110))
+    d.text(((W - tw) / 2, y), title, font=ft, fill=(225, 228, 234) if nula else (150, 255, 110))
     y += 190 if not compact else 155
-    sub = f"{streak} verdes seguidos 🔥".replace(" 🔥", "") if streak >= 2 else "Lo vimos antes del pitazo"
+    sub = ("Apuesta devuelta: no se pierde nada" if nula else
+           f"{streak} verdes seguidos" if streak >= 2 else "Lo vimos antes del pitazo")
     fs = _font("Medium", 40)
     d.text(((W - d.textlength(sub, font=fs)) / 2, y), sub, font=fs, fill=(235, 235, 235))
     y += 90 if not compact else 72
@@ -317,13 +333,13 @@ def render_win(pick: dict, streak: int = 1) -> bytes:
         if " (" in sel:
             sel = sel[:sel.index(" (")]
         sel, fsel = _fit(d, sel, "Bold", 36, x1 - x0 - 230)
-        d.rounded_rectangle((x0, cy, x1, cy + 72), 18, fill=(236, 249, 234))
-        d.text((x0 + 22, cy + 13), sel, font=fsel, fill=(30, 110, 30))
-        ok = "Acertado"
+        d.rounded_rectangle((x0, cy, x1, cy + 72), 18, fill=(240, 241, 244) if nula else (236, 249, 234))
+        d.text((x0 + 22, cy + 13), sel, font=fsel, fill=SOFT if nula else (30, 110, 30))
+        ok = "Devuelta" if nula else "Acertado"
         fok = _font("Bold", 28)
         okw = d.textlength(ok, font=fok)
-        d.text((x1 - 22 - okw, cy + 20), ok, font=fok, fill=(46, 150, 46))
-        im.alpha_composite(_check_badge(30), (int(x1 - 22 - okw - 40), int(cy + 22)))
+        d.text((x1 - 22 - okw, cy + 20), ok, font=fok, fill=MUTED if nula else (46, 150, 46))
+        im.alpha_composite(_return_badge(30) if nula else _check_badge(30), (int(x1 - 22 - okw - 40), int(cy + 22)))
         d = ImageDraw.Draw(im)
         cy += 72 + 24 + 30
     by = card_y + card_h - 96
@@ -333,7 +349,7 @@ def render_win(pick: dict, streak: int = 1) -> bytes:
     lab = "CUOTA TOTAL" if len(legs) > 1 else "CUOTA"
     total = formatting.odds(pick["price"])
     d.text((x0, by + 32), lab, font=fl, fill=MUTED)
-    d.text((x0 + d.textlength(lab, font=fl) + 16, by + 22), total, font=fv, fill=GREEN)
+    d.text((x0 + d.textlength(lab, font=fl) + 16, by + 22), total, font=fv, fill=SOFT if nula else GREEN)
     st = f"STAKE {pick['stake']}/10"
     d.text((x1 - d.textlength(st, font=fl), by + 32), st, font=fl, fill=MUTED)
 

@@ -83,3 +83,7 @@ def updates(offset: int) -> list[dict]:
 def edit_text(chat_id, message_id: int, text: str) -> None:
     _call("editMessageText", chat_id=chat_id, message_id=message_id, text=text,
           parse_mode="HTML", disable_web_page_preview=True)
+
+
+def edit_caption(chat_id, message_id: int, caption: str) -> None:
+    _call("editMessageCaption", chat_id=chat_id, message_id=message_id, caption=caption, parse_mode="HTML")

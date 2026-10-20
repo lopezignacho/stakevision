@@ -3,7 +3,7 @@
 - data/state.enc: estado completo CIFRADO (picks pendientes, VIP, ids de chat). El repositorio
   es público, así que nada privado se guarda en texto plano.
 - docs/historial.json: lo que se muestra en la web. Picks VIP solo aparecen cuando su partido
-  ya empezó, para no regalarlos antes de tiempo.
+  terminó y se cerró el resultado: son de pago.
 """
 from __future__ import annotations
 
@@ -65,9 +65,8 @@ def export_public(state: dict) -> None:
     for p in state["picks"].values():
         if p["status"] not in ("published", "settled"):
             continue
-        started = parse_ts(p["kickoff"]) <= now
-        if not (p.get("free") or started):
-            continue
+        if not (p.get("free") or p["status"] == "settled"):
+            continue   # los VIP son de pago: se muestran recién cuando el partido terminó y se cerró
         rows.append({
             "id": p["id"],
             "published_at": p.get("published_at"),

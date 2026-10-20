@@ -55,33 +55,17 @@ def find_fixture(home: str, away: str, date: str):
     return best if score >= 0.72 else None
 
 
-def _form(team_id: int) -> dict | None:
-    games = _get("/fixtures", team=team_id, last=5)
-    if not games:
-        return None
-    letters, gf, ga = [], 0, 0
-    for g in games:
-        home = g["teams"]["home"]["id"] == team_id
-        mine = g["goals"]["home"] if home else g["goals"]["away"]
-        theirs = g["goals"]["away"] if home else g["goals"]["home"]
-        if mine is None or theirs is None:
-            continue
-        gf += mine
-        ga += theirs
-        letters.append("G" if mine > theirs else "E" if mine == theirs else "P")
-    n = len(letters) or 1
-    return {"form": "".join(letters), "gf": round(gf / n, 1), "ga": round(ga / n, 1)}
-
-
 def context(home: str, away: str, kickoff_iso: str) -> dict | None:
+    """Últimos partidos de cada equipo, sacados del historial propio (sv/history.py)."""
+    from . import history
     fx = find_fixture(home, away, kickoff_iso[:10])
     if not fx:
         return None
-    h = _form(fx["teams"]["home"]["id"])
-    a = _form(fx["teams"]["away"]["id"])
-    if not h and not a:
+    h = history.team_matches(fx["teams"]["home"]["id"], kickoff_iso, 10)
+    a = history.team_matches(fx["teams"]["away"]["id"], kickoff_iso, 10)
+    if len(h) < 3 and len(a) < 3:
         return None
-    return {"home": h, "away": a}
+    return {"v": 2, "home": h, "away": a}
 
 
 def final_score(home: str, away: str, kickoff_iso: str):

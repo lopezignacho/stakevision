@@ -93,6 +93,11 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False)
                   f"{n_val} 🟢 con valor y {len(picks) - n_val} ⚖️ de cuota justa.\n"
                   f"Sugerencia: 1 para el canal gratis (✅ VIP + Gratis) y hasta 3 para el VIP. "
                   f"Revisa cada cuota en tu app antes de aprobar.")
+    try:
+        from . import history
+        history.update(max_fetch=5)   # completar el historial antes de calcular la forma de los equipos
+    except Exception:
+        traceback.print_exc()
     for p in picks:
         d = p.to_dict()
         for leg in d["legs"]:
@@ -191,16 +196,39 @@ def _publish(state: dict, p: dict, free: bool) -> None:
     p.update(status="published", free=free, published_at=_iso(store.now_utc()), has_photo=bool(image))
 
 
-def _settle(state: dict, p: dict, result: str) -> None:
-    p.update(result=result, status="settled", settled_at=_iso(store.now_utc()))
-    text = formatting.result_post(p)
-    p["result_msgs"] = {}
+def _result_image(state: dict, p: dict) -> bytes | None:
+    """Imagen de resultado para los canales: verde (celebración) o nula. Las rojas van solo en texto."""
+    if p.get("result") not in ("W", "V"):
+        return None
+    try:
+        from . import postimage
+        return postimage.render_win(p, _streak(state, p) if p["result"] == "W" else 1, p["result"])
+    except Exception:
+        traceback.print_exc()
+        return None
+
+
+def _post_result(state: dict, p: dict, text: str) -> None:
+    image = _result_image(state, p)
+    p["result_msgs"], p["result_is_photo"] = {}, {}
     for where, mid in (p.get("channel_msgs") or {}).items():
         chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
         try:
+            if image:
+                try:
+                    p["result_msgs"][where] = telegram.send_photo(chat, image, caption=text, reply_to=mid)["message_id"]
+                    p["result_is_photo"][where] = True
+                    continue
+                except Exception as e:  # noqa: BLE001
+                    print(f"No se pudo enviar la imagen del resultado en {where}: {e}")
             p["result_msgs"][where] = telegram.send(chat, text, reply_to=mid)["message_id"]
         except telegram.TelegramError as e:
             print(f"No se pudo publicar resultado en {where}: {e}")
+
+
+def _settle(state: dict, p: dict, result: str) -> None:
+    p.update(result=result, status="settled", settled_at=_iso(store.now_utc()))
+    _post_result(state, p, formatting.result_post(p))
     _instagram_kit(state, p)
 
 
@@ -319,15 +347,17 @@ def _instagram_queue(state: dict, now) -> None:
 
 
 def _correct(state: dict, p: dict, result: str) -> None:
-    """Cambia el resultado de un pick ya cerrado y corrige el mensaje en los canales."""
-    p.update(result=result, corrected_at=_iso(store.now_utc()))
-    text = formatting.result_correction(p)
-    for where, mid in (p.get("result_msgs") or {}).items():
+    """Cambia el resultado de un pick ya cerrado: tacha el mensaje anterior y publica el correcto."""
+    old_msgs, old_photo = p.get("result_msgs") or {}, p.get("result_is_photo") or {}
+    note = "✏️ <i>Resultado corregido: ver el mensaje siguiente.</i>"
+    for where, mid in old_msgs.items():
         chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
         try:
-            telegram.edit_text(chat, mid, text)
+            (telegram.edit_caption if old_photo.get(where) else telegram.edit_text)(chat, mid, note)
         except telegram.TelegramError as e:
-            print(f"No se pudo corregir el resultado en {where}: {e}")
+            print(f"No se pudo marcar la corrección en {where}: {e}")
+    p.update(result=result, corrected_at=_iso(store.now_utc()))
+    _post_result(state, p, formatting.result_correction(p))
     _instagram_kit(state, p)
 
 
@@ -554,6 +584,11 @@ def poll() -> None:
                 and now >= last_kick + timedelta(minutes=config.RESULT_CHECK_AFTER_MIN)
                 and not (p.get("next_check") and now < store.parse_ts(p["next_check"]))):
             _auto_result(state, p, owner, now, last_kick)
+    try:
+        from . import history
+        history.update(max_fetch=1)   # arma el historial de resultados de a poco (1 consulta por revisión)
+    except Exception:
+        traceback.print_exc()
     try:
         from . import instagram
         if instagram.enabled(state):

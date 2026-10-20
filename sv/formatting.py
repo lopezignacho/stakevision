@@ -63,24 +63,93 @@ def outcome_label(l: dict) -> str:
     return o
 
 
+def _n(x: float) -> str:
+    return f"{x:.1f}".replace(".", ",")
+
+
+def _streak_phrase(ms: list[dict]) -> str:
+    """Racha actual, del partido más reciente hacia atrás."""
+    res = ["G" if m["gf"] > m["ga"] else "E" if m["gf"] == m["ga"] else "P" for m in ms]
+    def run(pred):
+        k = 0
+        for r in res:
+            if not pred(r):
+                break
+            k += 1
+        return k
+    w, nl, l, nw = run(lambda r: r == "G"), run(lambda r: r != "P"), run(lambda r: r == "P"), run(lambda r: r != "G")
+    if w >= 3:
+        return f"{w} victorias seguidas"
+    if nl >= 3:
+        return f"{nl} partidos sin perder"
+    if l >= 2:
+        return f"{l} derrotas seguidas"
+    if nw >= 3:
+        return f"{nw} partidos sin ganar"
+    return ""
+
+
+def _team_line(team: str, ms: list[dict], venue: str) -> str:
+    """Una línea con la forma del equipo: racha, balance, goles y rendimiento de local o de visita."""
+    last = ms[:6]
+    g = sum(m["gf"] > m["ga"] for m in last)
+    e = sum(m["gf"] == m["ga"] for m in last)
+    p = len(last) - g - e
+    gf = sum(m["gf"] for m in last) / len(last)
+    ga = sum(m["ga"] for m in last) / len(last)
+    streak = _streak_phrase(ms)
+    head = f"{escape(team)} llega con {streak}" if streak else f"{escape(team)}"
+    line = (f"{head}{':' if streak else ''} {g}G {e}E {p}P en sus últimos {len(last)}, "
+            f"con {_n(gf)} goles a favor y {_n(ga)} en contra por partido")
+    at = [m for m in ms if m["venue"] == venue][:5]
+    if len(at) >= 3:
+        wins = sum(m["gf"] > m["ga"] for m in at)
+        where = "de local" if venue == "L" else "de visita"
+        line += f"; {where} ganó {wins} de {len(at)}"
+    return line + "."
+
+
+def _market_line(l: dict, h: list[dict], a: list[dict]) -> str:
+    """Dato que respalda directamente el mercado elegido."""
+    t, o, line = l.get("mtype", ""), str(l.get("outcome", "")).lower(), l.get("handicap")
+    hh, aa = h[:6], a[:6]
+    if t == "totals" and line is not None:
+        over = o.startswith(("más", "mas"))
+        cnt = lambda ms: sum(((m["gf"] + m["ga"]) > float(line)) == over for m in ms)  # noqa: E731
+        txt = f"{'más' if over else 'menos'} de {_line(line)} goles"
+        return (f"Se dieron {txt} en {cnt(hh)} de {len(hh)} partidos de {escape(l['home'])} "
+                f"y en {cnt(aa)} de {len(aa)} de {escape(l['away'])}.")
+    if t == "bothteamsscore":
+        yes = o.startswith(("s", "y"))
+        cnt = lambda ms: sum((m["gf"] > 0 and m["ga"] > 0) == yes for m in ms)  # noqa: E731
+        return (f"{'Ambos marcaron' if yes else 'Al menos uno no marcó'} en {cnt(hh)} de {len(hh)} partidos de "
+                f"{escape(l['home'])} y en {cnt(aa)} de {len(aa)} de {escape(l['away'])}.")
+    if t.startswith(("teamtotals", "toscore")):
+        side = hh if t.endswith("1") else aa
+        team = l["home"] if t.endswith("1") else l["away"]
+        scored = sum(m["gf"] > 0 for m in side)
+        return f"{escape(team)} marcó en {scored} de sus últimos {len(side)} partidos."
+    return ""
+
+
 def analysis(pick: dict) -> str:
-    """Texto breve y honesto basado en los datos que realmente tenemos."""
+    """Valor de la cuota + forma real de los equipos (si hay datos) + probabilidad. Breve."""
     parts = []
     for l in pick["legs"]:
-        line = (f"{escape(outcome_label(l))} en {escape(l['home'])} vs {escape(l['away'])}: "
-                f"cuota justa estimada {odds(l['fair_odds'])}, cuota disponible {odds(l['price'])}"
-                + (f" (+{pct(l['edge'])} de valor)." if l['edge'] >= 0 else " (en línea con la cuota justa)."))
-        ctx = l.get("context")
-        if ctx:
-            bits = []
-            for side, team in (("home", l["home"]), ("away", l["away"])):
-                c = ctx.get(side)
-                if c and c.get("form"):
-                    bits.append(f"{escape(team)} últimos {len(c['form'])}: {c['form']} "
-                                f"({c['gf']} a favor / {c['ga']} en contra por partido)")
-            if bits:
-                line += " " + "; ".join(bits) + "."
-        parts.append(line)
+        parts.append(f"{escape(outcome_label(l))} en {escape(l['home'])} vs {escape(l['away'])}: "
+                     f"cuota justa estimada {odds(l['fair_odds'])}, cuota disponible {odds(l['price'])}"
+                     + (f" (+{pct(l['edge'])} de valor)." if l['edge'] >= 0 else " (en línea con la cuota justa)."))
+        ctx = l.get("context") or {}
+        if ctx.get("v") == 2:
+            h, a = ctx.get("home") or [], ctx.get("away") or []
+            if len(h) >= 3:
+                parts.append("📊 " + _team_line(l["home"], h, "L"))
+            if len(a) >= 3:
+                parts.append("📊 " + _team_line(l["away"], a, "V"))
+            if len(h) >= 3 and len(a) >= 3:
+                m = _market_line(l, h, a)
+                if m:
+                    parts.append("🎯 " + m)
     parts.append(f"Probabilidad estimada: {pct(pick['prob'])}. "
                  f"Para no perder a esta cuota se necesita {pct(1 / pick['price'])}.")
     return "\n".join(parts)
