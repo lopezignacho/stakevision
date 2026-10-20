@@ -4,7 +4,7 @@ Sistema automático de pronósticos de fútbol:
 
 1. **Cada mañana (09:07 Chile)** busca partidos de las próximas 30 horas y compara cada cuota de **Betano** con la cuota justa de **Pinnacle** (sin su margen).
 2. Se queda con picks de **valor ≥ 3%** y **cuota final entre 1.65 y 2.00**: simples primero; dobles solo si cada selección tiene valor por sí sola.
-3. Te los manda por privado en Telegram con botones: **✅ Solo VIP**, **✅ VIP + Gratis** o **❌ Descartar**.
+3. Te los manda por privado en Telegram. Con **🖼 Elegir** genera la imagen del pick y te deja publicarlo en **👑 VIP**, **👑🎁 VIP + Gratis** y/o **📸 Instagram** (los que tú decidas); o **❌ Descartar**.
 4. Lo aprobado se publica solo en los canales (revisión cada 5 minutos, todo el día).
 5. Cada pick sale a los canales con su imagen (logo, cupón con las selecciones e ícono del deporte) y 30 minutos antes del partido el bot avisa que está por comenzar.
 6. Unas 2 h 15 min después del inicio, busca el marcador final (90') y **califica solo** el pick: ✅ verde, ❌ roja o ↩️ nula (devuelta). Lo publica como respuesta al pick y te avisa con un botón **✏️ Corregir** por si algo no cuadra. Si el marcador aún no está, reintenta cada 20 min; si a las 6 h no aparece, o el mercado no se puede leer, te pregunta a ti.
@@ -45,6 +45,7 @@ Nunca pegues estas claves en el código ni en un chat.
 ## Uso diario
 - Revisa la cuota de cada candidato en tu app antes de aprobar.
 - `/buscar` al bot: analiza en ese momento y te manda el top 3 (`/buscar 40` mira 40 horas adelante). Máximo 4 al día.
+- `/envivo` al bot: busca valor en partidos que se están jugando (el candidato vence a los 20 minutos).
 - `/estado` al bot: candidatos pendientes, picks en juego, historial y consultas de OddsPapi usadas.
 - `/ayuda`: lista de comandos.
 

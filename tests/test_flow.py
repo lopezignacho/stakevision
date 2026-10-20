@@ -215,3 +215,63 @@ main.poll()
 assert posted and posted[0][0] == pw["id"] and "#Stakevision" in posted[0][1]
 assert store.load()["picks"][pw["id"]]["ig_status"] == "posted" and "Publicado en Instagram" in sent[-1][1]
 print("OK Instagram")
+
+# 7) flujo nuevo: Elegir -> imagen con destinos -> VIP -> agregar Gratis -> Instagram
+config.MANUAL_SEARCHES_PER_DAY = 10
+fx4 = te.fixture("f4", "Audax Italiano", "Ñublense", hours=8)
+oddspapi.upcoming_fixtures = lambda frm, to: [fx4]
+oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "f4", "bookmakerOdds": {
+    "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
+    "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}}]
+main.scan()
+st = store.load()
+p4 = next(p for p in st["picks"].values() if p["legs"][0]["fixture_id"] == "f4")
+cand = [b for _, t, b, _ in sent if b and b[0][0][1] == f"s:{p4['id']}"]
+assert cand, "el candidato debe traer el botón Elegir"
+buttons_set = []
+telegram.set_buttons = lambda chat, mid, rows: buttons_set.append(rows)
+n_ph = len(photos)
+updates_q.append({"update_id": 100, "callback_query": {"id": "s1", "data": f"s:{p4['id']}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 70}}})
+main.poll()
+assert store.load()["picks"][p4["id"]]["status"] == "selected"
+assert any(ch == OWNER and c and "listo para compartir" in c for ch, c in photos[n_ph:])
+assert buttons_set and buttons_set[-1][0][0][1] == f"pv:{p4['id']}"
+updates_q.append({"update_id": 101, "callback_query": {"id": "s2", "data": f"pv:{p4['id']}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 71}}})
+main.poll()
+p4s = store.load()["picks"][p4["id"]]
+assert p4s["status"] == "published" and set(p4s["channel_msgs"]) == {"vip"} and not p4s["free"]
+assert buttons_set[-1][0][1][1] == f"pf:{p4['id']}"   # ahora ofrece agregar a Gratis
+updates_q.append({"update_id": 102, "callback_query": {"id": "s3", "data": f"pf:{p4['id']}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 71}}})
+main.poll()
+p4s = store.load()["picks"][p4["id"]]
+assert set(p4s["channel_msgs"]) == {"vip", "free"} and p4s["free"]
+n_vip = sum(1 for ch, *_ in sent if ch == VIP)
+updates_q.append({"update_id": 103, "callback_query": {"id": "s4", "data": f"pi:{p4['id']}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 71}}})
+posted.clear()
+main.poll()
+p4s = store.load()["picks"][p4["id"]]
+assert p4s["ig_pre_status"] == "posted" and posted[-1][0] == f"pre-{p4['id']}" and "PICK STAKEVISION" in posted[-1][1]
+assert sum(1 for ch, *_ in sent if ch == VIP) == n_vip   # no se duplicó en VIP
+print("OK elegir + destinos")
+
+# 8) /envivo: partidos jugándose; el candidato vence a los 20 min, no al inicio
+fx5 = te.fixture("f5", "Toluca", "Santos", hours=-0.5)
+oddspapi.live_fixtures = lambda frm, to: [fx5]
+oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "f5", "bookmakerOdds": {
+    "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
+    "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}}]
+from sv import espn  # noqa: E402
+espn.live_info = lambda *a, **k: {"score": "1-0", "clock": "32'", "state": "in"}
+updates_q.append({"update_id": 104, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/envivo"}})
+main.poll()
+st = store.load()
+p5 = next(p for p in st["picks"].values() if p["legs"][0]["fixture_id"] == "f5")
+assert p5["live"] and p5["status"] == "candidate" and p5["live_info"] == "1-0 · 32'"
+assert any("EN VIVO" in t for _, t, *_ in sent[-3:])
+main.poll()
+assert store.load()["picks"][p5["id"]]["status"] == "candidate"   # no vence por haber empezado
+print("OK /envivo")

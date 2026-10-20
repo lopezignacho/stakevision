@@ -109,6 +109,12 @@ def upcoming_fixtures(frm: str, to: str) -> list[dict]:
                 statusId=0, hasOdds="true", bookmakers=config.BOOK)
 
 
+def live_fixtures(frm: str, to: str) -> list[dict]:
+    """Partidos de fútbol que se están jugando (statusId=1) con cuotas de Betano."""
+    return _get("/fixtures", sportId=10, **{"from": frm, "to": to},
+                statusId=1, hasOdds="true", bookmakers=config.BOOK)
+
+
 def odds_by_tournaments(tournament_ids: list[int]) -> list[dict]:
     """Cuotas de Betano y Pinnacle. OddsPapi acepta 1 casa y hasta 5 ligas por consulta,
     así que se pide por grupos y se combinan por partido (bookmakerOdds por casa)."""

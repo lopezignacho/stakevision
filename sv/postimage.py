@@ -369,3 +369,17 @@ def render_win(pick: dict, streak: int = 1, result: str = "W") -> bytes:
     out = io.BytesIO()
     im.convert("RGB").save(out, "JPEG", quality=92, optimize=True)
     return out.getvalue()
+
+
+def fit_instagram(jpeg: bytes) -> bytes:
+    """Instagram acepta de 4:5 (vertical) a 1.91:1. Si la imagen es más alta, se encaja en 1080x1350."""
+    im = Image.open(io.BytesIO(jpeg)).convert("RGB")
+    if im.height <= 1350:
+        return jpeg
+    scale = 1350 / im.height
+    small = im.resize((round(im.width * scale), 1350), Image.LANCZOS)
+    canvas = _background(1350).convert("RGB")
+    canvas.paste(small, ((W - small.width) // 2, 0))
+    out = io.BytesIO()
+    canvas.save(out, "JPEG", quality=92, optimize=True)
+    return out.getvalue()

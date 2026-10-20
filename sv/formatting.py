@@ -182,12 +182,16 @@ def owner_candidate(pick: dict) -> str:
     tag = ("🟢 <b>Con valor</b>" if pick.get("tier", "valor") == "valor"
            else "⚖️ <b>Cuota justa</b> (sin ventaja medida: decide según tu lectura del partido)")
     sign = "+" if pick["edge"] >= 0 else ""
-    return (f"🆕 <b>Candidato #{pick['id']}</b> ({pick['kind']})\n{tag}\n\n"
+    live = ""
+    if pick.get("live"):
+        live = (f"🔴 <b>EN VIVO</b>" + (f" · {escape(pick['live_info'])}" if pick.get("live_info") else "")
+                + f"\n⏱ Vence en {config.LIVE_CANDIDATE_MIN} min: las cuotas en vivo cambian rápido.\n")
+    return (f"🆕 <b>Candidato #{pick['id']}</b> ({pick['kind']})\n{live}{tag}\n\n"
             f"{_legs_block(pick)}\n\n"
             f"📈 Cuota: <b>{odds(pick['price'])}</b> · Valor: <b>{sign}{pct(pick['edge'])}</b> · "
             f"Stake sugerido: {pick['stake']}/10\n\n"
             f"<i>{pick['analysis']}</i>\n\n"
-            f"Verifica la cuota en tu app antes de aprobar. Tu elección se aplica en unos minutos.")
+            f"Verifica la cuota en tu app antes de elegir. Al tocar «Elegir» te llega la imagen y decides dónde publicarla.")
 
 
 RESULT_LABEL = {"W": "✅ VERDE", "L": "❌ ROJA", "V": "↩️ NULA (devuelta)"}
@@ -290,4 +294,25 @@ def instagram_caption(pick: dict, streak: int = 1) -> str:
             if t and t not in tags:
                 tags.append(t)
     lines.append(" ".join(tags[:12]))
+    return "\n".join(lines)
+
+
+def instagram_pick_caption(pick: dict) -> str:
+    """Texto para Instagram de un pick antes del partido (texto plano)."""
+    import html as _h
+    import re as _re
+    emoji = {"soccer": "⚽", "tennis": "🎾", "basketball": "🏀"}
+    lines = ["👁 PICK STAKEVISION" + (" · 🔴 EN VIVO" if pick.get("live") else ""), ""]
+    for l in pick["legs"]:
+        lines.append(f"{emoji.get(l.get('sport') or 'soccer', '🏟')} {l['home']} vs {l['away']}")
+        lines.append(f"🏆 {l['league']} · 🕒 {local_time(l['kickoff'])}")
+        lines.append(f"🎯 {outcome_label(l)} @ {odds(l['price'])}")
+    lines.append(f"📈 Cuota {odds(pick['price'])} · Stake {pick['stake']}/10")
+    ana = _h.unescape(_re.sub(r"<[^>]+>", "", pick.get("analysis") or ""))
+    keep = [x for x in ana.split("\n") if x.startswith("📊") or x.startswith("🎯")]
+    if keep:
+        lines += [""] + keep[:3]
+    lines += ["", "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio).",
+              "🔞 +18 · Juega con responsabilidad. Apostar implica riesgo de pérdida.", "",
+              "#Stakevision #PronosticosDeportivos #Futbol #ApuestasDeportivas"]
     return "\n".join(lines)

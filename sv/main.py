@@ -14,9 +14,35 @@ from . import apifootball, config, formatting, oddspapi, store, telegram
 from .value import build_picks, selections_for_fixture
 
 CANDIDATE_BUTTONS = lambda pid: [  # noqa: E731
-    [("✅ Solo VIP", f"a:{pid}"), ("✅ VIP + Gratis", f"f:{pid}")],
+    [("🖼 Elegir y generar imagen", f"s:{pid}")],
     [("❌ Descartar", f"r:{pid}")],
 ]
+
+
+def SHARE_BUTTONS(p: dict) -> list:
+    """Destinos para un pick elegido. Cada uno se puede usar; lo ya hecho queda marcado."""
+    pid, msgs = p["id"], p.get("channel_msgs") or {}
+    rows = []
+    vip_done, free_done = "vip" in msgs, "free" in msgs
+    if not vip_done:
+        rows.append([("👑 Enviar a VIP", f"pv:{pid}"), ("👑🎁 VIP + Gratis", f"pf:{pid}")])
+    elif not free_done:
+        rows.append([("✅ En VIP", "noop"), ("🎁 Agregar a Gratis", f"pf:{pid}")])
+    else:
+        rows.append([("✅ En VIP + Gratis", "noop")])
+    st = p.get("ig_pre_status")
+    rows.append([("✅ Instagram" if st == "posted" else "⏳ Instagram en cola" if st == "queued"
+                  else "📸 Compartir en Instagram", "noop" if st in ("queued", "posted") else f"pi:{pid}")])
+    if not msgs and not st:
+        rows.append([("❌ Descartar", f"r:{pid}")])
+    return rows
+
+
+def _expires(p: dict):
+    """Un candidato en vivo vence a los 20 minutos (las cuotas cambian); uno normal, al empezar el partido."""
+    if p.get("live"):
+        return store.parse_ts(p["created_at"]) + timedelta(minutes=config.LIVE_CANDIDATE_MIN)
+    return store.parse_ts(p["kickoff"])
 RESULT_BUTTONS = lambda pid: [  # noqa: E731
     [("✅ Verde", f"W:{pid}"), ("❌ Roja", f"L:{pid}"), ("↩️ Nula", f"V:{pid}")],
 ]
@@ -27,18 +53,22 @@ def _iso(dt) -> str:
 
 
 # ---------------------------------------------------------------- escaneo diario
-def scan(hours: int | None = None, top: int | None = None, manual: bool = False) -> None:
+def scan(hours: int | None = None, top: int | None = None, manual: bool = False, live: bool = False) -> None:
     state = store.load()
     if not state["owner_chat"]:
         print("Aún no está vinculado tu chat. Escribe al bot: /vincular <tu código>")
         return
     now = store.now_utc()
     hours = min(hours or config.WINDOW_END_H, 47)
-    title = f"🔎 Búsqueda manual ({hours} h)" if manual else "🔎 Escaneo de hoy"
-    frm, to = now + timedelta(hours=config.WINDOW_START_H), now + timedelta(hours=hours)
+    if live:
+        title = "🔴 Búsqueda en vivo"
+        frm, to = now - timedelta(minutes=config.LIVE_MAX_MINUTE + 20), now
+    else:
+        title = f"🔎 Búsqueda manual ({hours} h)" if manual else "🔎 Escaneo de hoy"
+        frm, to = now + timedelta(hours=config.WINDOW_START_H), now + timedelta(hours=hours)
 
     markets = oddspapi.markets()
-    fixtures = oddspapi.upcoming_fixtures(_iso(frm), _iso(to))
+    fixtures = (oddspapi.live_fixtures if live else oddspapi.upcoming_fixtures)(_iso(frm), _iso(to))
     fixtures = [f for f in fixtures if frm <= store.parse_ts(f["startTime"]) <= to]
     by_id = {f["fixtureId"]: f for f in fixtures}
     print(f"Partidos con cuotas de Betano en la ventana: {len(by_id)}")
@@ -53,8 +83,8 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False)
     names = {t: config.TOURNAMENTS[t] for t in tournaments}
     print("Ligas analizadas hoy: " + "; ".join(f"{names[t]} ({counts[t]})" for t in tournaments))
     if not tournaments:
-        telegram.send(state["owner_chat"], f"{title}: ninguna de tus ligas tiene partidos en las "
-                      f"próximas {hours} horas.")
+        telegram.send(state["owner_chat"], f"{title}: ninguna de tus ligas tiene partidos "
+                      + ("jugándose ahora." if live else f"en las próximas {hours} horas."))
         return
 
     odds_rows = oddspapi.odds_by_tournaments(tournaments)
@@ -106,6 +136,15 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False)
         state["seq"] += 1
         pid = str(state["seq"])
         d.update(id=pid, status="candidate", created_at=_iso(now), stake_v=2)
+        if live:
+            d["live"] = True
+            try:
+                from . import espn
+                info = espn.live_info(d["legs"][0]["home"], d["legs"][0]["away"], d["legs"][0]["kickoff"])
+            except Exception:
+                info = None
+            if info:
+                d["live_info"] = f"{info['score']} · {info['clock']}"
         d["analysis"] = formatting.analysis(d)
         msg = telegram.send(state["owner_chat"], formatting.owner_candidate(d), CANDIDATE_BUTTONS(pid))
         d["owner_msg"] = msg["message_id"]
@@ -179,21 +218,28 @@ def _post(chat, text: str, image: bytes | None) -> int:
     return telegram.send(chat, text)["message_id"]
 
 
-def _publish(state: dict, p: dict, free: bool) -> None:
-    text = formatting.channel_post(p)
+def _pick_image(p: dict) -> bytes | None:
     try:
         from . import postimage
-        image = postimage.render(p)
+        return postimage.render(p)
     except Exception:
         traceback.print_exc()
-        image = None
-    p["channel_msgs"] = {}
+        return None
+
+
+def _publish(state: dict, p: dict, free: bool) -> None:
+    """Publica en VIP (y en Gratis si free). Si ya estaba en un canal, no lo repite."""
+    text = formatting.channel_post(p)
+    image = _pick_image(p)
+    msgs = p.setdefault("channel_msgs", {})
     vip = state.get("vip_chat")
-    if vip:
-        p["channel_msgs"]["vip"] = _post(vip, text, image)
-    if free:
-        p["channel_msgs"]["free"] = _post(config.FREE_CHANNEL, text, image)
-    p.update(status="published", free=free, published_at=_iso(store.now_utc()), has_photo=bool(image))
+    if vip and "vip" not in msgs:
+        msgs["vip"] = _post(vip, text, image)
+    if free and "free" not in msgs:
+        msgs["free"] = _post(config.FREE_CHANNEL, text, image)
+    if p["status"] != "published":
+        p.update(status="published", published_at=_iso(store.now_utc()), has_photo=bool(image))
+    p["free"] = "free" in msgs
 
 
 def _result_image(state: dict, p: dict) -> bytes | None:
@@ -326,21 +372,28 @@ def _instagram_queue(state: dict, now) -> None:
     """Publica en Instagram los verdes que aprobaste, cuando la imagen ya está en la web."""
     from . import instagram
     owner = state.get("owner_chat")
+    jobs = []
     for p in state["picks"].values():
-        if p.get("ig_status") != "queued":
-            continue
-        if not instagram.image_live(p["id"]):
+        if p.get("ig_status") == "queued":
+            jobs.append((p, "ig_status", p["id"], p.get("ig_caption") or ""))
+        if p.get("ig_pre_status") == "queued":
+            jobs.append((p, "ig_pre_status", f"pre-{p['id']}", p.get("ig_pre_caption") or ""))
+    for p, field, key, caption in jobs:
+        if not instagram.image_live(key):
             continue   # la web aún no la publica; se reintenta en la próxima revisión
         try:
-            link = instagram.publish(state, p["id"], p.get("ig_caption") or "")
-            p["ig_status"] = "posted"
+            link = instagram.publish(state, key, caption)
+            p[field] = "posted"
+            if field == "ig_pre_status" and p.get("share_msg") and owner:
+                telegram.set_buttons(owner, p["share_msg"], SHARE_BUTTONS(p))
             if owner:
                 telegram.send(owner, f"✅ Publicado en Instagram (pick #{p['id']})" + (f"\n{link}" if link else ""))
         except instagram.InstagramError as e:
-            p["ig_tries"] = p.get("ig_tries", 0) + 1
+            tries = field.replace("status", "tries")
+            p[tries] = p.get(tries, 0) + 1
             print(f"Instagram falló (pick {p['id']}): {e}")
-            if p["ig_tries"] >= 3:
-                p["ig_status"] = "failed"
+            if p[tries] >= 3:
+                p[field] = "failed"
                 if owner:
                     telegram.send(owner, f"⚠️ No pude publicar en Instagram el pick #{p['id']}: "
                                          f"{formatting.escape(str(e))}\nPuedes subirlo a mano con la imagen que te mandé.")
@@ -386,6 +439,8 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith(("/envivo", "/vivo")):
+            _request_search(state, text, live=True)
         elif chat == owner and text.lower().startswith("/buscar"):
             _request_search(state, text)
         elif chat == owner and text.lower().startswith(("/ayuda", "/start", "/help")):
@@ -413,11 +468,65 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.answer(cb["id"])
         return
 
-    if action in ("a", "f", "r"):
+    if action == "s":   # elegir: generar la imagen y preguntar destinos
         if p["status"] != "candidate":
             telegram.answer(cb["id"], "Ya estaba procesado")
             return
+        if _expires(p) <= store.now_utc():
+            p["status"] = "expired"
+            telegram.edit_buttons_off(owner, cb["message"]["message_id"], "⌛ Ya no está vigente")
+            telegram.answer(cb["id"], "Llegó tarde")
+            return
+        image = _pick_image(p)
+        p["status"] = "selected"
+        telegram.edit_buttons_off(owner, cb["message"]["message_id"], "🖼 Elegido: imagen generada abajo")
+        caption = (f"🖼 <b>Pick #{p['id']} listo para compartir</b>\n"
+                   "Elige dónde publicarlo (puedes usar varios botones):")
+        msg = (telegram.send_photo(owner, image, caption=caption) if image else telegram.send(owner, caption))
+        p["share_msg"] = msg["message_id"]
+        telegram.set_buttons(owner, p["share_msg"], SHARE_BUTTONS(p))
+        telegram.answer(cb["id"], "Imagen generada")
+        return
+
+    if action in ("pv", "pf", "pi"):
+        if p["status"] not in ("selected", "published"):
+            telegram.answer(cb["id"], "Este pick ya no está disponible")
+            return
+        late = _expires(p) <= store.now_utc() and not p.get("live")
+        if action in ("pv", "pf"):
+            if late and not p.get("channel_msgs"):
+                telegram.answer(cb["id"], "El partido ya empezó: no se publica")
+                return
+            if not state.get("vip_chat"):
+                telegram.answer(cb["id"], "Primero vincula el canal VIP con /vincular_vip")
+                return
+            _publish(state, p, free=(action == "pf"))
+            telegram.answer(cb["id"], "Publicado")
+        else:
+            from . import instagram
+            if not instagram.enabled(state):
+                telegram.answer(cb["id"], "Instagram no está conectado")
+                return
+            image = _pick_image(p)
+            if not image:
+                telegram.answer(cb["id"], "No se pudo generar la imagen")
+                return
+            from . import postimage
+            instagram.save_image(f"pre-{p['id']}", postimage.fit_instagram(image))
+            p["ig_pre_status"] = "queued"
+            p["ig_pre_caption"] = formatting.instagram_pick_caption(p)
+            telegram.answer(cb["id"], "Se publica en Instagram en unos minutos")
+        telegram.set_buttons(owner, cb["message"]["message_id"], SHARE_BUTTONS(p))
+        return
+
+    if action in ("a", "f", "r"):
+        if p["status"] not in ("candidate", "selected") or (action != "r" and p["status"] != "candidate"):
+            telegram.answer(cb["id"], "Ya estaba procesado")
+            return
         if action == "r":
+            if p.get("channel_msgs") or p.get("ig_pre_status"):
+                telegram.answer(cb["id"], "Ya se publicó en algún lado")
+                return
             p["status"] = "rejected"
             telegram.edit_buttons_off(owner, cb["message"]["message_id"], "❌ Descartado")
             telegram.answer(cb["id"], "Descartado")
@@ -477,18 +586,21 @@ HELP_TEXT = (
     "👁 <b>Comandos de Stakevision</b>\n\n"
     "/buscar · analiza ahora los partidos de las próximas 30 h y te manda el top 3\n"
     "/buscar 40 · igual, pero mirando 40 horas hacia adelante (máximo 47)\n"
+    "/envivo · busca valor en partidos que se están jugando ahora\n"
     "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
     "/ayuda · esta lista\n\n"
     "El escaneo automático sigue saliendo todos los días a las 09:07."
 )
 
 
-def _request_search(state: dict, text: str) -> None:
+def _request_search(state: dict, text: str, live: bool = False) -> None:
     from zoneinfo import ZoneInfo
     owner = state["owner_chat"]
     parts = text.split()
     hours = config.WINDOW_END_H
-    if len(parts) > 1:
+    if len(parts) > 1 and parts[1].lower() in ("vivo", "envivo", "live"):
+        live = True
+    elif len(parts) > 1 and not live:
         try:
             hours = max(2, min(47, int(parts[1])))
         except ValueError:
@@ -504,6 +616,11 @@ def _request_search(state: dict, text: str) -> None:
         return
     m["n"] += 1
     state["manual"] = m
+    if live:
+        state["scan_request"] = "live"
+        telegram.send(owner, f"🔴 Buscando valor en los partidos que se están jugando… te llega en un par de "
+                             f"minutos. (Búsqueda {m['n']} de {config.MANUAL_SEARCHES_PER_DAY} hoy)")
+        return
     state["scan_request"] = hours
     telegram.send(owner, f"🔎 Buscando los mejores picks de las próximas {hours} horas… "
                          f"te llegan en un par de minutos. (Búsqueda {m['n']} de {config.MANUAL_SEARCHES_PER_DAY} hoy)")
@@ -556,21 +673,25 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
-    if owner and state.get("cmds_v") != 1:
+    if owner and state.get("cmds_v") != 2:
         try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
             telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
                 {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
+                {"command": "envivo", "description": "Buscar valor en partidos que se están jugando"},
                 {"command": "estado", "description": "Pendientes, picks en juego e historial"},
                 {"command": "ayuda", "description": "Lista de comandos"}])
-            state["cmds_v"] = 1
+            state["cmds_v"] = 2
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)
     for p in state["picks"].values():
-        if p["status"] == "candidate" and store.parse_ts(p["kickoff"]) <= now:
+        if p["status"] in ("candidate", "selected") and _expires(p) <= now:
+            was = p["status"]
             p["status"] = "expired"
-            if owner and p.get("owner_msg"):
+            if owner and p.get("owner_msg") and was == "candidate":
                 telegram.edit_buttons_off(owner, p["owner_msg"], "⌛ Sin aprobar a tiempo")
+            if owner and p.get("share_msg"):
+                telegram.edit_buttons_off(owner, p["share_msg"], "⌛ Ya no está vigente")
         _remind(state, p, now)
         if (p["status"] == "settled" and p.get("result") == "W" and p.get("settled_at")
                 and now - store.parse_ts(p["settled_at"]) < timedelta(hours=48)):
@@ -608,7 +729,9 @@ def poll() -> None:
         traceback.print_exc()
     request = state.pop("scan_request", None)
     store.save(state)
-    if request:
+    if request == "live":
+        scan(top=config.MANUAL_TOP, manual=True, live=True)
+    elif request:
         scan(hours=request, top=config.MANUAL_TOP, manual=True)
 
 
