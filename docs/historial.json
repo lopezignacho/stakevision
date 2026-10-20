@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-20T00:10:26.761562+00:00",
+ "updated_at": "2026-10-20T00:15:24.153188+00:00",
  "summary": {
-  "picks": 1,
-  "wins": 1,
+  "picks": 2,
+  "wins": 2,
   "losses": 0,
   "hit_rate": 1.0,
-  "yield": 0.82,
-  "avg_odds": 1.82,
-  "units": 2.46
+  "yield": 0.845,
+  "avg_odds": 1.85,
+  "units": 5.07
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 3,
    "prob": null,
    "free": false,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Newell's Old Boys",
@@ -32,7 +32,10 @@
      "mtype": "totals",
      "handicap": 2.0,
      "sport": "soccer",
-     "score": null
+     "score": [
+      2,
+      1
+     ]
     }
    ],
    "analysis": null
