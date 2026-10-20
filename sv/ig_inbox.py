@@ -175,10 +175,22 @@ def _remember(box: dict, key: str, value: str) -> None:
 
 def _comments(state: dict, box: dict, me: dict, budget: list) -> None:
     since = box["since"]
-    media = instagram._call("GET", "me/media", state, fields="id,timestamp", limit=12).get("data") or []
+    media = instagram._call("GET", "me/media", state, fields="id,timestamp,comments_count,permalink",
+                            limit=12).get("data") or []
+    counts = box.setdefault("counts", {})
+    first = not counts
     for m in media:
+        n = int(m.get("comments_count") or 0)
+        seen = counts.get(m["id"], n if first else 0)
+        counts[m["id"]] = n
         data = instagram._call("GET", f"{m['id']}/comments", state,
                                fields="id,text,username,timestamp,from").get("data") or []
+        if n > seen and len(data) < n and state.get("owner_chat"):
+            # Meta (sin revisión de la app) no deja leer comentarios de terceros: al menos te avisamos.
+            telegram.send(state["owner_chat"],
+                          f"🗨 <b>Comentario nuevo en Instagram</b> ({n - seen})\n"
+                          f"Todavía no puedo leerlo ni responderlo solo (falta la revisión de Meta). "
+                          f"Respóndelo tú aquí: {m.get('permalink') or ''}")
         for c in data:
             if budget[0] <= 0:
                 return
