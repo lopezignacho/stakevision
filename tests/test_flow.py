@@ -299,3 +299,37 @@ updates_q.append({"update_id": 111, "message": {"chat": {"id": OWNER, "type": "p
 main.poll()
 assert len(photos) == n + 1 and "listo para compartir" in photos[-1][1]
 print("OK /compartir")
+
+# 10) asistente de Instagram: responde comentarios y mensajes; lo dudoso te lo avisa
+from sv import ig_inbox  # noqa: E402
+calls = []
+def fake_ig(method, path, state, **params):
+    calls.append((method, path, params))
+    if path == "me":
+        return {"user_id": "999", "username": "stakevision"}
+    if path == "me/media":
+        return {"data": [{"id": "m1"}]}
+    if path == "m1/comments":
+        return {"data": [
+            {"id": "c1", "text": "cuánto cuesta el vip?", "username": "juan", "timestamp": "2099-01-01T00:00:00+0000"},
+            {"id": "c2", "text": "tengo 15 años jaja", "username": "nico", "timestamp": "2099-01-01T00:00:00+0000"},
+            {"id": "c0", "text": "viejo", "username": "ana", "timestamp": "2000-01-01T00:00:00+0000"}]}
+    if path == "me/conversations":
+        return {"data": [{"id": "conv1", "updated_time": "2099-01-01T00:00:00+0000"}]}
+    if path == "conv1":
+        return {"messages": {"data": [
+            {"id": "d1", "created_time": "2099-01-01T00:00:00+0000", "from": {"id": "55", "username": "pedro"},
+             "message": "hola, donde veo el pick gratis?"}]}}
+    return {"id": "ok"}
+instagram._call = fake_ig
+n = len(sent)
+main.poll()
+posts = [(p, prm) for m, p, prm in calls if m == "POST"]
+assert ("c1/replies" in [p for p, _ in posts]) and not any(p == "c2/replies" or p == "c0/replies" for p, _ in posts)
+dm = [prm for p, prm in posts if p == "999/messages"]
+assert dm and "t.me/stakevision" in dm[0]["message"] and "+18" in dm[0]["message"]
+assert any("menor" in t.lower() for _, t, *_ in sent[n:]), "el posible menor se avisa por Telegram"
+calls.clear()
+main.poll()   # no repite respuestas
+assert not [1 for m, p, _ in calls if m == "POST"]
+print("OK asistente Instagram")

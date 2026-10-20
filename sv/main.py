@@ -770,6 +770,8 @@ def poll() -> None:
                 ig["checked"] = fp
             instagram.refresh_token(state)
             _instagram_queue(state, now)
+            from . import ig_inbox
+            ig_inbox.run(state)   # responde comentarios y mensajes directos
     except Exception:
         traceback.print_exc()
     request = state.pop("scan_request", None)

@@ -46,6 +46,7 @@ Nunca pegues estas claves en el código ni en un chat.
 - Revisa la cuota de cada candidato en tu app antes de aprobar.
 - `/buscar` al bot: analiza en ese momento y te manda el top 3 (`/buscar 40` mira 40 horas adelante). Máximo 4 al día.
 - `/compartir 8` al bot: te reenvía la imagen del pick #8 con los botones para VIP, Gratis o Instagram.
+- Instagram: el bot responde solo los comentarios y mensajes directos típicos (precio, pick gratis, stake, resultados…) y te avisa por Telegram lo que no entiende o lo delicado (pagos, posibles menores, problemas con el juego). Textos en `sv/ig_inbox.py`.
 - `/envivo` al bot: busca valor en partidos que se están jugando (el candidato vence a los 20 minutos).
 - `/estado` al bot: candidatos pendientes, picks en juego, historial y consultas de OddsPapi usadas.
 - `/ayuda`: lista de comandos.
