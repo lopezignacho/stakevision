@@ -131,3 +131,65 @@ def refresh_token(state: dict) -> None:
         ig["refreshed_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
     except Exception as e:  # noqa: BLE001
         print(f"No se pudo renovar el token de Instagram: {type(e).__name__}")
+
+
+# ---------------------------------------------------------------- carruseles e historias
+def _uid(state: dict) -> str:
+    me = _call("GET", "me", state, fields="user_id,username")
+    return me.get("user_id") or me.get("id")
+
+
+def _wait(state: dict, cid: str) -> None:
+    import time
+    for _ in range(30):
+        st = _call("GET", cid, state, fields="status_code").get("status_code") or ""
+        if st == "FINISHED":
+            return
+        if st in ("ERROR", "EXPIRED"):
+            raise InstagramError(f"Instagram no pudo procesar el contenido ({st})")
+        time.sleep(4)
+    raise InstagramError("el contenido no quedó listo a tiempo")
+
+
+def _publish_container(state: dict, uid: str, cid: str) -> str:
+    import time
+    for _ in range(5):
+        try:
+            m = _call("POST", f"{uid}/media_publish", state, creation_id=cid)
+            break
+        except InstagramError as e:
+            if "not available" not in str(e).lower():
+                raise
+            time.sleep(5)
+    else:
+        raise InstagramError("no se pudo publicar")
+    try:
+        return _call("GET", m["id"], state, fields="permalink").get("permalink") or m["id"]
+    except InstagramError:
+        return m["id"]
+
+
+def publish_carousel(state: dict, urls: list[str], caption: str) -> str:
+    uid = _uid(state)
+    kids = []
+    for u in urls:
+        c = _call("POST", f"{uid}/media", state, image_url=u, is_carousel_item="true")
+        _wait(state, c["id"])
+        kids.append(c["id"])
+    p = _call("POST", f"{uid}/media", state, media_type="CAROUSEL", children=",".join(kids), caption=caption)
+    _wait(state, p["id"])
+    return _publish_container(state, uid, p["id"])
+
+
+def publish_single(state: dict, url: str, caption: str) -> str:
+    uid = _uid(state)
+    c = _call("POST", f"{uid}/media", state, image_url=url, caption=caption)
+    _wait(state, c["id"])
+    return _publish_container(state, uid, c["id"])
+
+
+def publish_story(state: dict, url: str) -> str:
+    uid = _uid(state)
+    c = _call("POST", f"{uid}/media", state, image_url=url, media_type="STORIES")
+    _wait(state, c["id"])
+    return _publish_container(state, uid, c["id"])

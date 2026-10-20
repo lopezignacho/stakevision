@@ -1,0 +1,25 @@
+name: Instagram - publicar material del perfil
+on:
+  workflow_dispatch:
+    inputs:
+      que:
+        description: "todo | posts | historias"
+        default: "todo"
+concurrency:
+  group: stakevision-state
+  cancel-in-progress: false
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python tools/ig_publish_profile.py "${{ inputs.que }}"
+        env:
+          STATE_KEY: ${{ secrets.STATE_KEY }}
+          INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}

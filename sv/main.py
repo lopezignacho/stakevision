@@ -91,7 +91,7 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False)
                   f"{title}: {len(tournaments)} ligas, {analyzed} partidos, {len(selections)} cuotas comparadas.\n"
                   f"{'Tu top ' + str(len(picks)) if manual else 'Te envío ' + str(len(picks)) + ' candidatos'}: "
                   f"{n_val} 🟢 con valor y {len(picks) - n_val} ⚖️ de cuota justa.\n"
-                  f"Sugerencia: 1 para el canal gratis (✅ VIP + Gratis) y hasta 3 para el VIP. "
+                  f"Sugerencia: 1 para el canal gratis (✅ VIP + Gratis) y de 2 a 4 para el VIP. "
                   f"Revisa cada cuota en tu app antes de aprobar.")
     try:
         from . import history

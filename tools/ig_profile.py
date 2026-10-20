@@ -174,7 +174,7 @@ def welcome():
     text_block(im, (90, top + 95), "Dos canales en Telegram", "Bold", 64, WHITE, W - 180)
     y = top + 260
     plans = [("GRATIS", "1 pick diario", ["Análisis completo de cada pick", "Cuota, stake y probabilidad", "Resultado publicado siempre"]),
-             ("VIP", "1 a 3 picks diarios", ["Los mejores valores del día", "Aviso 30 minutos antes del partido", "Resultados y seguimiento"])]
+             ("VIP", "2 a 4 picks diarios", ["Los mejores valores del día", "Aviso 30 minutos antes del partido", "Resultados y seguimiento"])]
     for name, sub, items in plans:
         card(im, (90, y, W - 90, y + 360), 28)
         d = ImageDraw.Draw(im)
