@@ -268,7 +268,7 @@ updates_q.append({"update_id": 101, "callback_query": {"id": "s2", "data": f"pv:
 main.poll()
 p4s = store.load()["picks"][p4["id"]]
 assert p4s["status"] == "published" and set(p4s["channel_msgs"]) == {"vip"} and not p4s["free"]
-assert buttons_set[-1][0][1][1] == f"pf:{p4['id']}"   # ahora ofrece agregar a Gratis
+assert buttons_set[-1][0][1][1] == f"pg:{p4['id']}"   # ahora ofrece agregar a Gratis
 updates_q.append({"update_id": 102, "callback_query": {"id": "s3", "data": f"pf:{p4['id']}",
                                                        "message": {"chat": {"id": OWNER}, "message_id": 71}}})
 main.poll()
@@ -541,3 +541,21 @@ for lay in layouts.RECAP_LAYOUTS:
     for th in ("dark", "light"):
         assert layouts.render_recap(recap.build(pr, rep_, None), lay, th)[:2] == b"\xff\xd8"
 print("OK diseños que rotan")
+
+# 18) solo Gratis
+fx8 = te.fixture("f8", "Betis", "Sevilla", hours=12)
+oddspapi.upcoming_fixtures = lambda frm, to: [fx8]
+oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "f8", "bookmakerOdds": {
+    "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
+    "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}}]
+main.scan()
+p8 = next(p for p in store.load()["picks"].values() if p["legs"][0].get("fixture_id") == "f8")
+n = len(photos)
+for i, act in enumerate(("s", "pg")):
+    updates_q.append({"update_id": 900 + i, "callback_query": {"id": f"g{i}", "data": f"{act}:{p8['id']}",
+                                                               "message": {"chat": {"id": OWNER}, "message_id": 130}}})
+main.poll()
+p8s = store.load()["picks"][p8["id"]]
+assert set(p8s["channel_msgs"]) == {"free"} and p8s["status"] == "published" and p8s["free"]
+assert buttons_set[-1][0][0][1] == f"pv:{p8['id']}" and buttons_set[-1][0][1][1] == "noop"
+print("OK solo Gratis")

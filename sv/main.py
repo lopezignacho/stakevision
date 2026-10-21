@@ -25,10 +25,13 @@ def SHARE_BUTTONS(p: dict) -> list:
     pid, msgs = p["id"], p.get("channel_msgs") or {}
     rows = []
     vip_done, free_done = "vip" in msgs, "free" in msgs
-    if not vip_done:
-        rows.append([("👑 Enviar a VIP", f"pv:{pid}"), ("👑🎁 VIP + Gratis", f"pf:{pid}")])
+    if not vip_done and not free_done:
+        rows.append([("👑 Enviar a VIP", f"pv:{pid}"), ("🎁 Enviar a Gratis", f"pg:{pid}")])
+        rows.append([("👑🎁 Enviar a VIP + Gratis", f"pf:{pid}")])
     elif not free_done:
-        rows.append([("✅ En VIP", "noop"), ("🎁 Agregar a Gratis", f"pf:{pid}")])
+        rows.append([("✅ En VIP", "noop"), ("🎁 Agregar a Gratis", f"pg:{pid}")])
+    elif not vip_done:
+        rows.append([("👑 Agregar a VIP", f"pv:{pid}"), ("✅ En Gratis", "noop")])
     else:
         rows.append([("✅ En VIP + Gratis", "noop")])
     st = p.get("ig_pre_status")
@@ -339,13 +342,13 @@ def _pick_image(p: dict) -> bytes | None:
         return None
 
 
-def _publish(state: dict, p: dict, free: bool) -> None:
-    """Publica en VIP (y en Gratis si free). Si ya estaba en un canal, no lo repite."""
+def _publish(state: dict, p: dict, free: bool, vip_too: bool = True) -> None:
+    """Publica en VIP (si vip_too) y en Gratis (si free). Si ya estaba en un canal, no lo repite."""
     text = formatting.channel_post(p)
     image = _pick_image(p)
     msgs = p.setdefault("channel_msgs", {})
     vip = state.get("vip_chat")
-    if vip and "vip" not in msgs:
+    if vip_too and vip and "vip" not in msgs:
         msgs["vip"] = _post(vip, text, image)
     if free and "free" not in msgs:
         msgs["free"] = _post(config.FREE_CHANNEL, text, image)
@@ -924,20 +927,20 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.answer(cb["id"], "Imagen generada")
         return
 
-    if action in ("pv", "pf", "pi"):
+    if action in ("pv", "pf", "pg", "pi"):
         if p["status"] not in ("selected", "published"):
             telegram.answer(cb["id"], "Este pick ya no está disponible")
             return
         late = _expires(p) <= store.now_utc() and not p.get("live")
-        if action in ("pv", "pf"):
+        if action in ("pv", "pf", "pg"):
             if late and not p.get("channel_msgs"):
                 telegram.answer(cb["id"], "El partido ya empezó: no se publica")
                 return
-            if not state.get("vip_chat"):
+            if action != "pg" and not state.get("vip_chat"):
                 telegram.answer(cb["id"], "Primero vincula el canal VIP con /vincular_vip")
                 return
-            _publish(state, p, free=(action == "pf"))
-            telegram.answer(cb["id"], "Publicado")
+            _publish(state, p, free=(action in ("pf", "pg")), vip_too=(action != "pg"))
+            telegram.answer(cb["id"], {"pv": "Publicado en VIP", "pg": "Publicado en Gratis"}.get(action, "Publicado en VIP + Gratis"))
         else:
             from . import instagram
             if not instagram.enabled(state):
