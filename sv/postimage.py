@@ -383,3 +383,226 @@ def fit_instagram(jpeg: bytes) -> bytes:
     out = io.BytesIO()
     canvas.save(out, "JPEG", quality=92, optimize=True)
     return out.getvalue()
+
+
+# ---------------------------------------------------------------- piezas de contenido
+def _logo(w: int) -> Image.Image:
+    lg = Image.open(LOGO).convert("RGBA")
+    return lg.resize((w, round(lg.height * w / lg.width)), Image.LANCZOS)
+
+
+def _glow(im, box, color=(90, 255, 60, 55), blur=90):
+    g = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    ImageDraw.Draw(g).ellipse(box, fill=color)
+    im.alpha_composite(g.filter(ImageFilter.GaussianBlur(blur)))
+
+
+def _card(im, box, r=30):
+    sh = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    x0, y0, x1, y1 = box
+    ImageDraw.Draw(sh).rounded_rectangle((x0, y0 + 12, x1, y1 + 12), r, fill=(0, 0, 0, 140))
+    im.alpha_composite(sh.filter(ImageFilter.GaussianBlur(20)))
+    ImageDraw.Draw(im).rounded_rectangle(box, r, fill=(255, 255, 255))
+
+
+def _ctext(d, y, text, font, fill, w=W):
+    d.text(((w - d.textlength(text, font=font)) / 2, y), text, font=font, fill=fill)
+
+
+def _jpeg(im) -> bytes:
+    out = io.BytesIO()
+    im.convert("RGB").save(out, "JPEG", quality=92, optimize=True)
+    return out.getvalue()
+
+
+def render_weekly(week: dict) -> bytes:
+    """Resumen semanal 1080x1350. week = {label, picks:[{home,away,res,price,stake}], units, yield, hits, total}."""
+    H = 1350
+    im = _background(H).convert("RGBA")
+    _glow(im, (W / 2 - 380, -80, W / 2 + 380, 380), (90, 255, 60, 45), 90)
+    lg = _logo(260)
+    im.alpha_composite(lg, ((W - lg.width) // 2, 46))
+    d = ImageDraw.Draw(im)
+    y = 46 + lg.height + 26
+    _ctext(d, y, "RESUMEN SEMANAL", _font("Medium", 30), (150, 230, 120))
+    _ctext(d, y + 44, week["label"], _font("Bold", 54), (240, 240, 242))
+    # cifras
+    y += 140
+    units = week["units"]
+    tiles = [("Puntos", f"{'+' if units >= 0 else ''}{units:.1f}".replace(".", ",")),
+             ("Acierto", f"{week['hits']}/{week['total']}"),
+             ("Yield", f"{'+' if week['yield'] >= 0 else ''}{week['yield'] * 100:.1f}%".replace(".", ","))]
+    tw, gap = 286, 21
+    for i, (lab, val) in enumerate(tiles):
+        x = 90 + i * (tw + gap)
+        d.rounded_rectangle((x, y, x + tw, y + 150), 26, fill=(22, 24, 26), outline=(52, 58, 52), width=2)
+        fv = _font("Bold", 56)
+        col = (150, 255, 110) if (i != 1 and (units >= 0 if i == 0 else week["yield"] >= 0)) else (240, 240, 242)
+        if i != 1 and (units < 0 if i == 0 else week["yield"] < 0):
+            col = (255, 120, 110)
+        d.text((x + (tw - d.textlength(val, font=fv)) / 2, y + 24), val, font=fv, fill=col)
+        fl = _font("Medium", 26)
+        d.text((x + (tw - d.textlength(lab, font=fl)) / 2, y + 98), lab, font=fl, fill=(170, 172, 178))
+    # lista de picks
+    y += 190
+    rows = week["picks"][:8]
+    _card(im, (90, y, W - 90, y + 40 + 84 * len(rows)))
+    d = ImageDraw.Draw(im)
+    yy = y + 22
+    for k, p in enumerate(rows):
+        if k:
+            d.line((130, yy - 4, W - 130, yy - 4), fill=LINE, width=2)
+        badge = {"W": (_check_badge(44), "Verde", GREEN), "L": (None, "Roja", (194, 38, 26)),
+                 "V": (None, "Nula", MUTED)}[p["res"]]
+        if p["res"] == "W":
+            im.alpha_composite(badge[0], (130, int(yy + 14)))
+        else:
+            d.ellipse((130, yy + 14, 174, yy + 58), fill=badge[2])
+            glyph = "✕" if p["res"] == "L" else "↺"
+            fg = _font("Bold", 26)
+            if p["res"] == "L":
+                d.line((143, yy + 27, 161, yy + 45), fill="white", width=5)
+                d.line((161, yy + 27, 143, yy + 45), fill="white", width=5)
+            else:
+                d.arc((141, yy + 25, 163, yy + 47), 200, 520, fill="white", width=4)
+        d = ImageDraw.Draw(im)
+        name, fn = _fit(d, f"{p['home']} vs {p['away']}", "Medium", 32, W - 130 - 196 - 190)
+        d.text((196, yy + 16), name, font=fn, fill=INK)
+        right = f"@{p['price']:.2f}"
+        fr = _font("Bold", 30)
+        d.text((W - 130 - d.textlength(right, font=fr), yy + 18), right, font=fr, fill=SOFT)
+        yy += 84
+    # pie
+    d = ImageDraw.Draw(im)
+    _ctext(d, H - 150, "Historial completo en la web · link en la bio", _font("Medium", 30), (225, 225, 228))
+    _ctext(d, H - 96, "@stakevision · +18 · Juega con responsabilidad", _font("Regular", 24), (150, 150, 155))
+    return _jpeg(im)
+
+
+def render_story(pick: dict) -> bytes:
+    """Historia vertical 1080x1920 del pick gratis del día."""
+    H = 1920
+    im = _background(H).convert("RGBA")
+    _glow(im, (W / 2 - 420, 120, W / 2 + 420, 760), (90, 255, 60, 60), 110)
+    lg = _logo(420)
+    im.alpha_composite(lg, ((W - lg.width) // 2, 150))
+    d = ImageDraw.Draw(im)
+    legs = pick["legs"]
+    block = 76 + 64 + (120 + 300 * len(legs) + 120) + 90 + 190
+    y = max(150 + lg.height + 60, (H - 140 - block) // 2 + 200)
+    d.rounded_rectangle((W / 2 - 230, y, W / 2 + 230, y + 76), 38, fill=(124, 220, 90))
+    _ctext(d, y + 14, "PICK GRATIS DE HOY", _font("Bold", 36), (10, 14, 10))
+    y += 140
+    card_h = 120 + 300 * len(legs) + 120
+    _card(im, (80, y, W - 80, y + card_h), 40)
+    d = ImageDraw.Draw(im)
+    yy = y + 56
+    for l in legs:
+        sport = l.get("sport") or "soccer"
+        league, fl = _fit(d, l.get("league") or "", "Medium", 32, W - 300)
+        im.alpha_composite(_icon(sport, 44, SPORT_COLOR.get(sport, INK)), (130, int(yy)))
+        d = ImageDraw.Draw(im)
+        d.text((190, yy + 2), league, font=fl, fill=MUTED)
+        yy += 70
+        for team in (l["home"], l["away"]):
+            t, ft = _fit(d, team, "Bold", 54, W - 260)
+            d.text((130, yy), t, font=ft, fill=INK)
+            yy += 70
+        day, _, hour = formatting.local_time(l["kickoff"]).partition(" ")
+        d.text((130, yy + 4), f"🕒 {hour}".replace("🕒 ", ""), font=_font("Medium", 34), fill=GREEN)
+        yy += 70
+        sel = formatting.outcome_label(l)
+        sel = sel[:sel.index(" (")] if " (" in sel else sel
+        d.rounded_rectangle((120, yy, W - 120, yy + 96), 24, fill=(236, 249, 234))
+        s2, fs = _fit(d, sel, "Bold", 44, W - 460)
+        d.text((150, yy + 22), s2, font=fs, fill=(30, 110, 30))
+        od = formatting.odds(l["price"])
+        fo = _font("Bold", 52)
+        d.text((W - 150 - d.textlength(od, font=fo), yy + 16), od, font=fo, fill=INK)
+        yy += 130
+    d.text((130, yy), f"STAKE {pick['stake']}/10", font=_font("Medium", 32), fill=MUTED)
+    # llamado
+    d = ImageDraw.Draw(im)
+    cy = y + card_h + 90
+    _ctext(d, cy, "Análisis completo en Telegram", _font("Bold", 46), (240, 240, 242))
+    d.rounded_rectangle((W / 2 - 290, cy + 90, W / 2 + 290, cy + 190), 50, fill=(124, 220, 90))
+    _ctext(d, cy + 112, "t.me/stakevision", _font("Bold", 48), (10, 14, 10))
+    _ctext(d, H - 130, "+18 · Juega con responsabilidad", _font("Regular", 30), (150, 150, 155))
+    return _jpeg(im)
+
+
+def render_postmatch(m: dict) -> bytes:
+    """Noticia post partido 1080x1350 con datos reales: marcador, goles, estadísticas y el dato curioso."""
+    H = 1350
+    im = _background(H).convert("RGBA")
+    _glow(im, (W / 2 - 420, 120, W / 2 + 420, 520), (90, 255, 60, 45), 100)
+    lg = _logo(220)
+    im.alpha_composite(lg, ((W - lg.width) // 2, 40))
+    d = ImageDraw.Draw(im)
+    y = 40 + lg.height + 22
+    _ctext(d, y, ("FINAL · " + m["league"]).upper(), _font("Medium", 26), (150, 230, 120))
+    y += 56
+    # marcador
+    fs = _font("Bold", 124)
+    sc = f"{m['hg']}  -  {m['ag']}"
+    _ctext(d, y, sc, fs, (245, 245, 247))
+    fh = _font("Bold", 40)
+    home, f1 = _fit(d, m["home"], "Bold", 40, 300)
+    away, f2 = _fit(d, m["away"], "Bold", 40, 300)
+    d.text((90, y + 52), home, font=f1, fill=(240, 240, 242))
+    d.text((W - 90 - d.textlength(away, font=f2), y + 52), away, font=f2, fill=(240, 240, 242))
+    y += 170
+    # titular
+    _card(im, (70, y, W - 70, y + 150), 30)
+    d = ImageDraw.Draw(im)
+    lines = []
+    words, cur, ft = m["headline"].split(), "", _font("Bold", 40)
+    for w_ in words:
+        t = (cur + " " + w_).strip()
+        if d.textlength(t, font=ft) <= W - 220:
+            cur = t
+        else:
+            lines.append(cur)
+            cur = w_
+    lines.append(cur)
+    yy = y + 75 - len(lines) * 26
+    for ln in lines[:2]:
+        _ctext(d, yy, ln, ft, INK)
+        yy += 52
+    y += 180
+    # goles
+    d.text((90, y), "GOLES", font=_font("Medium", 26), fill=(150, 230, 120))
+    y += 44
+    for g in m["goals"][:5]:
+        d.text((90, y), g["min"], font=_font("Bold", 30), fill=(150, 255, 110))
+        t, fg = _fit(d, f"{g['player']} ({g['team']})", "Medium", 30, W - 300)
+        d.text((200, y), t, font=fg, fill=(240, 240, 242))
+        y += 46
+    y += 14
+    # estadísticas: barras enfrentadas
+    d.text((90, y), "ESTADÍSTICAS", font=_font("Medium", 26), fill=(150, 230, 120))
+    y += 48
+    for lab, a, b, fmt in m["stats"][:3]:
+        tot = (a + b) or 1
+        d.text((90, y), fmt(a), font=_font("Bold", 32), fill=(240, 240, 242))
+        bt = fmt(b)
+        d.text((W - 90 - d.textlength(bt, font=_font("Bold", 32)), y), bt, font=_font("Bold", 32), fill=(240, 240, 242))
+        _ctext(d, y + 4, lab, _font("Medium", 26), (170, 172, 178))
+        bx0, bx1, by = 90, W - 90, y + 48
+        split = bx0 + (bx1 - bx0) * a / tot
+        d.rounded_rectangle((bx0, by, split - 3, by + 12), 6, fill=(124, 220, 90))
+        d.rounded_rectangle((split + 3, by, bx1, by + 12), 6, fill=(110, 116, 124))
+        y += 74
+    # nuestro pick
+    if m.get("pick"):
+        p = m["pick"]
+        y = H - 190
+        ok = p["res"] == "W"
+        d.rounded_rectangle((90, y, W - 90, y + 96), 26, fill=(28, 52, 26) if ok else (40, 42, 46))
+        if ok:
+            im.alpha_composite(_check_badge(52), (120, int(y + 22)))
+        d = ImageDraw.Draw(im)
+        txt, fp = _fit(d, f"Nuestro pick: {p['label']} @ {p['price']:.2f}", "Bold", 34, W - 320)
+        d.text((190, y + 26), txt, font=fp, fill=(150, 255, 110) if ok else (230, 230, 232))
+    _ctext(d, H - 70, "@stakevision · +18 · Juega con responsabilidad", _font("Regular", 24), (150, 150, 155))
+    return _jpeg(im)
