@@ -1,0 +1,13 @@
+{"event": {"id": "401913957", "name": "Boca Juniors at Vasco da Gama", "season": {"year": 2026, "slug": "semifinals"},
+  "status": {"type": {"state": "post", "completed": true, "shortDetail": "FT"}}},
+ "competition": {"venue": {"fullName": "Estádio do Maracanã"}, "leg": {"value": 2, "displayValue": "2nd Leg"},
+  "series": {"competitors": [{"id": "3454", "aggregateScore": 2}, {"id": "5", "aggregateScore": 3}], "completed": true, "title": "Semifinals"},
+  "competitors": [
+   {"homeAway": "home", "score": "1", "winner": false, "aggregateScore": 2, "team": {"id": "3454", "displayName": "Vasco da Gama", "shortDisplayName": "Vasco", "abbreviation": "VAS", "color": "000000", "alternateColor": "fafafc"}},
+   {"homeAway": "away", "score": "3", "winner": true, "aggregateScore": 3, "team": {"id": "5", "displayName": "Boca Juniors", "shortDisplayName": "Boca ", "abbreviation": "CABJ", "color": "fcb000", "alternateColor": "0060f0"}}],
+  "details": [
+   {"type": {"text": "Goal - Header"}, "clock": {"value": 198, "displayValue": "4'"}, "team": {"id": "5"}, "scoringPlay": true, "penaltyKick": false, "ownGoal": false, "shootout": false, "athletesInvolved": [{"displayName": "Lautaro Di Lollo", "shortName": "L. Di Lollo", "fullName": "Lautaro Di Lollo"}]},
+   {"type": {"text": "Goal"}, "clock": {"value": 1981, "displayValue": "34'"}, "team": {"id": "5"}, "scoringPlay": true, "penaltyKick": false, "ownGoal": false, "shootout": false, "athletesInvolved": [{"displayName": "Miguel Merentiel", "shortName": "M. Merentiel", "fullName": "Miguel Merentiel"}]},
+   {"type": {"text": "Yellow Card"}, "clock": {"value": 2191, "displayValue": "37'"}, "team": {"id": "5"}, "scoringPlay": false, "athletesInvolved": [{"displayName": "Leandro Paredes", "shortName": "L. Paredes"}]},
+   {"type": {"text": "Goal"}, "clock": {"value": 3934, "displayValue": "66'"}, "team": {"id": "3454"}, "scoringPlay": true, "penaltyKick": false, "ownGoal": false, "shootout": false, "athletesInvolved": [{"displayName": "José Luis Rodríguez", "shortName": "J. Rodríguez", "fullName": "José Luis Rodríguez"}]},
+   {"type": {"text": "Goal"}, "clock": {"value": 5261, "displayValue": "88'"}, "team": {"id": "5"}, "scoringPlay": true, "penaltyKick": false, "ownGoal": false, "shootout": false, "athletesInvolved": [{"displayName": "Leandro Paredes", "shortName": "L. Paredes", "fullName": "Leandro Paredes"}]}]}}

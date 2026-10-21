@@ -637,3 +637,366 @@ def render_postmatch(m: dict, theme: str = "dark") -> bytes:
         d.text((190, y + 26), txt, font=fp, fill=T["pos"] if ok else T["text2"])
     _ctext(d, H - 70, "@stakevision · +18 · Juega con responsabilidad", _font("Regular", 24), T["faint"])
     return _jpeg(im)
+
+
+# ---------------------------------------------------------------- post partido (formato revista)
+BRAND = (126, 217, 87)
+_DARK = (5, 6, 5)
+
+
+def _bebas(size: int) -> ImageFont.FreeTypeFont:
+    return ImageFont.truetype(os.path.join(FONTS, "BebasNeue-Regular.ttf"), size)
+
+
+def _oswald(size: int, weight: int = 600) -> ImageFont.FreeTypeFont:
+    f = ImageFont.truetype(os.path.join(FONTS, "Oswald-Variable.ttf"), size)
+    try:
+        f.set_variation_by_axes([weight])
+    except Exception:  # noqa: BLE001
+        pass
+    return f
+
+
+def _lum(c) -> float:
+    r, g, b = (x / 255 for x in c[:3])
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _mix(c, other, t: float) -> tuple:
+    return tuple(round(a + (b - a) * t) for a, b in zip(c[:3], other[:3]))
+
+
+def team_palette(team: dict) -> tuple[tuple, tuple]:
+    """(relleno del escudo, acento). El relleno es el color más oscuro del club; el acento, el más claro."""
+    a, b = tuple(team.get("color") or (40, 44, 50)), tuple(team.get("alt") or (240, 240, 240))
+    fill, accent = (a, b) if _lum(a) <= _lum(b) else (b, a)
+    if _lum(accent) < 0.35:
+        accent = _mix(accent, (255, 255, 255), 0.55)
+    if abs(_lum(accent) - _lum(fill)) < 0.25:
+        fill = _mix(fill, (0, 0, 0), 0.6)
+    return fill, accent
+
+
+def _spaced(d, xy, text, font, fill, spacing=0.0, anchor="ls"):
+    """Texto con espaciado entre letras (Pillow no lo trae)."""
+    x, y = xy
+    for ch in text:
+        d.text((x, y), ch, font=font, fill=fill, anchor=anchor)
+        x += d.textlength(ch, font=font) + spacing
+    return x
+
+
+def _spaced_len(d, text, font, spacing=0.0) -> float:
+    return sum(d.textlength(ch, font=font) for ch in text) + spacing * max(len(text) - 1, 0)
+
+
+def _bez(p0, p1, p2, p3, n=24):
+    out = []
+    for i in range(1, n + 1):
+        t = i / n
+        u = 1 - t
+        out.append((u ** 3 * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t ** 3 * p3[0],
+                    u ** 3 * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t ** 3 * p3[1]))
+    return out
+
+
+def _shield_poly(inset: float, k: float) -> list:
+    """Silueta de escudo genérica (viewBox 200x236), escalada por k."""
+    i = inset
+    top, side = 6 + i, 12 + i
+    pts = [(100, top), (188 - i, 30 + i * 0.7), (188 - i, 110)]
+    pts += _bez((188 - i, 110), (188 - i, 168 - i * 0.6), (150 - i * 0.6, 206 - i), (100, 230 - i))
+    pts += _bez((100, 230 - i), (50 + i * 0.6, 206 - i), (side, 168 - i * 0.6), (side, 110))
+    pts += [(side, 30 + i * 0.7)]
+    return [(x * k, y * k) for x, y in pts]
+
+
+def _vgrad(size, c0, c1) -> Image.Image:
+    w, h = size
+    g = Image.new("RGB", (1, h))
+    for y in range(h):
+        g.putpixel((0, y), _mix(c0, c1, y / max(h - 1, 1)))
+    return g.resize((w, h))
+
+
+def shield(team: dict, width: int) -> Image.Image:
+    """Escudo propio del equipo: forma clásica, colores del club, iniciales y borde metálico.
+    No reproduce el escudo oficial."""
+    fill, accent = team_palette(team)
+    s = 4
+    k = width * s / 200
+    W2, H2 = round(200 * k), round(236 * k)
+    out = Image.new("RGBA", (W2, H2 + round(14 * k)), (0, 0, 0, 0))
+    outer = Image.new("L", out.size, 0)
+    ImageDraw.Draw(outer).polygon(_shield_poly(0, k), fill=255)
+    sh = Image.new("RGBA", out.size, (0, 0, 0, 0))
+    sh.paste((0, 0, 0, 150), (0, round(8 * k)), outer.crop((0, 0, out.width, out.height - round(8 * k))))
+    out.alpha_composite(sh.filter(ImageFilter.GaussianBlur(6 * k)))
+    rim = Image.new("RGB", out.size)
+    rim.paste(_vgrad(out.size, _mix(accent, (255, 255, 255), 0.55), _mix(accent, (0, 0, 0), 0.45)))
+    out.paste(rim, (0, 0), outer)
+    inner = Image.new("L", out.size, 0)
+    ImageDraw.Draw(inner).polygon(_shield_poly(14, k), fill=255)
+    out.paste(_vgrad(out.size, _mix(fill, (255, 255, 255), 0.18), _mix(fill, (0, 0, 0), 0.35)), (0, 0), inner)
+    gloss = Image.new("L", out.size, 0)
+    ImageDraw.Draw(gloss).ellipse((-60 * k, -150 * k, 260 * k, 92 * k), fill=60)
+    out.paste((255, 255, 255), (0, 0), ImageChops.multiply(gloss, inner))
+    d = ImageDraw.Draw(out)
+    abbr = (team.get("abbr") or team.get("short", "")[:3]).upper()[:4]
+    size = round((78 if len(abbr) <= 3 else 62) * k)
+    f = _bebas(size)
+    tw = d.textlength(abbr, font=f)
+    d.text(((W2 - tw) / 2, 146 * k), abbr, font=f, fill=accent, anchor="ls",
+           stroke_width=round(1.2 * k), stroke_fill=_mix(fill, (0, 0, 0), 0.5))
+    return out.resize((out.width // s, out.height // s), Image.LANCZOS)
+
+
+def _cover(photo: bytes, size, focus=(0.62, 0.10)) -> Image.Image:
+    im = Image.open(io.BytesIO(photo)).convert("RGB")
+    w, h = size
+    scale = max(w / im.width, h / im.height)
+    im = im.resize((round(im.width * scale), round(im.height * scale)), Image.LANCZOS)
+    x = round((im.width - w) * focus[0])
+    y = round((im.height - h) * focus[1])
+    return im.crop((x, y, x + w, y + h))
+
+
+def _alpha_ramp(size, stops, horizontal: bool) -> Image.Image:
+    """Máscara L con rampas lineales entre (posición 0..1, opacidad 0..255)."""
+    w, h = size
+    n = w if horizontal else h
+    line = Image.new("L", (n, 1))
+    for i in range(n):
+        t = i / max(n - 1, 1)
+        for (p0, a0), (p1, a1) in zip(stops, stops[1:]):
+            if p0 <= t <= p1:
+                line.putpixel((i, 0), round(a0 + (a1 - a0) * (t - p0) / max(p1 - p0, 1e-6)))
+                break
+        else:
+            line.putpixel((i, 0), stops[-1][1] if t > stops[-1][0] else stops[0][1])
+    return line.resize((w, h)) if horizontal else line.transpose(Image.ROTATE_270).resize((w, h))
+
+
+def split_headline(text: str) -> tuple[str, str]:
+    """Parte el titular en dos líneas (la segunda va en contorno verde).
+    Respeta un guion o un espacio puesto a mano; si no, corta una palabra larga por sílaba."""
+    t = " ".join(text.upper().split())
+    if "-" in t:
+        a, b = t.split("-", 1)
+        return a.strip() + "-", b.strip()
+    words = t.split(" ")
+    if len(words) > 1:
+        best = min(range(1, len(words)), key=lambda i: abs(len(" ".join(words[:i])) - len(" ".join(words[i:]))))
+        return " ".join(words[:best]), " ".join(words[best:])
+    if len(t) <= 6:
+        return t, ""
+    vow = set("AEIOUÁÉÍÓÚ")
+    keep = {"BL", "BR", "CL", "CR", "DR", "FL", "FR", "GL", "GR", "PL", "PR", "TR", "CH", "LL", "RR"}
+    cuts = []
+    for i in range(2, len(t) - 1):
+        a, b, c = t[i - 1], t[i], t[i + 1] if i + 1 < len(t) else ""
+        if b not in vow and c in vow and a in vow:
+            cuts.append(i)
+        elif a not in vow and b not in vow and c in vow and (a + b) not in keep:
+            cuts.append(i)
+        elif a in "AEO" and b in "AEO":
+            cuts.append(i)
+    if not cuts:
+        return t, ""
+    i = min(cuts, key=lambda c: (abs(c - len(t) / 2), -c))
+    return t[:i] + "-", t[i:]
+
+
+def _clusters(goals: list, gap: int = 10) -> list[list]:
+    out = []
+    for g in goals:
+        if out and g["min"] - out[-1][-1]["min"] < gap:
+            out[-1].append(g)
+        else:
+            out.append([g])
+    return out
+
+
+def render_recap(m: dict, theme: str = "dark") -> bytes:
+    """Post partido estilo revista: foto a color del protagonista, titular gigante, marcador con
+    escudos propios, línea de tiempo de los goles y el resultado de nuestro pick.
+
+    m = {"report": espn.report_from_event(...), "eyebrow": str, "headline": str, "subline": (normal, bold),
+         "pick": {"label": str, "odds": str, "result": "W"|"L"|"V"} | None, "dato": str | None,
+         "photo": bytes | None, "credit": str | None}
+    """
+    H = 1350
+    rep = m["report"]
+    home, away = rep["home"], rep["away"]
+    _hf, hacc = team_palette(home)
+    _af, aacc = team_palette(away)
+    if sum(abs(x - y) for x, y in zip(hacc, aacc)) < 120:   # acentos casi iguales: separarlos
+        aacc = (241, 243, 239) if _lum(hacc) < 0.8 else BRAND
+    im = Image.new("RGBA", (W, H), _DARK + (255,))
+    if m.get("photo"):
+        ph = _cover(m["photo"], (W, H))
+        ph = _enhance(ph)
+        im.paste(ph, (0, 0))
+    else:
+        im = _bg(H, "dark")
+        win = aacc if away["score"] > home["score"] else hacc
+        lose = hacc if win is aacc else aacc
+        _glow(im, (500, 80, 1300, 900), tuple(win) + (80,), 160)
+        _glow(im, (-300, 300, 500, 1000), tuple(lose) + (35,), 160)
+    dark = Image.new("RGBA", (W, H), _DARK + (255,))
+    im = Image.composite(dark, im, _alpha_ramp((W, H), [(0, 255), (0.30, 217), (0.62, 0), (1, 0)], True))
+    im = Image.composite(dark, im, _alpha_ramp((W, H), [(0, 0), (0.45, 0), (0.72, 255), (1, 255)], False))
+    d = ImageDraw.Draw(im)
+
+    lg = _logo(150)
+    im.alpha_composite(lg, (60, 44))
+    _spaced(d, (60, 248), m.get("eyebrow", "").upper(), _oswald(28), BRAND, spacing=28 * 0.14)
+
+    l1, l2 = split_headline(m.get("headline") or "")
+    size = 210
+    while size > 120 and max(d.textlength(l1, font=_bebas(size)), d.textlength(l2, font=_bebas(size))) > 640:
+        size -= 6
+    fb = _bebas(size)
+    b1 = 262 + round(0.714 * size)
+    d.text((52, b1), l1, font=fb, fill=(241, 243, 239), anchor="ls")
+    if l2:
+        b2 = b1 + round(0.84 * size)
+        outer = Image.new("L", (W, H), 0)
+        inner = Image.new("L", (W, H), 0)
+        ImageDraw.Draw(outer).text((52, b2), l2, font=fb, fill=255, anchor="ls", stroke_width=3, stroke_fill=255)
+        ImageDraw.Draw(inner).text((52, b2), l2, font=fb, fill=255, anchor="ls")
+        im.paste(BRAND + (255,), (0, 0), ImageChops.subtract(outer, inner))
+
+    # marcador
+    y0 = 668
+    sh_h = shield(home, 96)
+    sh_a = shield(away, 96)
+    im.alpha_composite(sh_h, (60, y0))
+    x = 60 + 96 + 30
+    fs = _bebas(150)
+    hs, as_ = str(home["score"]), str(away["score"])
+    winner = "home" if home["score"] > away["score"] else "away" if away["score"] > home["score"] else ""
+    base = y0 + 106
+    d.text((x, base), hs, font=fs, fill=hacc if winner == "home" else (241, 243, 239), anchor="ls")
+    x += d.textlength(hs, font=fs) + 34
+    d.rectangle((x, base - 64, x + 44, base - 54), fill=BRAND)
+    x += 44 + 34
+    d.text((x, base), as_, font=fs, fill=aacc if winner == "away" else (241, 243, 239), anchor="ls")
+    x += d.textlength(as_, font=fs) + 30
+    im.alpha_composite(sh_a, (round(x), y0))
+    sub_n, sub_b = m.get("subline") or ("", "")
+    fsub, fsubb = _oswald(28, 500), _oswald(28, 600)
+    xx = _spaced(d, (62, 836), sub_n, fsub, (201, 206, 198), spacing=1.6)
+    _spaced(d, (xx + 6, 836), sub_b, fsubb, (241, 243, 239), spacing=1.6)
+
+    # línea de tiempo
+    card = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    cd = ImageDraw.Draw(card)
+    cd.rounded_rectangle((40, 880, 1040, 1180), 24, fill=(18, 22, 18, 205), outline=BRAND + (64,), width=1)
+    im.alpha_composite(card)
+    d = ImageDraw.Draw(im)
+    end = max(90, max([g["min"] for g in rep["goals"]] + [0]))
+    end = 120 if end > 100 else end
+    _spaced(d, (70, 930), f"EL PARTIDO EN {end}'", _oswald(22), (154, 160, 149), spacing=22 * 0.16)
+    fl = _oswald(19, 400)
+    lx = 1010
+    for team, col in ((away, aacc), (home, hacc)):
+        name = (team.get("short") or team.get("name") or "").strip()
+        tw = d.textlength(name, font=fl)
+        d.text((lx - tw, 930), name, font=fl, fill=(201, 206, 198), anchor="ls")
+        d.ellipse((lx - tw - 20, 917, lx - tw - 8, 929), fill=col)
+        lx = lx - tw - 40
+    L, R, ly = 110, 930, 1050
+    track = _vgrad((6, R - L), BRAND, (42, 51, 42)).rotate(-90, expand=True)
+    mask = Image.new("L", track.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, track.width - 1, track.height - 1), 3, fill=255)
+    im.paste(track, (L, ly - 3), mask)
+    d = ImageDraw.Draw(im)
+    hx = L + (R - L) * 45 / end
+    d.line((hx, ly - 20, hx, ly + 26), fill=(255, 255, 255, 90), width=2)
+    ft = _oswald(18, 400)
+    for t in range(0, end + 1, 15):
+        tx = L + (R - L) * t / end
+        lab = f"{t}'"
+        d.text((tx - d.textlength(lab, font=ft) / 2, ly + 34), lab, font=ft, fill=(110, 117, 106), anchor="ls")
+    fmin, fname = _bebas(40), _oswald(19)
+
+    def label_x(cx, wdt):
+        return min(max(cx - wdt / 2, 60), 1020 - wdt)
+
+    for side, col, up in (("home", hacc, True), ("away", aacc, False)):
+        goals = [g for g in rep["goals"] if g["side"] == side]
+        for cl in _clusters(goals):
+            xs = [L + (R - L) * min(g["min"], end) / end for g in cl]
+            for gx in xs:
+                d.ellipse((gx - 13, ly - 13, gx + 13, ly + 13), fill=col)
+                d.ellipse((gx - 9, ly - 9, gx + 9, ly + 9), fill=_DARK)
+                d.ellipse((gx - 6, ly - 6, gx + 6, ly + 6), fill=col)
+            mins = " · ".join(g["label"] for g in cl)
+            players = []
+            for g in cl:
+                nm = (g["player"].split(". ", 1)[-1] if ". " in g["player"] else g["player"]).upper()
+                nm += " (P)" if g["kind"] == "penalty" else " (EC)" if g["kind"] == "own" else ""
+                if players and players[-1][0] == nm:
+                    players[-1][1] += 1
+                else:
+                    players.append([nm, 1])
+            who = " · ".join(n + (f" x{c}" if c > 1 else "") for n, c in players)
+            cx = sum(xs) / len(xs)
+            wm, wn = d.textlength(mins, font=fmin), _spaced_len(d, who, fname, 0.8)
+            if up:
+                d.text((label_x(cx, wm), ly - 64), mins, font=fmin, fill=col, anchor="ls")
+                _spaced(d, (label_x(cx, wn), ly - 26), who, fname, col, 0.8)
+            else:
+                d.text((label_x(cx, wm), ly + 84), mins, font=fmin, fill=col, anchor="ls")
+                _spaced(d, (label_x(cx, wn), ly + 116), who, fname, col, 0.8)
+    if not rep["goals"]:
+        msg = "Sin goles: el cero no se movió en todo el partido"
+        _ctext(d, ly - 52, msg, _oswald(24, 500), (201, 206, 198))
+
+    # nuestro pick / el dato
+    pk = m.get("pick")
+    fb_, fr_ = _font("Bold", 22), _font("Medium", 22)
+    if pk:
+        tag = {"W": ("✓ VERDE", BRAND, (11, 26, 6)), "L": ("✕ ROJA", (227, 38, 46), (255, 255, 255)),
+               "V": ("↺ NULA", (110, 116, 124), (255, 255, 255))}[pk["result"]]
+        lead, body = "Nuestro pick:", f" {pk['label']} · {pk['odds']}  "
+        ftag = _font("Bold", 21)
+        tag_txt = tag[0].split(" ", 1)[1]
+        total = d.textlength(lead, font=fb_) + d.textlength(body, font=fr_) + d.textlength(tag_txt, font=ftag) + 58
+        x = (W - total) / 2
+        d.text((x, 1238), lead, font=fb_, fill=BRAND, anchor="ls")
+        x += d.textlength(lead, font=fb_)
+        d.text((x, 1238), body, font=fr_, fill=(201, 206, 198), anchor="ls")
+        x += d.textlength(body, font=fr_)
+        tw = d.textlength(tag_txt, font=ftag) + 58
+        d.rounded_rectangle((x, 1212, x + tw, 1248), 18, fill=tag[1])
+        cx, cy = x + 22, 1230
+        if pk["result"] == "W":
+            d.line((cx - 7, cy, cx - 2, cy + 6, cx + 8, cy - 6), fill=tag[2], width=4, joint="curve")
+        elif pk["result"] == "L":
+            d.line((cx - 6, cy - 6, cx + 6, cy + 6), fill=tag[2], width=4)
+            d.line((cx - 6, cy + 6, cx + 6, cy - 6), fill=tag[2], width=4)
+        else:
+            d.arc((cx - 8, cy - 8, cx + 8, cy + 8), 40, 330, fill=tag[2], width=4)
+        d.text((x + 40, 1238), tag_txt, font=ftag, fill=tag[2], anchor="ls")
+    elif m.get("dato"):
+        lead, body = "El dato:", " " + m["dato"]
+        total = d.textlength(lead, font=fb_) + d.textlength(body, font=fr_)
+        x = (W - total) / 2
+        d.text((x, 1238), lead, font=fb_, fill=BRAND, anchor="ls")
+        d.text((x + d.textlength(lead, font=fb_), 1238), body, font=fr_, fill=(201, 206, 198), anchor="ls")
+    _ctext(d, 1306, "+18 · Juega con responsabilidad", _font("Medium", 17), (154, 160, 149))
+
+    if m.get("credit"):
+        fc = _font("Regular", 14)
+        tw = round(d.textlength(m["credit"], font=fc)) + 8
+        tmp = Image.new("RGBA", (tw, 22), (0, 0, 0, 0))
+        ImageDraw.Draw(tmp).text((0, 2), m["credit"], font=fc, fill=(255, 255, 255, 160))
+        im.alpha_composite(tmp.rotate(-90, expand=True), (1040, 180))
+    return _jpeg(im)
+
+
+def _enhance(ph: Image.Image) -> Image.Image:
+    from PIL import ImageEnhance
+    return ImageEnhance.Color(ImageEnhance.Contrast(ph).enhance(1.08)).enhance(1.1)

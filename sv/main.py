@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import os
 import sys
 import traceback
 from datetime import timedelta
@@ -44,11 +45,17 @@ def _share_panel(state: dict, p: dict) -> None:
     if not owner:
         return
     image = _pick_image(p)
-    caption = (f"🖼 <b>Pick #{p['id']} listo para compartir</b>\n"
-               "Elige dónde publicarlo (puedes usar varios botones):")
+    head = (f"🖼 <b>Pick #{p['id']} listo para compartir</b>\n"
+            "Elige dónde publicarlo (puedes usar varios botones). Este es el texto que sale con la imagen:")
+    text = formatting.channel_post(p)
+    full = f"{head}\n\n{text}"
+    together = bool(image) and formatting.caption_fits(full)
+    caption = full if together else head
     msg = telegram.send_photo(owner, image, caption=caption) if image else telegram.send(owner, caption)
     p["share_msg"] = msg["message_id"]
     telegram.set_buttons(owner, p["share_msg"], SHARE_BUTTONS(p))
+    if not together:
+        telegram.send(owner, text)
 
 
 def _share_command(state: dict, text: str) -> None:
@@ -66,6 +73,8 @@ def _share_command(state: dict, text: str) -> None:
         return
     if p["status"] in ("selected", "published"):
         _share_panel(state, p)
+    elif p["status"] == "settled" and p.get("recap") and os.path.exists(_recap_file(p)):
+        _recap_panel(state, p)
     elif p["status"] == "settled" and p.get("result") == "W":
         p["ig_kit_sent"] = False
         if p.get("ig_status") not in ("queued", "posted"):
@@ -313,7 +322,7 @@ def _post_result(state: dict, p: dict, text: str) -> None:
 def _settle(state: dict, p: dict, result: str) -> None:
     p.update(result=result, status="settled", settled_at=_iso(store.now_utc()))
     _post_result(state, p, formatting.result_post(p))
-    _instagram_kit(state, p)
+    _after_result(state, p)
 
 
 def _remind(state: dict, p: dict, now) -> None:
@@ -416,6 +425,8 @@ def _instagram_queue(state: dict, now) -> None:
             jobs.append((p, "ig_status", p["id"], p.get("ig_caption") or ""))
         if p.get("ig_pre_status") == "queued":
             jobs.append((p, "ig_pre_status", f"pre-{p['id']}", p.get("ig_pre_caption") or ""))
+        if p.get("ig_res_status") == "queued":
+            jobs.append((p, "ig_res_status", f"res-{p['id']}", p.get("ig_res_caption") or ""))
     for p, field, key, caption in jobs:
         if not instagram.image_live(key):
             continue   # la web aún no la publica; se reintenta en la próxima revisión
@@ -424,6 +435,8 @@ def _instagram_queue(state: dict, now) -> None:
             p[field] = "posted"
             if field == "ig_pre_status" and p.get("share_msg") and owner:
                 telegram.set_buttons(owner, p["share_msg"], SHARE_BUTTONS(p))
+            if field == "ig_res_status" and (p.get("recap") or {}).get("panel") and owner:
+                telegram.set_buttons(owner, p["recap"]["panel"], RECAP_BUTTONS(p))
             if owner:
                 telegram.send(owner, f"✅ Publicado en Instagram (pick #{p['id']})" + (f"\n{link}" if link else ""))
         except instagram.InstagramError as e:
@@ -449,7 +462,141 @@ def _correct(state: dict, p: dict, result: str) -> None:
             print(f"No se pudo marcar la corrección en {where}: {e}")
     p.update(result=result, corrected_at=_iso(store.now_utc()))
     _post_result(state, p, formatting.result_correction(p))
-    _instagram_kit(state, p)
+    _after_result(state, p)
+
+
+# ---------------------------------------------------------------- post partido (formato revista)
+def RECAP_BUTTONS(p: dict) -> list:
+    pid, msgs = p["id"], (p.get("recap") or {}).get("msgs") or {}
+    st = p.get("ig_res_status")
+    return [
+        [("✅ En VIP", "noop") if "vip" in msgs else ("👑 Compartir en VIP", f"xv:{pid}"),
+         ("✅ En Gratis", "noop") if "free" in msgs else ("🎁 Compartir en Gratis", f"xf:{pid}")],
+        [("✅ Instagram" if st == "posted" else "⏳ Instagram en cola" if st == "queued" else "📸 Compartir en Instagram",
+          "noop" if st in ("queued", "posted") else f"xi:{pid}")],
+        [("✏️ Cambiar titular", f"xt:{pid}")],
+    ]
+
+
+def _recap_supported(p: dict) -> bool:
+    return len(p["legs"]) == 1 and (p["legs"][0].get("sport") or "soccer") == "soccer"
+
+
+def _recap_file(p: dict) -> str:
+    from . import recap
+    return recap.image_path(p["id"])
+
+
+def _recap_panel(state: dict, p: dict) -> None:
+    """Te manda la imagen post partido con los botones para compartirla."""
+    owner = state["owner_chat"]
+    r = p["recap"]
+    if r.get("panel"):
+        telegram.edit_buttons_off(owner, r["panel"], "↪️ Reemplazada por la versión de abajo")
+    label = {"W": "✅ verde", "L": "❌ roja", "V": "↩️ nula"}.get(p.get("result"), "")
+    cap = (f"📰 <b>Post partido · pick #{p['id']}</b> ({label})\n"
+           f"Titular: <b>{formatting.escape(r['title'])}</b> · para cambiarlo: /titular {p['id']} TU TITULAR\n"
+           "Elige dónde compartirlo (puedes usar varios botones).")
+    if r.get("credit"):
+        cap += f"\n📸 {formatting.escape(r['credit']['text'])}"
+    with open(_recap_file(p), "rb") as f:
+        msg = telegram.send_photo(owner, f.read(), caption=cap)
+    r["panel"] = msg["message_id"]
+    telegram.set_buttons(owner, r["panel"], RECAP_BUTTONS(p))
+
+
+def _recap(state: dict, p: dict) -> bool:
+    """Arma la imagen post partido con datos de ESPN y te la manda. False si ESPN aún no tiene el final."""
+    if not state.get("owner_chat") or not _recap_supported(p):
+        return False
+    from . import commons, espn, postimage, recap
+    l = p["legs"][0]
+    rep = espn.match_report(l["home"], l["away"], l["kickoff"])
+    if not rep:
+        return False
+    old = p.get("recap") or {}
+    who = recap.hero(rep)
+    photo = commons.photo(who["full"]) if who else None
+    data = recap.build(p, rep, photo, old.get("custom_title"))
+    image = postimage.render_recap(data)
+    path = _recap_file(p)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(image)
+    credit = photo[1] if photo else None
+    p["recap"] = {"title": data["headline"], "custom_title": old.get("custom_title"), "credit": credit,
+                  "msgs": old.get("msgs") or {}, "panel": old.get("panel"), "hero": who["full"] if who else None,
+                  "tg": recap.telegram_caption(p, rep, data["headline"]),
+                  "ig": recap.instagram_caption(p, rep, data["headline"], credit)}
+    p.pop("recap_pending", None)
+    p["ig_kit_sent"] = True   # el post partido reemplaza a la imagen de celebración
+    _recap_panel(state, p)
+    return True
+
+
+def _after_result(state: dict, p: dict) -> None:
+    """Con el resultado listo: imagen post partido (fútbol, pick simple) o la celebración de siempre."""
+    if not _recap_supported(p):
+        _instagram_kit(state, p)
+        return
+    p["recap_pending"] = True
+    p["ig_kit_sent"] = True
+    p.pop("recap_next", None)
+    try:
+        _recap(state, p)
+    except Exception:
+        traceback.print_exc()
+
+
+def _recap_retry(state: dict, p: dict, now) -> None:
+    """ESPN a veces tarda en cerrar el partido: reintenta cada 20 min durante 6 h y luego usa la celebración."""
+    if not p.get("recap_pending") or p["status"] != "settled":
+        return
+    if p.get("recap_next") and now < store.parse_ts(p["recap_next"]):
+        return
+    if now - store.parse_ts(p.get("settled_at") or _iso(now)) > timedelta(minutes=config.RESULT_GIVE_UP_MIN):
+        p.pop("recap_pending", None)
+        if p.get("result") == "W":
+            p["ig_kit_sent"] = False   # sin datos de ESPN: se ofrece la imagen de celebración
+        return
+    p["recap_next"] = _iso(now + timedelta(minutes=config.RESULT_RETRY_MIN))
+    try:
+        _recap(state, p)
+    except Exception:
+        traceback.print_exc()
+
+
+def _recap_share(state: dict, p: dict, where: str) -> None:
+    chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
+    r = p["recap"]
+    with open(_recap_file(p), "rb") as f:
+        image = f.read()
+    reply = (p.get("channel_msgs") or {}).get(where)
+    text = r["tg"]
+    if formatting.caption_fits(text):
+        r["msgs"][where] = telegram.send_photo(chat, image, caption=text, reply_to=reply)["message_id"]
+    else:
+        r["msgs"][where] = telegram.send_photo(chat, image, reply_to=reply)["message_id"]
+        telegram.send(chat, text)
+
+
+def _title_command(state: dict, text: str) -> None:
+    owner = state["owner_chat"]
+    parts = text.split(maxsplit=2)
+    p = state["picks"].get(parts[1].lstrip("#")) if len(parts) > 1 else None
+    if not p or len(parts) < 3:
+        telegram.send(owner, "Usa /titular, el número del pick y el titular. Ejemplo: /titular 8 MARACA-NAZO\n"
+                             "El guion marca dónde se parte en dos líneas (la segunda va en verde).")
+        return
+    if not p.get("recap"):
+        telegram.send(owner, f"El pick #{p['id']} todavía no tiene imagen post partido.")
+        return
+    p["recap"]["custom_title"] = parts[2].strip()[:24]
+    telegram.send(owner, "✏️ Generando la imagen con el nuevo titular…")
+    if not _recap(state, p):
+        telegram.send(owner, "⚠️ No pude volver a leer el partido en ESPN. Intenta de nuevo en un rato.")
+    elif p.get("ig_res_status") in ("queued", "posted"):
+        telegram.send(owner, "Ojo: en Instagram ya quedó la versión anterior.")
 
 
 # ---------------------------------------------------------------- botones y mensajes
@@ -477,6 +624,8 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith("/titular"):
+            _title_command(state, text)
         elif chat == owner and text.lower().startswith("/compartir"):
             _share_command(state, text)
         elif chat == owner and text.lower().startswith(("/envivo", "/vivo")):
@@ -579,6 +728,38 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.edit_buttons_off(owner, cb["message"]["message_id"], note)
         telegram.answer(cb["id"], "Publicado")
 
+    elif action in ("xv", "xf", "xi", "xt"):   # compartir la imagen post partido
+        if not p.get("recap") or not os.path.exists(_recap_file(p)):
+            telegram.answer(cb["id"], "La imagen post partido ya no está disponible")
+            return
+        if action == "xt":
+            telegram.send(owner, f"Escribe /titular {pid} y el titular nuevo. Ejemplo: /titular {pid} MARACA-NAZO\n"
+                                 "El guion marca dónde se parte en dos líneas (la segunda va en verde).")
+            telegram.answer(cb["id"])
+            return
+        if action in ("xv", "xf"):
+            where = "vip" if action == "xv" else "free"
+            if where in p["recap"]["msgs"]:
+                telegram.answer(cb["id"], "Ya estaba compartida ahí")
+                return
+            if where == "vip" and not state.get("vip_chat"):
+                telegram.answer(cb["id"], "Primero vincula el canal VIP con /vincular_vip")
+                return
+            _recap_share(state, p, where)
+            telegram.answer(cb["id"], "Compartida")
+        else:
+            from . import instagram
+            if not instagram.enabled(state):
+                telegram.answer(cb["id"], "Instagram no está conectado")
+                return
+            if p.get("ig_res_status") in ("queued", "posted"):
+                telegram.answer(cb["id"], "Ya estaba en proceso")
+                return
+            p["ig_res_status"] = "queued"
+            p["ig_res_caption"] = p["recap"]["ig"]
+            telegram.answer(cb["id"], "Se publica en Instagram en unos minutos")
+        telegram.set_buttons(owner, cb["message"]["message_id"], RECAP_BUTTONS(p))
+
     elif action in ("ig", "ign"):  # publicar (o no) la celebración en Instagram
         if p.get("ig_status") in ("queued", "posted"):
             telegram.answer(cb["id"], "Ya estaba en proceso")
@@ -622,7 +803,8 @@ HELP_TEXT = (
     "/buscar · analiza ahora los partidos de las próximas 30 h y te manda el top 3\n"
     "/buscar 40 · igual, pero mirando 40 horas hacia adelante (máximo 47)\n"
     "/envivo · busca valor en partidos que se están jugando ahora\n"
-    "/compartir 8 · vuelve a mandarte la imagen del pick #8 para publicarlo (VIP, Gratis o Instagram)\n"
+    "/compartir 8 · vuelve a mandarte la imagen del pick #8 (o su post partido, si ya terminó)\n"
+    "/titular 8 MARACA-NAZO · cambia el titular de la imagen post partido del pick #8\n"
     "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
     "/ayuda · esta lista\n\n"
     "El escaneo automático sigue saliendo todos los días a las 09:07."
@@ -709,15 +891,16 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
-    if owner and state.get("cmds_v") != 3:
+    if owner and state.get("cmds_v") != 4:
         try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
             telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
                 {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
                 {"command": "envivo", "description": "Buscar valor en partidos que se están jugando"},
                 {"command": "compartir", "description": "Imagen de un pick para VIP, Gratis o Instagram"},
+                {"command": "titular", "description": "Cambiar el titular de la imagen post partido"},
                 {"command": "estado", "description": "Pendientes, picks en juego e historial"},
                 {"command": "ayuda", "description": "Lista de comandos"}])
-            state["cmds_v"] = 3
+            state["cmds_v"] = 4
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)
@@ -738,6 +921,7 @@ def poll() -> None:
             if owner and p.get("share_msg"):
                 telegram.edit_buttons_off(owner, p["share_msg"], "⌛ Ya no está vigente")
         _remind(state, p, now)
+        _recap_retry(state, p, now)
         if (p["status"] == "settled" and p.get("result") == "W" and p.get("settled_at")
                 and now - store.parse_ts(p["settled_at"]) < timedelta(hours=48)):
             from . import instagram

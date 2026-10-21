@@ -49,6 +49,9 @@ oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "f1", "bookmakerOdds":
     "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
     "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}}]
 apifootball.context = lambda *a: None
+from sv import commons, espn  # noqa: E402
+espn.match_report = lambda *a, **k: None   # sin internet: ESPN "todavía no tiene el final"
+commons.photo = lambda name: None
 apifootball.final_score = lambda *a: (2, 1)
 
 OWNER, VIP = 111, -100222
@@ -113,6 +116,13 @@ assert "Resultado automático" in req[1] and "VERDE" in req[1] and "2-1" in req[
 st = store.load()
 assert st["picks"][pid]["result"] == "W" and st["picks"][pid]["auto_result"]
 assert set(st["picks"][pid]["result_msgs"]) == {"vip", "free"}
+# fútbol: se espera el post partido de ESPN; si no llega en 6 h, se ofrece la celebración de siempre
+assert st["picks"][pid]["recap_pending"] and not any(c and "Para Instagram" in c for ch, c in photos)
+st["picks"][pid]["settled_at"] = (datetime.now(timezone.utc) - timedelta(hours=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+store.save(st)
+main.poll()
+st = store.load()
+assert not st["picks"][pid].get("recap_pending")
 # kit de Instagram al dueño: imagen de celebración + texto para copiar
 assert any(c and "Para Instagram" in c for ch, c in photos if ch == OWNER)
 ig = [t for ch, t, *_ in sent if ch == OWNER and t.startswith("<pre>")]
@@ -205,7 +215,10 @@ st = store.load()
 pw = next(p for p in st["picks"].values() if p["legs"][0]["fixture_id"] == "f3")
 pw.update(status="published", result=None, ig_kit_sent=False)
 store.save(st)
+_sup = main._recap_supported
+main._recap_supported = lambda p: False   # este bloque prueba la celebración (picks sin post partido)
 main._settle(st, pw, "W")
+main._recap_supported = _sup
 store.save(st)
 btn = sent[-1]
 assert btn[2] and btn[2][0][0][1] == f"ig:{pw['id']}", btn
@@ -333,3 +346,48 @@ calls.clear()
 main.poll()   # no repite respuestas
 assert not [1 for m, p, _ in calls if m == "POST"]
 print("OK asistente Instagram")
+
+# 11) post partido: imagen revista con datos de ESPN -> VIP, Gratis, Instagram y /titular
+import io as _io  # noqa: E402
+import json as _json  # noqa: E402
+from PIL import Image as _Image  # noqa: E402
+from sv import recap  # noqa: E402
+fxr = _json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "espn_boca_vasco.json")))
+cr = fxr["competition"]
+rep_ = espn.report_from_event(fxr["event"], cr, *[next(x for x in cr["competitors"] if x["homeAway"] == s_)
+                                                  for s_ in ("home", "away")])
+assert [g["label"] for g in rep_["goals"]] == ["4'", "34'", "66'", "88'"] and rep_["away"]["agg"] == 3
+assert recap.headline(rep_) == "REMONTADA" and recap.hero(rep_)["full"] == "Leandro Paredes"
+assert recap.subline(rep_, "2026-10-21T00:30:00Z") == ("Global", "2-3 · Boca es finalista")
+buf = _io.BytesIO()
+_Image.new("RGB", (800, 1100), (40, 90, 160)).save(buf, "JPEG")
+espn.match_report = lambda *a, **k: rep_
+commons.photo = lambda name: (buf.getvalue(), {"author": "Autor", "license": "CC BY-SA 4.0", "page": "x",
+                                               "text": "Foto: Autor / Wikimedia Commons · CC BY-SA 4.0 · modificada"})
+st = store.load()
+pr = st["picks"][p6["id"]]
+pr.update(status="published", result=None)
+pr.pop("recap", None)
+main._settle(st, pr, "W")
+store.save(st)
+assert "Post partido" in photos[-1][1] and "Foto: Autor" in photos[-1][1], photos[-1]
+assert os.path.exists(os.path.join(tmp, "docs", "ig", f"pick-res-{pr['id']}.jpg"))
+assert pr["ig_kit_sent"] and not pr.get("recap_pending") and "Paredes" in pr["recap"]["ig"]
+assert "Wikimedia Commons (CC BY-SA 4.0)" in pr["recap"]["ig"] and "+18" in pr["recap"]["ig"]
+assert buttons_set[-1][0][0][1] == f"xv:{pr['id']}" and buttons_set[-1][1][0][1] == f"xi:{pr['id']}"
+n = len(photos)
+posted.clear()
+for i, act in enumerate(("xv", "xf", "xi")):
+    updates_q.append({"update_id": 200 + i, "callback_query": {"id": f"r{i}", "data": f"{act}:{pr['id']}",
+                                                               "message": {"chat": {"id": OWNER}, "message_id": 70}}})
+main.poll()
+chans = [ch for ch, c in photos[n:]]
+assert VIP in chans and config.FREE_CHANNEL in chans, photos[n:]
+prs = store.load()["picks"][pr["id"]]
+assert set(prs["recap"]["msgs"]) == {"vip", "free"} and prs["ig_res_status"] == "posted"
+assert posted and posted[-1][0] == f"res-{pr['id']}" and "Nuestro pick" in posted[-1][1]
+updates_q.append({"update_id": 210, "message": {"chat": {"id": OWNER, "type": "private"},
+                                                "text": f"/titular {pr['id']} MARACA-NAZO"}})
+main.poll()
+assert "MARACA-NAZO" in photos[-1][1] and store.load()["picks"][pr["id"]]["recap"]["title"] == "MARACA-NAZO"
+print("OK post partido")

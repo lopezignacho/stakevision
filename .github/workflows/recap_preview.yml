@@ -1,0 +1,27 @@
+name: Post partido - vista previa con datos reales
+on:
+  workflow_dispatch:
+    inputs:
+      home: {description: "Local (como en ESPN)", required: true}
+      away: {description: "Visita", required: true}
+      kickoff: {description: "Inicio en UTC, ej. 2026-10-21T00:30:00Z", required: true}
+      league: {description: "Liga", required: false, default: ""}
+permissions:
+  contents: write
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python tools/recap_preview.py "${{ inputs.home }}" "${{ inputs.away }}" "${{ inputs.kickoff }}" "${{ inputs.league }}"
+      - run: |
+          git config user.name "stakevision-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add media/preview
+          git commit -m "vista previa post partido" || echo "sin cambios"
+          git pull --rebase && git push
