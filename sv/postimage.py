@@ -821,7 +821,7 @@ def _best_offset(energy: list, window: int, weights) -> int:
     return best_i
 
 
-def _cover(photo: bytes, size, focus=None) -> Image.Image:
+def _cover(photo: bytes, size, focus=None, side: str = "right") -> Image.Image:
     """Llena el tamaño sin deformar. Sin focus, elige el recorte solo: deja al protagonista (la zona con
     más detalle) en la mitad derecha, que es la que no tapa el texto, y prioriza la parte de arriba (caras)."""
     im = Image.open(io.BytesIO(photo)).convert("RGB")
@@ -838,7 +838,8 @@ def _cover(photo: bytes, size, focus=None) -> Image.Image:
     x = y = 0
     if im.width > w:
         cols = [sum(px[i, j] for j in range(small.height)) for i in range(small.width)]
-        x = _best_offset(cols, w // k, lambda t: 0.35 if t < 0.38 else 1.0) * k
+        wts = (lambda t: 0.35 if t < 0.38 else 1.0) if side == "right" else (lambda t: 1.0 - abs(t - 0.5))
+        x = _best_offset(cols, w // k, wts) * k
     if im.height > h:
         rows = [sum(px[i, j] for i in range(small.width)) for j in range(small.height)]
         y = _best_offset(rows, h // k, lambda t: 1.0 if t < 0.55 else 0.55) * k
@@ -940,6 +941,41 @@ def _accents(home: dict, away: dict, theme: str) -> tuple:
         if theme == "light" and _lum(h) < 0.2:
             a = L_GREEN
     return h, a
+
+
+def _result_line(d, T, m: dict, y: int, x_center: float = W / 2) -> None:
+    """Línea de cierre: el resultado de nuestro pick (✓ VERDE / ✕ ROJA / ↺ NULA) o «El dato»."""
+    pk = m.get("pick")
+    fb_, fr_ = _font("Bold", 22), _font("Medium", 22)
+    if pk:
+        tag = {"W": ("✓ VERDE", BRAND, (11, 26, 6)), "L": ("✕ ROJA", (227, 38, 46), (255, 255, 255)),
+               "V": ("↺ NULA", (110, 116, 124), (255, 255, 255))}[pk["result"]]
+        lead, body = "Nuestro pick:", f" {pk['label']} · {pk['odds']}  "
+        ftag = _font("Bold", 21)
+        tag_txt = tag[0].split(" ", 1)[1]
+        total = d.textlength(lead, font=fb_) + d.textlength(body, font=fr_) + d.textlength(tag_txt, font=ftag) + 58
+        x = x_center - total / 2
+        d.text((x, y), lead, font=fb_, fill=T["brand"], anchor="ls")
+        x += d.textlength(lead, font=fb_)
+        d.text((x, y), body, font=fr_, fill=T["sub"], anchor="ls")
+        x += d.textlength(body, font=fr_)
+        tw = d.textlength(tag_txt, font=ftag) + 58
+        d.rounded_rectangle((x, y - 26, x + tw, y + 10), 18, fill=tag[1])
+        cx, cy = x + 22, y - 8
+        if pk["result"] == "W":
+            d.line((cx - 7, cy, cx - 2, cy + 6, cx + 8, cy - 6), fill=tag[2], width=4, joint="curve")
+        elif pk["result"] == "L":
+            d.line((cx - 6, cy - 6, cx + 6, cy + 6), fill=tag[2], width=4)
+            d.line((cx - 6, cy + 6, cx + 6, cy - 6), fill=tag[2], width=4)
+        else:
+            d.arc((cx - 8, cy - 8, cx + 8, cy + 8), 40, 330, fill=tag[2], width=4)
+        d.text((x + 40, y), tag_txt, font=ftag, fill=tag[2], anchor="ls")
+    elif m.get("dato"):
+        lead, body = "El dato:", " " + m["dato"]
+        total = d.textlength(lead, font=fb_) + d.textlength(body, font=fr_)
+        x = x_center - total / 2
+        d.text((x, y), lead, font=fb_, fill=T["brand"], anchor="ls")
+        d.text((x + d.textlength(lead, font=fb_), y), body, font=fr_, fill=T["sub"], anchor="ls")
 
 
 def render_recap(m: dict, theme: str = "dark") -> bytes:
@@ -1073,38 +1109,7 @@ def render_recap(m: dict, theme: str = "dark") -> bytes:
         msg = "Sin goles: el cero no se movió en todo el partido"
         _ctext(d, ly - 52, msg, _oswald(24, 500), T["sub"])
 
-    # nuestro pick / el dato
-    pk = m.get("pick")
-    fb_, fr_ = _font("Bold", 22), _font("Medium", 22)
-    if pk:
-        tag = {"W": ("✓ VERDE", BRAND, (11, 26, 6)), "L": ("✕ ROJA", (227, 38, 46), (255, 255, 255)),
-               "V": ("↺ NULA", (110, 116, 124), (255, 255, 255))}[pk["result"]]
-        lead, body = "Nuestro pick:", f" {pk['label']} · {pk['odds']}  "
-        ftag = _font("Bold", 21)
-        tag_txt = tag[0].split(" ", 1)[1]
-        total = d.textlength(lead, font=fb_) + d.textlength(body, font=fr_) + d.textlength(tag_txt, font=ftag) + 58
-        x = (W - total) / 2
-        d.text((x, 1238), lead, font=fb_, fill=T["brand"], anchor="ls")
-        x += d.textlength(lead, font=fb_)
-        d.text((x, 1238), body, font=fr_, fill=T["sub"], anchor="ls")
-        x += d.textlength(body, font=fr_)
-        tw = d.textlength(tag_txt, font=ftag) + 58
-        d.rounded_rectangle((x, 1212, x + tw, 1248), 18, fill=tag[1])
-        cx, cy = x + 22, 1230
-        if pk["result"] == "W":
-            d.line((cx - 7, cy, cx - 2, cy + 6, cx + 8, cy - 6), fill=tag[2], width=4, joint="curve")
-        elif pk["result"] == "L":
-            d.line((cx - 6, cy - 6, cx + 6, cy + 6), fill=tag[2], width=4)
-            d.line((cx - 6, cy + 6, cx + 6, cy - 6), fill=tag[2], width=4)
-        else:
-            d.arc((cx - 8, cy - 8, cx + 8, cy + 8), 40, 330, fill=tag[2], width=4)
-        d.text((x + 40, 1238), tag_txt, font=ftag, fill=tag[2], anchor="ls")
-    elif m.get("dato"):
-        lead, body = "El dato:", " " + m["dato"]
-        total = d.textlength(lead, font=fb_) + d.textlength(body, font=fr_)
-        x = (W - total) / 2
-        d.text((x, 1238), lead, font=fb_, fill=T["brand"], anchor="ls")
-        d.text((x + d.textlength(lead, font=fb_), 1238), body, font=fr_, fill=T["sub"], anchor="ls")
+    _result_line(d, T, m, 1238)
     _ctext(d, 1306, "+18 · Juega con responsabilidad", _font("Medium", 17), T["muted"])
 
     if m.get("credit"):

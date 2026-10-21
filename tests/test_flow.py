@@ -518,3 +518,26 @@ p7s = store.load()["picks"][p7["id"]]
 assert p7s["status"] == "selected" and buttons_set[0][0][0][1] == f"u:{p7['id']}", buttons_set
 assert buttons_set[-1][0][0][1] == f"pv:{p7['id']}"
 print("OK deshacer + modo día")
+
+# 17) diseños que rotan y «Otro diseño»
+from sv import layouts  # noqa: E402
+st = store.load()
+seq_before = (st.get("design_seq") or {}).get("recap", -1)
+updates_q.append({"update_id": 800, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/postpartido Vasco vs Boca"}})
+updates_q.append({"update_id": 801, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/postpartido Vasco vs Boca"}})
+main.poll()
+st = store.load()
+n2, n3 = st["picks"]["N2"]["recap"]["layout"], st["picks"]["N3"]["recap"]["layout"]
+assert n2 != n3 and n2 in layouts.RECAP_LAYOUTS and n3 in layouts.RECAP_LAYOUTS, (n2, n3)
+updates_q.append({"update_id": 802, "callback_query": {"id": "z1", "data": "xl:N3",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 120}}})
+main.poll()
+assert store.load()["picks"]["N3"]["recap"]["layout"] == layouts.cycle(n3, "recap")
+updates_q.append({"update_id": 803, "callback_query": {"id": "z2", "data": f"dl:{p7['id']}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 121}}})
+main.poll()
+assert store.load()["picks"][p7["id"]]["pick_layout"] in layouts.PICK_LAYOUTS
+for lay in layouts.RECAP_LAYOUTS:
+    for th in ("dark", "light"):
+        assert layouts.render_recap(recap.build(pr, rep_, None), lay, th)[:2] == b"\xff\xd8"
+print("OK diseños que rotan")

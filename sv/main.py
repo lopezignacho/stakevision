@@ -39,7 +39,8 @@ def SHARE_BUTTONS(p: dict) -> list:
                  ("🖼 Adjuntar mi imagen", f"yp:{pid}")])
     if photo:
         rows.append([("🌙 Modo noche" if p.get("theme") == "light" else "☀️ Modo día", f"th:{pid}"),
-                     ("📲 Adelanto (historia)", f"ad:{pid}")])
+                     ("🔀 Otro diseño", f"dl:{pid}")])
+        rows.append([("📲 Adelanto (historia)", f"ad:{pid}")])
     else:
         rows.append([("📲 Adelanto (historia)", f"ad:{pid}")])
     if not msgs and not st:
@@ -315,7 +316,9 @@ def _make_pick_photo(p: dict, user_photo: bytes | None = None, reuse: bool = Fal
         os.makedirs(os.path.dirname(cache), exist_ok=True)
         with open(cache, "wb") as f:
             f.write(photo[0])
-    image = postimage.render_pick_photo(teaser.pick_photo_data(p, teams, photo), p.get("theme") or "dark")
+    from . import layouts
+    image = layouts.render_pick(teaser.pick_photo_data(p, teams, photo), p.get("pick_layout") or "revista",
+                                p.get("theme") or "dark")
     path = _pick_photo_file(p)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
@@ -546,7 +549,8 @@ def RECAP_BUTTONS(p: dict) -> list:
         [("✅ Instagram" if st == "posted" else "⏳ Instagram en cola" if st == "queued" else "📸 Compartir en Instagram",
           "noop" if st in ("queued", "posted") else f"xi:{pid}")],
         [("🖼 Adjuntar mi imagen", f"xp:{pid}"), ("✏️ Cambiar titular", f"xt:{pid}")],
-        [("🌙 Modo noche" if (p.get("recap") or {}).get("theme") == "light" else "☀️ Modo día", f"xh:{pid}")],
+        [("🌙 Modo noche" if (p.get("recap") or {}).get("theme") == "light" else "☀️ Modo día", f"xh:{pid}"),
+         ("🔀 Otro diseño", f"xl:{pid}")],
     ]
 
 
@@ -603,11 +607,13 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
         photo = commons.photo(who["full"]) if who else None
     data = recap.build(p, rep, photo, old.get("custom_title"))
     data["credit"] = photo[1]["text"] if photo and photo[1] else None
+    from . import layouts
+    layout = old.get("layout") or layouts.next_layout(state, "recap")
     if old.get("mode") == "raw" and os.path.exists(_upload_file(p)):
         with open(_upload_file(p), "rb") as f:
             image = postimage.fit_instagram(f.read())
     else:
-        image = postimage.render_recap(data, old.get("theme") or "dark")
+        image = layouts.render_recap(data, layout, old.get("theme") or "dark")
     path = _recap_file(p)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
@@ -616,7 +622,7 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
     p["recap"] = {"title": data["headline"], "custom_title": old.get("custom_title"), "credit": credit,
                   "msgs": old.get("msgs") or {}, "panel": old.get("panel"), "hero": who["full"] if who else None,
                   "report": rep, "photo_src": old.get("photo_src"), "mode": old.get("mode"), "v": RECAP_TEXT_V,
-                  "theme": old.get("theme"),
+                  "theme": old.get("theme"), "layout": layout,
                   "tg": recap.telegram_caption(p, rep, data["headline"]),
                   "ig": recap.instagram_caption(p, rep, data["headline"], credit)}
     p.pop("recap_pending", None)
@@ -989,12 +995,17 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.edit_buttons_off(owner, cb["message"]["message_id"], note)
         telegram.answer(cb["id"], "Publicado")
 
-    elif action == "th":   # modo día / noche de la versión con foto del pick
+    elif action in ("th", "dl"):   # modo día / noche u otro diseño de la versión con foto del pick
         if p["status"] not in ("selected", "published") or p.get("pick_style") != "photo":
             telegram.answer(cb["id"], "No disponible")
             return
-        p["theme"] = "dark" if p.get("theme") == "light" else "light"
-        telegram.answer(cb["id"], "Cambiando a modo " + ("día…" if p["theme"] == "light" else "noche…"))
+        from . import layouts
+        if action == "th":
+            p["theme"] = "dark" if p.get("theme") == "light" else "light"
+            telegram.answer(cb["id"], "Cambiando a modo " + ("día…" if p["theme"] == "light" else "noche…"))
+        else:
+            p["pick_layout"] = layouts.cycle(p.get("pick_layout"), "pick")
+            telegram.answer(cb["id"], "Diseño: " + layouts.LAYOUT_NAMES[p["pick_layout"]])
         try:
             _make_pick_photo(p, reuse=True)
         except Exception:
@@ -1016,6 +1027,9 @@ def _handle_update(state: dict, u: dict) -> None:
             else:
                 telegram.answer(cb["id"], "Armando la versión con foto…")
                 try:
+                    if not p.get("pick_layout"):
+                        from . import layouts
+                        p["pick_layout"] = layouts.next_layout(state, "pick")
                     _make_pick_photo(p)
                     p["pick_style"] = "photo"
                 except Exception:
@@ -1097,13 +1111,18 @@ def _handle_update(state: dict, u: dict) -> None:
             telegram.send(owner, "Ojo: en Instagram ya quedó la versión anterior.")
         return
 
-    elif action == "xh":   # modo día / noche del post partido
+    elif action in ("xh", "xl"):   # modo día / noche u otro diseño del post partido
         r = p.get("recap") or {}
         if not r or r.get("mode") == "raw":
-            telegram.answer(cb["id"], "Esta imagen va tal cual: no tiene modo día")
+            telegram.answer(cb["id"], "Esta imagen va tal cual: no tiene diseño")
             return
-        r["theme"] = "dark" if r.get("theme") == "light" else "light"
-        telegram.answer(cb["id"], "Cambiando a modo " + ("día…" if r["theme"] == "light" else "noche…"))
+        if action == "xh":
+            r["theme"] = "dark" if r.get("theme") == "light" else "light"
+            telegram.answer(cb["id"], "Cambiando a modo " + ("día…" if r["theme"] == "light" else "noche…"))
+        else:
+            from . import layouts
+            r["layout"] = layouts.cycle(r.get("layout"), "recap")
+            telegram.answer(cb["id"], "Diseño: " + layouts.LAYOUT_NAMES[r["layout"]])
         if not _recap(state, p, reuse=True):
             telegram.send(owner, "⚠️ No pude cambiar el modo. Intenta de nuevo en un rato.")
         return
