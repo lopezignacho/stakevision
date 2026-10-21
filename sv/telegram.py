@@ -75,8 +75,9 @@ def answer(callback_id: str, text: str = "") -> None:
         pass
 
 
-def updates(offset: int) -> list[dict]:
-    return _call("getUpdates", offset=offset, timeout=0,
+def updates(offset: int, wait: int = 0) -> list[dict]:
+    """wait > 0: espera hasta esos segundos a que llegue algo (respuesta inmediata a los botones)."""
+    return _call("getUpdates", offset=offset, timeout=wait,
                  allowed_updates=["message", "callback_query", "channel_post"])
 
 

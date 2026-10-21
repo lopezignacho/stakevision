@@ -95,6 +95,11 @@ RESULT_BUTTONS = lambda pid: [  # noqa: E731
 ]
 
 
+def _local_today() -> str:
+    from zoneinfo import ZoneInfo
+    return store.now_utc().astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat()
+
+
 def _iso(dt) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -105,6 +110,13 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False,
     if not state["owner_chat"]:
         print("Aún no está vinculado tu chat. Escribe al bot: /vincular <tu código>")
         return
+    if not manual and not live:   # el escaneo diario sale una sola vez (lo pueden lanzar dos caminos)
+        today = _local_today()
+        if state.get("auto_scan_date") == today:
+            print("El escaneo de hoy ya salió.")
+            return
+        state["auto_scan_date"] = today
+        store.save(state)
     now = store.now_utc()
     hours = min(hours or config.WINDOW_END_H, 47)
     if live:
@@ -998,13 +1010,13 @@ def _migrate_stakes(state: dict, now) -> None:
         p["stake_v"] = 2
 
 
-def poll() -> None:
-    state = store.load()
-    ups = telegram.updates(state["tg_offset"])
+def _process_updates(state: dict, wait: int = 0) -> int:
+    ups = telegram.updates(state["tg_offset"], wait=wait)
     kinds = [k for u in ups for k in ("message", "channel_post", "callback_query") if k in u]
-    print(f"Actualizaciones recibidas: {len(ups)} ({', '.join(sorted(set(kinds))) or 'ninguna'}); "
-          f"dueño vinculado: {'sí' if state.get('owner_chat') else 'no'}; "
-          f"VIP vinculado: {'sí' if state.get('vip_chat') else 'no'}")
+    if ups or not wait:
+        print(f"Actualizaciones recibidas: {len(ups)} ({', '.join(sorted(set(kinds))) or 'ninguna'}); "
+              f"dueño vinculado: {'sí' if state.get('owner_chat') else 'no'}; "
+              f"VIP vinculado: {'sí' if state.get('vip_chat') else 'no'}")
     for u in ups:
         state["tg_offset"] = u["update_id"] + 1
         try:
@@ -1012,6 +1024,70 @@ def poll() -> None:
         except Exception:
             traceback.print_exc()
         store.save(state)
+    return len(ups)
+
+
+def _checkpoint(msg: str = "Actualizar estado") -> None:
+    """Guarda el estado en el repo a mitad de la escucha (solo en GitHub Actions)."""
+    import subprocess
+    if not os.environ.get("GIT_CHECKPOINT"):
+        return
+    try:
+        subprocess.run("git add data docs/historial.json docs/ig", shell=True, check=False)
+        if subprocess.run("git diff --cached --quiet", shell=True).returncode != 0:
+            subprocess.run(f'git commit -q -m "{msg}" && git pull -q --rebase && git push -q', shell=True, check=False)
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+
+
+def _run_scan_request(state: dict) -> dict:
+    request = state.pop("scan_request", None)
+    if not request:
+        return state
+    store.save(state)
+    if request == "live":
+        scan(top=config.MANUAL_TOP, manual=True, live=True)
+    else:
+        scan(hours=request, top=config.MANUAL_TOP, manual=True)
+    return store.load()
+
+
+def listen(seconds: int = 270) -> None:
+    """Revisión completa y luego queda escuchando: los botones responden al instante (1-2 s)."""
+    import time
+    end = time.time() + seconds
+    poll()
+    _checkpoint()
+    last_ig = time.time()
+    while time.time() < end - 25:
+        state = store.load()
+        try:
+            n = _process_updates(state, wait=20)
+        except Exception:
+            traceback.print_exc()
+            time.sleep(5)
+            continue
+        state = _run_scan_request(state)
+        if n:
+            store.save(state)
+            _checkpoint()
+        if time.time() - last_ig > 60:   # Instagram necesita que la imagen ya esté en la web
+            last_ig = time.time()
+            try:
+                from . import instagram
+                if instagram.enabled(state) and any(
+                        p.get(f) == "queued" for p in state["picks"].values()
+                        for f in ("ig_status", "ig_pre_status", "ig_res_status")):
+                    _instagram_queue(state, store.now_utc())
+                    store.save(state)
+                    _checkpoint()
+            except Exception:
+                traceback.print_exc()
+
+
+def poll() -> None:
+    state = store.load()
+    _process_updates(state)
 
     now = store.now_utc()
     owner = state.get("owner_chat")
@@ -1083,12 +1159,13 @@ def poll() -> None:
             ig_inbox.run(state)   # responde comentarios y mensajes directos
     except Exception:
         traceback.print_exc()
-    request = state.pop("scan_request", None)
     store.save(state)
-    if request == "live":
-        scan(top=config.MANUAL_TOP, manual=True, live=True)
-    elif request:
-        scan(hours=request, top=config.MANUAL_TOP, manual=True)
+    state = _run_scan_request(state)
+    from zoneinfo import ZoneInfo
+    local = store.now_utc().astimezone(ZoneInfo(config.TIMEZONE))
+    if (config.AUTO_SCAN_FALLBACK and state.get("owner_chat") and state.get("auto_scan_date") != _local_today()
+            and (local.hour, local.minute) >= (9, 7) and local.hour < 22):
+        scan()   # respaldo del escaneo diario por si el disparo de las 09:07 no corrió
 
 
 def setup() -> None:
@@ -1103,4 +1180,4 @@ def setup() -> None:
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "poll"
-    {"scan": scan, "poll": poll, "setup": setup}[cmd]()
+    {"scan": scan, "poll": poll, "listen": listen, "setup": setup}[cmd]()

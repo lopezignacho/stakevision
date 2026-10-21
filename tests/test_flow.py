@@ -40,7 +40,19 @@ telegram.send_photo = fake_photo
 telegram.edit_buttons_off = lambda *a, **k: None
 telegram.answer = lambda *a, **k: None
 telegram._call = lambda *a, **k: True
-telegram.updates = lambda offset: [u for u in updates_q if u["update_id"] >= offset]
+telegram.updates = lambda offset, wait=0: [u for u in updates_q if u["update_id"] >= offset]
+config.AUTO_SCAN_FALLBACK = False
+_scan = main.scan
+
+
+def _scan_any_day(*a, **k):   # en las pruebas el escaneo "diario" se lanza varias veces el mismo día
+    st_ = store.load()
+    st_.pop("auto_scan_date", None)
+    store.save(st_)
+    return _scan(*a, **k)
+
+
+main.scan = _scan_any_day
 
 fx = te.fixture("f1", "Colo-Colo", "U. de Chile", hours=5)
 oddspapi.markets = lambda force=False: te.MARKETS

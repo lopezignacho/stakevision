@@ -77,6 +77,7 @@ ODDS_BATCHES = 4                 # máximo de grupos de 5 ligas por escaneo (20 
 
 # --- Horarios y zona -----------------------------------------------------
 TIMEZONE = "America/Santiago"
+AUTO_SCAN_FALLBACK = True   # si el disparo de las 09:07 no corre, la revisión lanza el escaneo del día
 REMINDER_BEFORE_MIN = 30      # aviso en los canales antes del partido
 RESULT_CHECK_AFTER_MIN = 135   # minutos tras el inicio para buscar el marcador final
 RESULT_RETRY_MIN = 20          # si el marcador aún no está, reintentar cada 20 min
