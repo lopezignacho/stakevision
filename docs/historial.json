@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-21T15:16:38.950876+00:00",
+ "updated_at": "2026-10-21T15:16:49.553545+00:00",
  "summary": {
   "picks": 4,
   "wins": 3,
@@ -36,6 +36,33 @@
     }
    ],
    "analysis": "Más de 3 goles (con 3 exactos se devuelve) en Club Brugge vs Racing Club De Lens: cuota justa estimada 1.66, cuota disponible 1.65 (en línea con la cuota justa).\nProbabilidad estimada: 60,3%. Para no perder a esta cuota se necesita 60,6%."
+  },
+  {
+   "id": "16",
+   "published_at": "2026-10-21T15:16:48Z",
+   "kickoff": "2026-10-21T18:00:00.000Z",
+   "kind": "simple",
+   "price": 1.78,
+   "stake": 3,
+   "prob": 0.5602,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Levante UD",
+     "away": "Athletic Bilbao",
+     "league": "España · LaLiga",
+     "market": "Hándicap Asiático",
+     "outcome": "1",
+     "price": 1.78,
+     "label": "Levante UD +0.5 (hándicap asiático)",
+     "mtype": "spreads",
+     "handicap": 0.5,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "Levante UD +0.5 (hándicap asiático) en Levante UD vs Athletic Bilbao: cuota justa estimada 1.78, cuota disponible 1.78 (en línea con la cuota justa).\nProbabilidad estimada: 56,0%. Para no perder a esta cuota se necesita 56,2%."
   },
   {
    "id": "7",
