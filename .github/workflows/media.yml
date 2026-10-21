@@ -1,0 +1,21 @@
+name: Media - descargar foto libre de Wikimedia Commons
+on:
+  workflow_dispatch:
+    inputs:
+      file:
+        description: "Nombre del archivo en Commons (sin 'File:')"
+        required: true
+permissions:
+  contents: write
+jobs:
+  bajar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python tools/commons_fetch.py "${{ inputs.file }}"
+      - run: |
+          git config user.name "stakevision-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add media
+          git commit -m "media: ${{ inputs.file }}" || echo "sin cambios"
+          git pull --rebase && git push
