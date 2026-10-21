@@ -554,7 +554,7 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
     credit = photo[1] if photo and old.get("mode") != "raw" else None
     p["recap"] = {"title": data["headline"], "custom_title": old.get("custom_title"), "credit": credit,
                   "msgs": old.get("msgs") or {}, "panel": old.get("panel"), "hero": who["full"] if who else None,
-                  "report": rep, "photo_src": old.get("photo_src"), "mode": old.get("mode"),
+                  "report": rep, "photo_src": old.get("photo_src"), "mode": old.get("mode"), "v": RECAP_TEXT_V,
                   "tg": recap.telegram_caption(p, rep, data["headline"]),
                   "ig": recap.instagram_caption(p, rep, data["headline"], credit)}
     p.pop("recap_pending", None)
@@ -593,6 +593,25 @@ def _recap_retry(state: dict, p: dict, now) -> None:
         _recap(state, p)
     except Exception:
         traceback.print_exc()
+
+
+RECAP_TEXT_V = 2
+
+
+def _refresh_recap_texts(state: dict) -> None:
+    """Textos nuevos del post partido para los que aún no salieron a Instagram."""
+    from . import recap
+    for p in state["picks"].values():
+        r = p.get("recap") or {}
+        if not r.get("report") or r.get("v") == RECAP_TEXT_V:
+            continue
+        r["v"] = RECAP_TEXT_V
+        if p.get("ig_res_status") == "posted":
+            continue
+        r["tg"] = recap.telegram_caption(p, r["report"], r.get("title") or "")
+        r["ig"] = recap.instagram_caption(p, r["report"], r.get("title") or "", r.get("credit"))
+        if p.get("ig_res_status") == "queued":
+            p["ig_res_caption"] = r["ig"]
 
 
 def _recap_share(state: dict, p: dict, where: str) -> None:
@@ -1105,6 +1124,7 @@ def poll() -> None:
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)
+    _refresh_recap_texts(state)
     for p in state["picks"].values():   # picks aprobados con el flujo antiguo: ofrecer la imagen para compartir
         if (owner and p["status"] == "published" and not p.get("share_msg") and not p.get("share_offered")
                 and store.parse_ts(p["kickoff"]) > now):

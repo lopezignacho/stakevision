@@ -397,7 +397,7 @@ chans = [ch for ch, c in photos[n:]]
 assert VIP in chans and config.FREE_CHANNEL in chans, photos[n:]
 prs = store.load()["picks"][pr["id"]]
 assert set(prs["recap"]["msgs"]) == {"vip", "free"} and prs["ig_res_status"] == "posted"
-assert posted and posted[-1][0] == f"res-{pr['id']}" and "Nuestro pick" in posted[-1][1]
+assert posted and posted[-1][0] == f"res-{pr['id']}" and "¡VERDE!" in posted[-1][1] and "Paredes" in posted[-1][1]
 updates_q.append({"update_id": 210, "message": {"chat": {"id": OWNER, "type": "private"},
                                                 "text": f"/titular {pr['id']} MARACA-NAZO"}})
 main.poll()
@@ -443,7 +443,7 @@ main.poll()
 st = store.load()
 nw = st["picks"]["N1"]
 assert nw["status"] == "news" and len(photos) == n + 1 and "Post partido · partido N1" in photos[-1][1]
-assert "Nuestro pick" not in nw["recap"]["ig"] and "Boca" in nw["recap"]["ig"]
+assert "🎯" not in nw["recap"]["ig"] and "Boca" in nw["recap"]["ig"]
 pub = json.load(open(config.PUBLIC_HISTORY))
 assert all(str(x.get("id")) != "N1" for x in pub["picks"])
 print("OK /postpartido")

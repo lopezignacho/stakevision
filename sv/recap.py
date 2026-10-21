@@ -167,6 +167,121 @@ def dato(rep: dict) -> str:
 
 RESULT_TXT = {"W": "✅ VERDE", "L": "❌ ROJA", "V": "↩️ NULA"}
 
+OPENERS = {
+    "REMONTADA": ["¡QUÉ NOCHE! 🔥 Nadie lo daba por hecho y lo dieron vuelta.",
+                  "¡LO DIERON VUELTA! 🔄🔥 Esto es fútbol en estado puro.",
+                  "¡REMONTADA DE LAS QUE SE CUENTAN! 🔥 Corazón, garra y cabeza fría."],
+    "GOLEADA": ["¡BAILE TOTAL! 💃⚽ Un partido para guardar.", "¡FESTIVAL DE GOLES! 🎉 No hubo equivalencias."],
+    "AGÓNICO": ["¡INFARTO HASTA EL ÚLTIMO SEGUNDO! 😱", "¡SE DEFINIÓ CON EL CORAZÓN EN LA BOCA! ⏱️🔥"],
+    "GOLPE DE VISITA": ["¡GOLPE EN CASA AJENA! 👊 Fueron a ganar y lo hicieron.",
+                        "¡SILENCIO EN LAS TRIBUNAS! 🤫 Ganó la visita."],
+    "IMPECABLE": ["¡SÓLIDO DE PRINCIPIO A FIN! 🧱 Ganó y no le hicieron goles.",
+                  "¡PARTIDO REDONDO! 💯 Triunfo y valla invicta."],
+    "VICTORIA": ["¡TRIUNFAZO! 💪 Tres puntos que valen oro.", "¡HICIERON LA TAREA! ✅ Triunfo trabajado."],
+    "CERO A CERO": ["Partido trabado y de dientes apretados 🔒 Ninguno pudo romper el cero."],
+    "TODO IGUAL": ["¡Se repartieron todo! ⚖️ Nadie se quiso ir con las manos vacías."],
+    "SON CAMPEONES": ["¡CAMPEONES! 🏆🏆🏆 Noche histórica."],
+}
+QUESTIONS = {
+    "REMONTADA": ["¿Dónde estabas cuando cayó el gol del triunfo? 👇", "¿La mejor remontada del año? Te leemos 👇"],
+    "GOLEADA": ["¿Merecido o se les pasó la mano? 👇"],
+    "AGÓNICO": ["¿Cuántos se comieron las uñas con este final? 🙋 👇"],
+    "GOLPE DE VISITA": ["¿Lo viste venir o te sorprendió? 👇"],
+    "CERO A CERO": ["¿Quién mereció más? 👇"],
+    "TODO IGUAL": ["¿Justo el empate? 👇"],
+}
+DEFAULT_Q = ["¿Quién fue la figura para ti? 👇", "¿Qué te pareció el partido? Te leemos 👇"]
+
+
+def _pick_one(options: list[str], seed: str) -> str:
+    return options[sum(map(ord, seed or "x")) % len(options)]
+
+
+def _how(g: dict) -> str:
+    return " de cabeza" if g["kind"] == "header" else " de penal" if g["kind"] == "penalty" else ""
+
+
+def _surname(g: dict) -> str:
+    n = g.get("player") or g.get("full") or ""
+    return n.split(". ", 1)[-1] if ". " in n else n
+
+
+def story(rep: dict) -> list[str]:
+    """Cuenta el partido en 2 a 4 frases a partir de los goles (sin inventar nada que no esté en los datos)."""
+    goals = rep["goals"]
+    if not goals:
+        return [f"{_team(rep['home'])} y {_team(rep['away'])} chocaron de principio a fin, "
+                "pero el arco quedó cerrado."]
+    run = {"home": 0, "away": 0}
+    lines, prev_kind = [], ""
+    for i, g in enumerate(goals):
+        side, other = g["side"], "away" if g["side"] == "home" else "home"
+        before = run[side] - run[other]
+        run[side] += 1
+        team, who, m = _team(rep[side]), _surname(g), g["label"]
+        if g["kind"] == "own":
+            text, kind = f"un gol en contra a los {m} le dio vida a {team}", "own"
+        elif i == 0:
+            text, kind = f"{who} abrió el marcador{_how(g)} a los {m} y encendió todo para {team}", "open"
+        elif before == -1:
+            text, kind = f"{who} lo empató{_how(g)} a los {m} y volvió a meter a {team} en el partido", "tie"
+        elif before == 0:
+            last = g is goals[-1]
+            text = (f"{who} apareció a los {m}{_how(g)} para poner a {team} arriba" +
+                    (" cuando más pesaba" if last and g["min"] >= 80 else ""))
+            kind = "lead"
+        elif before < -1:
+            text, kind = f"{who} descontó para {team} a los {m}{_how(g)} y le metió suspenso", "cut"
+        else:
+            last = g is goals[-1]
+            text = (f"{who} la liquidó a los {m}{_how(g)}" if last and g["min"] >= 75 else
+                    f"{who} amplió la ventaja a los {m}{_how(g)}")
+            kind = "extend"
+        if prev_kind in ("cut", "tie") and kind in ("lead", "extend"):
+            text = "Pero " + text
+        lines.append(text[0].upper() + text[1:] + ".")
+        prev_kind = kind
+    if len(lines) > 4:   # muchos goles: el primero, el resumen y el último
+        lines = [lines[0], f"Después fue un ida y vuelta con {len(goals) - 2} goles más.", lines[-1]]
+    return lines
+
+
+def _stakes(rep: dict) -> str:
+    s = rep.get("series")
+    if not s:
+        return ""
+    sw = _series_winner(rep)
+    ha, aa = rep["home"].get("agg"), rep["away"].get("agg")
+    if sw:
+        phrase = (STAGE.get(rep.get("stage") or "") or ("", "avanza"))[1]
+        loser = "away" if sw == "home" else "home"
+        wb = (rep[sw].get("agg") or 0) - rep[sw]["score"]
+        lb = (rep[loser].get("agg") or 0) - rep[loser]["score"]
+        back = f" Llegaba perdiendo {wb}-{lb} de la ida y lo dio vuelta." if wb < lb else ""
+        return f"🏆 Global {ha}-{aa}: {_team(rep[sw])} {phrase}.{back}"
+    if s.get("leg") == 1:
+        return f"🔜 Esto recién empieza: la serie se define en la vuelta."
+    return ""
+
+
+def _hero_line(rep: dict) -> str:
+    h = hero(rep)
+    if not h:
+        return ""
+    mins = [g["label"] for g in rep["goals"] if g["full"] == h["full"] and g["kind"] != "own"]
+    goles = f"doblete ({', '.join(mins)})" if len(mins) == 2 else f"triplete ({', '.join(mins)})" \
+        if len(mins) >= 3 else f"gol al {mins[0]}"
+    return f"⭐ Figura: {h['full']}, {goles}."
+
+
+def _pick_story(p: dict) -> str:
+    if p.get("news"):
+        return ""
+    lab, o = pick_label(p), formatting.odds(p["price"])
+    return {"W": f"🎯 Y lo vimos venir: {lab} @ {o} ✅ ¡VERDE! 💚",
+            "L": f"🎯 Esta vez no se nos dio: {lab} @ {o} ❌. Se pierde, se anota y seguimos con la misma disciplina.",
+            "V": f"🎯 {lab} @ {o} ↩️ Nula: se devuelve lo apostado."}.get(p.get("result"), "")
+
 
 def _goal_lines(rep: dict) -> list[str]:
     out = []
@@ -176,39 +291,46 @@ def _goal_lines(rep: dict) -> list[str]:
     return out
 
 
+def _body(p: dict, rep: dict) -> tuple[str, list[str], str]:
+    kind = headline(rep)
+    seed = str(rep.get("id") or p.get("id"))
+    opener = _pick_one(OPENERS.get(kind, OPENERS["VICTORIA"]), seed)
+    question = _pick_one(QUESTIONS.get(kind, DEFAULT_Q), seed + "q")
+    h, a = rep["home"], rep["away"]
+    score = f"{_team(h)} {h['score']}-{a['score']} {_team(a)}"
+    parts = [score, ""] + [" ".join(story(rep))]
+    for extra in (_stakes(rep), _hero_line(rep)):
+        if extra:
+            parts += ["", extra]
+    return opener, parts, question
+
+
 def telegram_caption(p: dict, rep: dict, title: str) -> str:
     esc = formatting.escape
-    h, a = rep["home"], rep["away"]
-    lines = [f"📰 <b>{esc(title.replace('-', ''))}</b>",
-             f"<b>{esc(_team(h))} {h['score']}-{a['score']} {esc(_team(a))}</b>", ""]
-    lines += [esc(x) for x in _goal_lines(rep)] or ["Sin goles."]
-    sub = subline(rep, p["legs"][0]["kickoff"])
-    if sub[0] in ("Global", "Ida"):
-        lines += ["", esc(" ".join(sub))]
-    if not p.get("news"):
-        lines += ["", f"🎯 Nuestro pick: {esc(pick_label(p))} @ {formatting.odds(p['price'])} → "
-                      f"<b>{RESULT_TXT.get(p.get('result'), '')}</b>"]
+    opener, parts, question = _body(p, rep)
+    lines = [f"📰 <b>{esc(opener)}</b>", ""]
+    lines += [f"<b>{esc(parts[0])}</b>"] + [esc(x) for x in parts[1:]]
+    ps = _pick_story(p)
+    if ps:
+        lines += ["", esc(ps)]
     lines += ["", "🔞 +18 · Juega con responsabilidad."]
     return "\n".join(lines)
 
 
 def instagram_caption(p: dict, rep: dict, title: str, credit: dict | None) -> str:
-    h, a = rep["home"], rep["away"]
-    lines = [f"🔥 {title.replace('-', '')} 🔥", f"{_team(h)} {h['score']}-{a['score']} {_team(a)}", ""]
-    lines += _goal_lines(rep) or ["Sin goles."]
-    sub = subline(rep, p["legs"][0]["kickoff"])
-    if sub[0] in ("Global", "Ida"):
-        lines += ["", " ".join(sub)]
-    if not p.get("news"):
-        lines += ["", f"🎯 Nuestro pick: {pick_label(p)} @ {formatting.odds(p['price'])} → "
-                      f"{RESULT_TXT.get(p.get('result'), '')}"]
-    lines += ["", "¿Quién se lleva el próximo? 👇", "",
+    opener, parts, question = _body(p, rep)
+    lines = [opener, ""] + parts + [""] + (_goal_lines(rep) or [])
+    ps = _pick_story(p)
+    if ps:
+        lines += ["", ps]
+    lines += ["", question, "",
               "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio)."]
     if credit:
         lines += ["", f"📸 Foto: {credit['author']} / Wikimedia Commons ({credit['license']}), modificada. "
                       f"Esta imagen se comparte bajo la misma licencia."]
     lines += ["🔞 +18 · Juega con responsabilidad. Apostar implica riesgo de pérdida.", ""]
     tags = ["#Stakevision", "#Futbol"]
+    h, a = rep["home"], rep["away"]
     for t in (formatting._tag((p["legs"][0].get("league") or "").split("·")[-1]),
               formatting._tag(_team(h)), formatting._tag(_team(a))):
         if t and t not in tags:
