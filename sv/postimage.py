@@ -369,17 +369,33 @@ def render_win(pick: dict, streak: int = 1, result: str = "W") -> bytes:
     return out.getvalue()
 
 
-def fit_instagram(jpeg: bytes) -> bytes:
-    """Instagram acepta de 4:5 (vertical) a 1.91:1. Si la imagen es más alta, se encaja en 1080x1350."""
+def fit_instagram(jpeg: bytes, story: bool = False) -> bytes:
+    """Deja cualquier imagen lista para publicar sin deformarla ni cortarla.
+    Feed: Instagram acepta de 4:5 a 1.91:1; dentro de ese rango solo se ajusta a 1080 de ancho.
+    Fuera de ese rango (o para historias, 1080x1920) se encaja completa sobre un fondo hecho con
+    la misma imagen, desenfocada y oscurecida."""
+    from PIL import ImageEnhance
     im = Image.open(io.BytesIO(jpeg)).convert("RGB")
-    if im.height <= 1350:
-        return jpeg
-    scale = 1350 / im.height
-    small = im.resize((round(im.width * scale), 1350), Image.LANCZOS)
-    canvas = _background(1350).convert("RGB")
-    canvas.paste(small, ((W - small.width) // 2, 0))
+    tw, th = (1080, 1920) if story else (1080, 1350)
+    ratio = im.width / im.height
     out = io.BytesIO()
-    canvas.save(out, "JPEG", quality=92, optimize=True)
+    if (not story and 0.8 <= ratio <= 1.91) or (story and abs(ratio - tw / th) < 0.02):
+        if im.width == tw:
+            return jpeg
+        im.resize((tw, round(tw / ratio)), Image.LANCZOS).save(out, "JPEG", quality=92, optimize=True)
+        return out.getvalue()
+    scale = max(tw / im.width, th / im.height)
+    bg = im.resize((round(im.width * scale) + 2, round(im.height * scale) + 2), Image.LANCZOS)
+    bg = bg.crop(((bg.width - tw) // 2, (bg.height - th) // 2, (bg.width - tw) // 2 + tw, (bg.height - th) // 2 + th))
+    bg = ImageEnhance.Brightness(bg.filter(ImageFilter.GaussianBlur(40))).enhance(0.55).convert("RGBA")
+    scale = min(tw / im.width, th / im.height)
+    fg = im.resize((max(1, round(im.width * scale)), max(1, round(im.height * scale))), Image.LANCZOS)
+    x, y = (tw - fg.width) // 2, (th - fg.height) // 2
+    sh = Image.new("RGBA", bg.size, (0, 0, 0, 0))
+    ImageDraw.Draw(sh).rectangle((x, y + 10, x + fg.width, y + fg.height + 10), fill=(0, 0, 0, 120))
+    bg.alpha_composite(sh.filter(ImageFilter.GaussianBlur(18)))
+    bg.paste(fg, (x, y))
+    bg.convert("RGB").save(out, "JPEG", quality=92, optimize=True)
     return out.getvalue()
 
 
@@ -792,13 +808,42 @@ def shield(team: dict, width: int) -> Image.Image:
     return out.resize((out.width // s, out.height // s), Image.LANCZOS)
 
 
-def _cover(photo: bytes, size, focus=(0.62, 0.10)) -> Image.Image:
+def _best_offset(energy: list, window: int, weights) -> int:
+    """Desplazamiento de la ventana que deja más 'detalle' (bordes) en las zonas que pesan más."""
+    n = len(energy)
+    if window >= n:
+        return 0
+    best, best_i = -1.0, 0
+    for i in range(0, n - window + 1):
+        sc = sum(energy[i + k] * weights(k / window) for k in range(window))
+        if sc > best:
+            best, best_i = sc, i
+    return best_i
+
+
+def _cover(photo: bytes, size, focus=None) -> Image.Image:
+    """Llena el tamaño sin deformar. Sin focus, elige el recorte solo: deja al protagonista (la zona con
+    más detalle) en la mitad derecha, que es la que no tapa el texto, y prioriza la parte de arriba (caras)."""
     im = Image.open(io.BytesIO(photo)).convert("RGB")
     w, h = size
     scale = max(w / im.width, h / im.height)
     im = im.resize((round(im.width * scale), round(im.height * scale)), Image.LANCZOS)
-    x = round((im.width - w) * focus[0])
-    y = round((im.height - h) * focus[1])
+    if focus:
+        x = round((im.width - w) * focus[0])
+        y = round((im.height - h) * focus[1])
+        return im.crop((x, y, x + w, y + h))
+    k = 8   # análisis en una versión chica
+    small = im.convert("L").resize((max(1, im.width // k), max(1, im.height // k))).filter(ImageFilter.FIND_EDGES)
+    px = small.load()
+    x = y = 0
+    if im.width > w:
+        cols = [sum(px[i, j] for j in range(small.height)) for i in range(small.width)]
+        x = _best_offset(cols, w // k, lambda t: 0.35 if t < 0.38 else 1.0) * k
+    if im.height > h:
+        rows = [sum(px[i, j] for i in range(small.width)) for j in range(small.height)]
+        y = _best_offset(rows, h // k, lambda t: 1.0 if t < 0.55 else 0.55) * k
+        y = min(y, round((im.height - h) * 0.35))   # nunca bajar demasiado: las cabezas van arriba
+    x, y = min(x, im.width - w), min(y, im.height - h)
     return im.crop((x, y, x + w, y + h))
 
 
@@ -1198,7 +1243,7 @@ def render_pick_photo(m: dict, theme: str = "dark") -> bytes:
     hacc, aacc = _accents(home, away, theme)
     if m.get("photo"):
         im = Image.new("RGBA", (W, H), T["bg"] + (255,))
-        im.paste(_enhance(_cover(m["photo"], (W, H), (0.6, 0.2))), (0, 0))
+        im.paste(_enhance(_cover(m["photo"], (W, H))), (0, 0))
     else:
         im = _bg(H, theme)
         _glow(im, (500, 80, 1300, 900), tuple(hacc) + (70,), 160)

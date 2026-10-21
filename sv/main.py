@@ -818,15 +818,22 @@ def _receive_upload(state: dict, msg: dict) -> None:
         traceback.print_exc()
         telegram.send(owner, "⚠️ No pude abrir esa imagen. Prueba con otra (JPG o PNG).")
         return
-    if im.width > 1440:
-        im = im.resize((1440, round(im.height * 1440 / im.width)), Image.LANCZOS)
+    small_note = ("\n⚠️ Es una imagen chica ({}x{} px): puede verse pixelada. Si la tienes más grande, "
+                  "mándala como archivo (📎 → Archivo) para que Telegram no la comprima.".format(*im.size)
+                  if min(im.size) < 700 else "")
+    if max(im.size) > 2160:
+        k = 2160 / max(im.size)
+        im = im.resize((round(im.width * k), round(im.height * k)), Image.LANCZOS)
     path = _upload_file(p, kind)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     im.save(path, "JPEG", quality=92)
     state.pop("await_photo", None)
     pre = "x" if kind == "recap" else "y"
     what = "el post partido" if kind == "recap" else "la imagen"
-    telegram.send(owner, f"📥 Recibí tu imagen para {what} del pick #{p['id']}. ¿Cómo la uso?",
+    telegram.send(owner, f"📥 Recibí tu imagen para {what} del pick #{p['id']}. ¿Cómo la uso?\n"
+                         "🎨 Dentro del diseño: la recorto sola dejando al protagonista a la derecha.\n"
+                         "📤 Tal cual: la ajusto a 1080x1350 sin cortarla (si no calza, con fondo difuminado)."
+                         + small_note,
                   [[("🎨 Usar dentro del diseño", f"{pre}d:{p['id']}")], [("📤 Subir tal cual", f"{pre}r:{p['id']}")],
                    [("Cancelar", f"xc:{p['id']}")]])
 
