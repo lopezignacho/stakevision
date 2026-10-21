@@ -480,3 +480,22 @@ p7s = store.load()["picks"][p7["id"]]
 assert p7s["pick_style"] == "photo" and "listo para compartir" in photos[-1][1]
 assert main._pick_image(p7s) == open(main._pick_photo_file(p7s), "rb").read()
 print("OK adelanto + pick con foto")
+
+# 15) adjuntar tu imagen para el pick (antes del partido)
+for i, upd in enumerate([
+        {"callback_query": {"id": "u1", "data": f"yp:{p7['id']}", "message": {"chat": {"id": OWNER}, "message_id": 96}}},
+        {"message": {"chat": {"id": OWNER, "type": "private"}, "photo": [{"file_id": "g", "file_size": 5}]}}]):
+    updates_q.append({"update_id": 600 + i, **upd})
+main.poll()
+assert sent[-1][2][0][0][1] == f"yd:{p7['id']}", sent[-1]
+n = len(photos)
+updates_q.append({"update_id": 610, "callback_query": {"id": "u2", "data": f"yd:{p7['id']}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 97}}})
+main.poll()
+p7s = store.load()["picks"][p7["id"]]
+assert len(photos) == n + 1 and p7s["pick_style"] == "photo" and p7s["pick_photo_credit"] is None
+updates_q.append({"update_id": 611, "callback_query": {"id": "u3", "data": f"yr:{p7['id']}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 98}}})
+main.poll()
+assert len(photos) == n + 2
+print("OK imagen propia en el pick")

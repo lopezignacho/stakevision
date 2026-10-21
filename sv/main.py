@@ -36,7 +36,8 @@ def SHARE_BUTTONS(p: dict) -> list:
                   else "📸 Compartir en Instagram", "noop" if st in ("queued", "posted") else f"pi:{pid}")])
     photo = p.get("pick_style") == "photo"
     rows.append([("🧾 Volver al cupón" if photo else "📰 Versión con foto", f"st:{pid}"),
-                 ("📲 Adelanto (historia)", f"ad:{pid}")])
+                 ("🖼 Adjuntar mi imagen", f"yp:{pid}")])
+    rows.append([("📲 Adelanto (historia)", f"ad:{pid}")])
     if not msgs and not st:
         rows.append([("❌ Descartar", f"r:{pid}")])
     return rows
@@ -284,8 +285,8 @@ def _pick_photo_file(p: dict) -> str:
     return os.path.join(config.ROOT, "data", "pickimg", f"{p['id']}.jpg")
 
 
-def _make_pick_photo(p: dict) -> bool:
-    """Versión del pick con foto real del equipo (Commons) y colores de ESPN. Se guarda para reutilizarla."""
+def _make_pick_photo(p: dict, user_photo: bytes | None = None) -> bool:
+    """Versión del pick con foto real del equipo (Commons, o la tuya) y colores de ESPN. Se guarda para reutilizarla."""
     from . import commons, espn, postimage, teaser
     l = p["legs"][0]
     teams = espn.preview(l["home"], l["away"], l["kickoff"])
@@ -293,8 +294,8 @@ def _make_pick_photo(p: dict) -> bool:
     names = [l[side], l["away" if side == "home" else "home"]]
     if teams:
         names = [teams[side]["name"], teams["away" if side == "home" else "home"]["name"]] + names
-    photo = None
-    for n in dict.fromkeys(names):
+    photo = (user_photo, None) if user_photo else None
+    for n in ([] if photo else dict.fromkeys(names)):
         photo = commons.photo(n, team=True)
         if photo:
             break
@@ -560,8 +561,9 @@ def _recap_panel(state: dict, p: dict) -> None:
     telegram.set_buttons(owner, r["panel"], RECAP_BUTTONS(p))
 
 
-def _upload_file(p: dict) -> str:
-    return os.path.join(config.ROOT, "data", "uploads", f"{p['id']}.jpg")
+def _upload_file(p: dict, kind: str = "recap") -> str:
+    name = f"{p['id']}.jpg" if kind == "recap" else f"{p['id']}-{kind}.jpg"
+    return os.path.join(config.ROOT, "data", "uploads", name)
 
 
 def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
@@ -775,8 +777,10 @@ def _receive_upload(state: dict, msg: dict) -> None:
     """Llegó una imagen tuya para el post partido: la guarda y pregunta cómo usarla."""
     owner = state["owner_chat"]
     wait = state.get("await_photo") or {}
+    kind = wait.get("kind") or "recap"
     p = state["picks"].get(wait.get("pid") or "")
-    if not p or not p.get("recap") or store.now_utc() > store.parse_ts(wait["until"]):
+    ok = p and (p.get("recap") if kind == "recap" else p["status"] in ("selected", "published"))
+    if not ok or store.now_utc() > store.parse_ts(wait["until"]):
         state.pop("await_photo", None)
         telegram.send(owner, "Para usar una imagen tuya, primero toca «🖼 Adjuntar mi imagen» en el post partido.")
         return
@@ -798,12 +802,14 @@ def _receive_upload(state: dict, msg: dict) -> None:
         return
     if im.width > 1440:
         im = im.resize((1440, round(im.height * 1440 / im.width)), Image.LANCZOS)
-    path = _upload_file(p)
+    path = _upload_file(p, kind)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     im.save(path, "JPEG", quality=92)
     state.pop("await_photo", None)
-    telegram.send(owner, f"📥 Recibí tu imagen para el pick #{p['id']}. ¿Cómo la uso?",
-                  [[("🎨 Usar dentro del diseño", f"xd:{p['id']}")], [("📤 Subir tal cual", f"xr:{p['id']}")],
+    pre = "x" if kind == "recap" else "y"
+    what = "el post partido" if kind == "recap" else "la imagen"
+    telegram.send(owner, f"📥 Recibí tu imagen para {what} del pick #{p['id']}. ¿Cómo la uso?",
+                  [[("🎨 Usar dentro del diseño", f"{pre}d:{p['id']}")], [("📤 Subir tal cual", f"{pre}r:{p['id']}")],
                    [("Cancelar", f"xc:{p['id']}")]])
 
 
@@ -992,7 +998,53 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.set_buttons(owner, cb["message"]["message_id"], TEASER_BUTTONS(p))
         return
 
+    elif action in ("yp", "yd", "yr"):   # tu propia imagen para el pick (antes del partido)
+        if p["status"] not in ("selected", "published"):
+            telegram.answer(cb["id"], "Este pick ya no está disponible")
+            return
+        if action == "yp":
+            state["await_photo"] = {"pid": pid, "kind": "pick", "until": _iso(store.now_utc() + timedelta(hours=2))}
+            telegram.send(owner, f"🖼 Mándame ahora la imagen para el pick #{pid} (como foto o como archivo).\n"
+                                 "Usa solo imágenes tuyas o con permiso de uso: las fotos de agencias o "
+                                 "medios pueden traer reclamos de copyright en Instagram.")
+            telegram.answer(cb["id"], "Esperando tu imagen")
+            return
+        up = _upload_file(p, "pick")
+        if not os.path.exists(up):
+            telegram.answer(cb["id"], "No encuentro tu imagen, mándala de nuevo")
+            return
+        with open(up, "rb") as f:
+            raw = f.read()
+        telegram.edit_buttons_off(owner, cb["message"]["message_id"],
+                                  "🎨 Dentro del diseño" if action == "yd" else "📤 Tal cual")
+        telegram.answer(cb["id"], "Generando…")
+        try:
+            if action == "yd":
+                _make_pick_photo(p, user_photo=raw)
+            else:
+                from . import postimage
+                path = _pick_photo_file(p)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                with open(path, "wb") as f:
+                    f.write(postimage.fit_instagram(raw))
+            p["pick_photo_credit"] = None
+            p["pick_style"] = "photo"
+        except Exception:
+            traceback.print_exc()
+            telegram.send(owner, "⚠️ No pude usar esa imagen. Prueba con otra.")
+            return
+        if p.get("share_msg"):
+            telegram.edit_buttons_off(owner, p["share_msg"], "↪️ Reemplazada por la versión de abajo")
+        _share_panel(state, p)
+        if p.get("ig_pre_status") in ("queued", "posted"):
+            telegram.send(owner, "Ojo: en Instagram ya quedó la versión anterior.")
+        return
+
     elif action in ("xp", "xd", "xr", "xc"):   # tu propia imagen para el post partido
+        if action == "xc":
+            telegram.edit_buttons_off(owner, cb["message"]["message_id"], "Cancelado: sigue la imagen anterior")
+            telegram.answer(cb["id"])
+            return
         if not p.get("recap"):
             telegram.answer(cb["id"], "Este pick no tiene post partido")
             return
