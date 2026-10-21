@@ -37,7 +37,11 @@ def SHARE_BUTTONS(p: dict) -> list:
     photo = p.get("pick_style") == "photo"
     rows.append([("🧾 Volver al cupón" if photo else "📰 Versión con foto", f"st:{pid}"),
                  ("🖼 Adjuntar mi imagen", f"yp:{pid}")])
-    rows.append([("📲 Adelanto (historia)", f"ad:{pid}")])
+    if photo:
+        rows.append([("🌙 Modo noche" if p.get("theme") == "light" else "☀️ Modo día", f"th:{pid}"),
+                     ("📲 Adelanto (historia)", f"ad:{pid}")])
+    else:
+        rows.append([("📲 Adelanto (historia)", f"ad:{pid}")])
     if not msgs and not st:
         rows.append([("❌ Descartar", f"r:{pid}")])
     return rows
@@ -285,7 +289,7 @@ def _pick_photo_file(p: dict) -> str:
     return os.path.join(config.ROOT, "data", "pickimg", f"{p['id']}.jpg")
 
 
-def _make_pick_photo(p: dict, user_photo: bytes | None = None) -> bool:
+def _make_pick_photo(p: dict, user_photo: bytes | None = None, reuse: bool = False) -> bool:
     """Versión del pick con foto real del equipo (Commons, o la tuya) y colores de ESPN. Se guarda para reutilizarla."""
     from . import commons, espn, postimage, teaser
     l = p["legs"][0]
@@ -294,12 +298,20 @@ def _make_pick_photo(p: dict, user_photo: bytes | None = None) -> bool:
     names = [l[side], l["away" if side == "home" else "home"]]
     if teams:
         names = [teams[side]["name"], teams["away" if side == "home" else "home"]["name"]] + names
+    cache = _upload_file(p, "pickphoto")
     photo = (user_photo, None) if user_photo else None
-    for n in ([] if photo else dict.fromkeys(names)):
+    if not photo and reuse and os.path.exists(cache):
+        with open(cache, "rb") as f:
+            photo = (f.read(), p.get("pick_photo_credit"))
+    for n in ([] if photo or reuse else dict.fromkeys(names)):
         photo = commons.photo(n, team=True)
         if photo:
             break
-    image = postimage.render_pick_photo(teaser.pick_photo_data(p, teams, photo))
+    if photo:
+        os.makedirs(os.path.dirname(cache), exist_ok=True)
+        with open(cache, "wb") as f:
+            f.write(photo[0])
+    image = postimage.render_pick_photo(teaser.pick_photo_data(p, teams, photo), p.get("theme") or "dark")
     path = _pick_photo_file(p)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
@@ -530,6 +542,7 @@ def RECAP_BUTTONS(p: dict) -> list:
         [("✅ Instagram" if st == "posted" else "⏳ Instagram en cola" if st == "queued" else "📸 Compartir en Instagram",
           "noop" if st in ("queued", "posted") else f"xi:{pid}")],
         [("🖼 Adjuntar mi imagen", f"xp:{pid}"), ("✏️ Cambiar titular", f"xt:{pid}")],
+        [("🌙 Modo noche" if (p.get("recap") or {}).get("theme") == "light" else "☀️ Modo día", f"xh:{pid}")],
     ]
 
 
@@ -590,7 +603,7 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
         with open(_upload_file(p), "rb") as f:
             image = postimage.fit_instagram(f.read())
     else:
-        image = postimage.render_recap(data)
+        image = postimage.render_recap(data, old.get("theme") or "dark")
     path = _recap_file(p)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
@@ -599,6 +612,7 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
     p["recap"] = {"title": data["headline"], "custom_title": old.get("custom_title"), "credit": credit,
                   "msgs": old.get("msgs") or {}, "panel": old.get("panel"), "hero": who["full"] if who else None,
                   "report": rep, "photo_src": old.get("photo_src"), "mode": old.get("mode"), "v": RECAP_TEXT_V,
+                  "theme": old.get("theme"),
                   "tg": recap.telegram_caption(p, rep, data["headline"]),
                   "ig": recap.instagram_caption(p, rep, data["headline"], credit)}
     p.pop("recap_pending", None)
@@ -924,6 +938,21 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.set_buttons(owner, cb["message"]["message_id"], SHARE_BUTTONS(p))
         return
 
+    if action == "u":   # deshacer un descarte
+        mid = cb["message"]["message_id"]
+        if p["status"] != "rejected":
+            telegram.answer(cb["id"], "Ya no estaba descartado")
+            return
+        if _expires(p) <= store.now_utc():
+            p["status"] = "expired"
+            telegram.edit_buttons_off(owner, mid, "⌛ Ya no está vigente")
+            telegram.answer(cb["id"], "Llegó tarde: ya no está vigente")
+            return
+        p["status"] = p.pop("prev_status", None) or "candidate"
+        telegram.set_buttons(owner, mid, CANDIDATE_BUTTONS(pid) if p["status"] == "candidate" else SHARE_BUTTONS(p))
+        telegram.answer(cb["id"], "Recuperado")
+        return
+
     if action in ("a", "f", "r"):
         if p["status"] not in ("candidate", "selected") or (action != "r" and p["status"] != "candidate"):
             telegram.answer(cb["id"], "Ya estaba procesado")
@@ -932,9 +961,9 @@ def _handle_update(state: dict, u: dict) -> None:
             if p.get("channel_msgs") or p.get("ig_pre_status"):
                 telegram.answer(cb["id"], "Ya se publicó en algún lado")
                 return
-            p["status"] = "rejected"
-            telegram.edit_buttons_off(owner, cb["message"]["message_id"], "❌ Descartado")
-            telegram.answer(cb["id"], "Descartado")
+            p["prev_status"], p["status"] = p["status"], "rejected"
+            telegram.set_buttons(owner, cb["message"]["message_id"], [[("❌ Descartado · ↩️ Deshacer", f"u:{pid}")]])
+            telegram.answer(cb["id"], "Descartado (puedes deshacerlo)")
             return
         if store.parse_ts(p["kickoff"]) <= store.now_utc():
             p["status"] = "expired"
@@ -948,6 +977,23 @@ def _handle_update(state: dict, u: dict) -> None:
         note = "✅ Publicado en VIP + Gratis" if action == "f" else "✅ Publicado en VIP"
         telegram.edit_buttons_off(owner, cb["message"]["message_id"], note)
         telegram.answer(cb["id"], "Publicado")
+
+    elif action == "th":   # modo día / noche de la versión con foto del pick
+        if p["status"] not in ("selected", "published") or p.get("pick_style") != "photo":
+            telegram.answer(cb["id"], "No disponible")
+            return
+        p["theme"] = "dark" if p.get("theme") == "light" else "light"
+        telegram.answer(cb["id"], "Cambiando a modo " + ("día…" if p["theme"] == "light" else "noche…"))
+        try:
+            _make_pick_photo(p, reuse=True)
+        except Exception:
+            traceback.print_exc()
+            telegram.send(owner, "⚠️ No pude cambiar el modo.")
+            return
+        if p.get("share_msg"):
+            telegram.edit_buttons_off(owner, p["share_msg"], "↪️ Reemplazada por la versión de abajo")
+        _share_panel(state, p)
+        return
 
     elif action in ("st", "ad", "ia", "ag"):   # estilo de la imagen del pick y adelanto para historias
         if action == "st":
@@ -1038,6 +1084,17 @@ def _handle_update(state: dict, u: dict) -> None:
         _share_panel(state, p)
         if p.get("ig_pre_status") in ("queued", "posted"):
             telegram.send(owner, "Ojo: en Instagram ya quedó la versión anterior.")
+        return
+
+    elif action == "xh":   # modo día / noche del post partido
+        r = p.get("recap") or {}
+        if not r or r.get("mode") == "raw":
+            telegram.answer(cb["id"], "Esta imagen va tal cual: no tiene modo día")
+            return
+        r["theme"] = "dark" if r.get("theme") == "light" else "light"
+        telegram.answer(cb["id"], "Cambiando a modo " + ("día…" if r["theme"] == "light" else "noche…"))
+        if not _recap(state, p, reuse=True):
+            telegram.send(owner, "⚠️ No pude cambiar el modo. Intenta de nuevo en un rato.")
         return
 
     elif action in ("xp", "xd", "xr", "xc"):   # tu propia imagen para el post partido

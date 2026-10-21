@@ -23,7 +23,11 @@ def _clean(html: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", html or "")).strip()
 
 
-SKIP = ("logo", "escudo", "crest", "badge", "emblem", "kit", "shirt", "camiseta", "map", "mapa", "flag", "bandera")
+SKIP = ("logo", "escudo", "crest", "badge", "emblem", "kit", "shirt", "camiseta", "map", "mapa", "flag", "bandera",
+        "radio", "interview", "entrevista", "press", "prensa", "rueda", "conferencia", "conference", "presentacion",
+        "store", "tienda", "museum", "museo", "bus", "signature", "firma", "office", "oficina", "studio")
+GOOD = ("match", "partido", "vs", " v ", "players", "jugadores", "team", "equipo", "plantel", "celebr", "goal",
+        "gol", "stadium", "estadio", "fans", "hinchas", "afici", "torcida", "derby", "clasico", "training", "entreno")
 
 
 def candidates(name: str, limit: int = 30, team: bool = False) -> list[dict]:
@@ -59,9 +63,10 @@ def candidates(name: str, limit: int = 30, team: bool = False) -> list[dict]:
         out.append({"title": title, "url": info.get("thumburl") or info.get("url"), "page": info.get("descriptionurl"),
                     "license": lic, "author": author[:60], "year": year, "portrait": h >= w,
                     "first": _plain(title).removeprefix("file:").startswith(_plain(name)),
-                    "cropped": "(cropped)" in title.lower()})
-    # Preferir: reciente, con el jugador como protagonista (su nombre primero), vertical y recortada
-    out.sort(key=lambda c: (c["year"], c["first"], c["portrait"], c["cropped"]), reverse=True)
+                    "cropped": "(cropped)" in title.lower(),
+                    "good": team and any(w in f" {_plain(title)} " for w in GOOD)})
+    # Preferir: (equipos) fotos de partido/hinchada; reciente; el jugador como protagonista; vertical y recortada
+    out.sort(key=lambda c: (c["good"], c["year"], c["first"], c["portrait"], c["cropped"]), reverse=True)
     return out
 
 

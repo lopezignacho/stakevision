@@ -499,3 +499,22 @@ updates_q.append({"update_id": 611, "callback_query": {"id": "u3", "data": f"yr:
 main.poll()
 assert len(photos) == n + 2
 print("OK imagen propia en el pick")
+
+# 16) deshacer un descarte y modo día / noche
+updates_q.append({"update_id": 700, "callback_query": {"id": "v1", "data": f"th:{p7['id']}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 99}}})
+main.poll()
+assert store.load()["picks"][p7["id"]]["theme"] == "light" and "listo para compartir" in photos[-1][1]
+updates_q.append({"update_id": 701, "callback_query": {"id": "v2", "data": "xh:N1",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 98}}})
+main.poll()
+assert store.load()["picks"]["N1"]["recap"]["theme"] == "light"
+buttons_set.clear()
+for i, act in enumerate(("r", "u")):
+    updates_q.append({"update_id": 710 + i, "callback_query": {"id": f"w{i}", "data": f"{act}:{p7['id']}",
+                                                               "message": {"chat": {"id": OWNER}, "message_id": 100}}})
+main.poll()
+p7s = store.load()["picks"][p7["id"]]
+assert p7s["status"] == "selected" and buttons_set[0][0][0][1] == f"u:{p7['id']}", buttons_set
+assert buttons_set[-1][0][0][1] == f"pv:{p7['id']}"
+print("OK deshacer + modo día")

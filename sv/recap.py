@@ -325,7 +325,7 @@ def instagram_caption(p: dict, rep: dict, title: str, credit: dict | None) -> st
         lines += ["", ps]
     lines += ["", question, "",
               "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio)."]
-    if credit:
+    if credit and credit.get("author"):
         lines += ["", f"📸 Foto: {credit['author']} / Wikimedia Commons ({credit['license']}), modificada. "
                       f"Esta imagen se comparte bajo la misma licencia."]
     lines += ["🔞 +18 · Juega con responsabilidad. Apostar implica riesgo de pérdida.", ""]
