@@ -79,6 +79,10 @@ def _share_command(state: dict, text: str) -> None:
         telegram.send(owner, "Usa /compartir y el número del pick, por ejemplo /compartir 8"
                       + (f"\n\nÚltimos picks:\n{lista}" if lista else ""))
         return
+    if p["status"] == "rejected" and _expires(p) > store.now_utc():   # recuperar un descarte
+        p["status"] = "selected"
+        p.pop("prev_status", None)
+        telegram.send(owner, f"↩️ Recuperé el pick #{p['id']}.")
     if p["status"] in ("selected", "published"):
         _share_panel(state, p)
     elif p["status"] in ("settled", "news") and p.get("recap") and os.path.exists(_recap_file(p)):
