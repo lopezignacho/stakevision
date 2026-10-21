@@ -132,7 +132,7 @@ def build(p: dict, rep: dict, photo: tuple[bytes, dict] | None, title: str | Non
     data = {"report": rep, "eyebrow": eyebrow(rep, l.get("league") or ""), "headline": title,
             "subline": subline(rep, l["kickoff"]),
             "pick": {"label": pick_label(p), "odds": formatting.odds(p["price"]), "result": p.get("result") or "V"},
-            "photo": photo[0] if photo else None, "credit": photo[1]["text"] if photo else None}
+            "photo": photo[0] if photo else None, "credit": photo[1]["text"] if photo and photo[1] else None}
     return data
 
 

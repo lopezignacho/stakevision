@@ -391,3 +391,32 @@ updates_q.append({"update_id": 210, "message": {"chat": {"id": OWNER, "type": "p
 main.poll()
 assert "MARACA-NAZO" in photos[-1][1] and store.load()["picks"][pr["id"]]["recap"]["title"] == "MARACA-NAZO"
 print("OK post partido")
+
+# 12) adjuntar tu propia imagen: dentro del diseño y tal cual
+telegram.download = lambda file_id: buf.getvalue()
+pid_ = pr["id"]
+for i, upd in enumerate([
+        {"callback_query": {"id": "a1", "data": f"xp:{pid_}", "message": {"chat": {"id": OWNER}, "message_id": 71}}},
+        {"message": {"chat": {"id": OWNER, "type": "private"}, "photo": [{"file_id": "f-small", "file_size": 10},
+                                                                          {"file_id": "f-big", "file_size": 99}]}}]):
+    updates_q.append({"update_id": 300 + i, **upd})
+main.poll()
+assert "¿Cómo la uso?" in sent[-1][1] and sent[-1][2][0][0][1] == f"xd:{pid_}", sent[-1]
+assert os.path.exists(os.path.join(tmp, "data", "uploads", f"{pid_}.jpg")) or os.path.exists(main._upload_file(pr))
+n = len(photos)
+updates_q.append({"update_id": 310, "callback_query": {"id": "a2", "data": f"xd:{pid_}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 72}}})
+main.poll()
+r_ = store.load()["picks"][pid_]["recap"]
+assert len(photos) == n + 1 and "Post partido" in photos[-1][1] and r_["photo_src"] == "user" and not r_["credit"]
+assert "Wikimedia" not in r_["ig"]
+updates_q.append({"update_id": 311, "callback_query": {"id": "a3", "data": f"xr:{pid_}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 73}}})
+main.poll()
+r_ = store.load()["picks"][pid_]["recap"]
+assert r_["mode"] == "raw" and len(photos) == n + 2
+# sin haber tocado «Adjuntar», una foto suelta no se usa
+updates_q.append({"update_id": 312, "message": {"chat": {"id": OWNER, "type": "private"}, "photo": [{"file_id": "x"}]}})
+main.poll()
+assert "primero toca" in sent[-1][1]
+print("OK imagen propia")

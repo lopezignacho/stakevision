@@ -87,3 +87,12 @@ def edit_text(chat_id, message_id: int, text: str) -> None:
 
 def edit_caption(chat_id, message_id: int, caption: str) -> None:
     _call("editMessageCaption", chat_id=chat_id, message_id=message_id, caption=caption, parse_mode="HTML")
+
+
+def download(file_id: str) -> bytes:
+    """Descarga un archivo que te mandaron al bot (foto o documento)."""
+    info = _call("getFile", file_id=file_id)
+    r = requests.get(f"https://api.telegram.org/file/bot{config.TELEGRAM_TOKEN}/{info['file_path']}", timeout=60)
+    if not r.ok:
+        raise TelegramError("No se pudo descargar el archivo")   # sin URL: lleva el token
+    return r.content
