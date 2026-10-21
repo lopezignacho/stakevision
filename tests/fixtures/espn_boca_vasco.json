@@ -1,7 +1,7 @@
 {"event": {"id": "401913957", "name": "Boca Juniors at Vasco da Gama", "season": {"year": 2026, "slug": "semifinals"},
   "status": {"type": {"state": "post", "completed": true, "shortDetail": "FT"}}},
  "competition": {"venue": {"fullName": "Estádio do Maracanã"}, "leg": {"value": 2, "displayValue": "2nd Leg"},
-  "series": {"competitors": [{"id": "3454", "aggregateScore": 2}, {"id": "5", "aggregateScore": 3}], "completed": true, "title": "Semifinals"},
+  "series": {"competitors": [{"id": "3454", "aggregateScore": 2.0}, {"id": "5", "aggregateScore": 3.0}], "completed": true, "title": "Semifinals"},
   "competitors": [
    {"homeAway": "home", "score": "1", "winner": false, "aggregateScore": 2, "team": {"id": "3454", "displayName": "Vasco da Gama", "shortDisplayName": "Vasco", "abbreviation": "VAS", "color": "000000", "alternateColor": "fafafc"}},
    {"homeAway": "away", "score": "3", "winner": true, "aggregateScore": 3, "team": {"id": "5", "displayName": "Boca Juniors", "shortDisplayName": "Boca ", "abbreviation": "CABJ", "color": "fcb000", "alternateColor": "0060f0"}}],

@@ -85,8 +85,15 @@ def _side(t: dict, x: dict, agg: dict) -> dict:
             "short": (team.get("shortDisplayName") or team.get("displayName") or "").strip(),
             "abbr": (team.get("abbreviation") or "")[:4].upper(),
             "color": _rgb(team.get("color"), (40, 44, 50)), "alt": _rgb(team.get("alternateColor"), (240, 240, 240)),
-            "score": int(x.get("score") or 0), "winner": bool(x.get("winner")),
-            "agg": x.get("aggregateScore", agg.get(str(team.get("id")))), **t}
+            "score": _int(x.get("score")) or 0, "winner": bool(x.get("winner")),
+            "agg": _int(x.get("aggregateScore", agg.get(str(team.get("id"))))), **t}
+
+
+def _int(v):
+    try:
+        return None if v is None else int(float(v))
+    except (TypeError, ValueError):
+        return None
 
 
 def report_from_event(e: dict, c: dict, h: dict, a: dict) -> dict:
