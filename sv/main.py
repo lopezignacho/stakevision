@@ -699,6 +699,52 @@ def _recap_share(state: dict, p: dict, where: str) -> None:
         telegram.send(chat, text)
 
 
+def _invite_command(state: dict, text: str) -> None:
+    """/invitar Nombre [días] — enlace de un solo uso al canal VIP (para invitar sin cobrar)."""
+    import re as _re
+    owner = state["owner_chat"]
+    if not state.get("vip_chat"):
+        telegram.send(owner, "Primero vincula el canal VIP con /vincular_vip.")
+        return
+    body = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
+    days = 7
+    m = _re.search(r"\s(\d{1,3})\s*(d|días|dias)?$", " " + body)
+    if m:
+        days = max(1, min(365, int(m.group(1))))
+        body = body[:m.start()].strip() if m.start() > 0 else ""
+    name = (body or "Invitado")[:32]
+    expire = int((store.now_utc() + timedelta(days=days)).timestamp())
+    try:
+        link = telegram._call("createChatInviteLink", chat_id=state["vip_chat"], name=name,
+                              member_limit=1, expire_date=expire)
+    except telegram.TelegramError as e:
+        telegram.send(owner, "⚠️ No pude crear el enlace. Revisa que el bot sea administrador del canal VIP con el "
+                             "permiso «Invitar usuarios mediante enlace».\n" + formatting.escape(str(e)))
+        return
+    state.setdefault("invites", []).append({"name": name, "link": link["invite_link"], "created": _iso(store.now_utc()),
+                                            "days": days})
+    telegram.send(owner, f"🎟 Enlace VIP para <b>{formatting.escape(name)}</b> (1 sola persona, vence en {days} días):\n"
+                         f"{link['invite_link']}\n\nCópialo y envíaselo. Para anularlo: /anular {formatting.escape(name)}")
+
+
+def _revoke_command(state: dict, text: str) -> None:
+    owner = state["owner_chat"]
+    name = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
+    inv = [i for i in state.get("invites") or [] if i["name"].lower() == name.lower() and not i.get("revoked")]
+    if not inv:
+        lista = ", ".join(i["name"] for i in state.get("invites") or [] if not i.get("revoked")) or "ninguno"
+        telegram.send(owner, f"No encontré un enlace activo para «{formatting.escape(name)}». Activos: {formatting.escape(lista)}")
+        return
+    for i in inv:
+        try:
+            telegram._call("revokeChatInviteLink", chat_id=state["vip_chat"], invite_link=i["link"])
+        except telegram.TelegramError as e:
+            print(f"No se pudo anular el enlace: {e}")
+        i["revoked"] = True
+    telegram.send(owner, f"🚫 Enlace de {formatting.escape(name)} anulado. Si ya había entrado, sigue en el canal "
+                         "(puedes sacarlo desde Suscriptores).")
+
+
 def _teaser(state: dict, p: dict, reveal: str | None, vip: bool = False) -> None:
     """Adelanto en modo día para historias: pistas del pick y el pick tapado hasta la revelación."""
     from . import instagram, postimage, teaser
@@ -875,6 +921,10 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith("/invitar"):
+            _invite_command(state, text)
+        elif chat == owner and text.lower().startswith("/anular"):
+            _revoke_command(state, text)
         elif chat == owner and text.lower().startswith("/adelanto"):
             _teaser_command(state, text)
         elif chat == owner and text.lower().startswith("/postpartido"):
@@ -1242,6 +1292,8 @@ HELP_TEXT = (
     "/titular 8 MARACA-NAZO · cambia el titular de la imagen post partido del pick #8\n"
     "/postpartido Vasco vs Boca | Sudamericana · imagen post partido de cualquier partido terminado\n"
     "/adelanto 8 10:00 · adelanto del pick #8 para historias (pistas + pick tapado hasta las 10:00)\n"
+    "/invitar Juan · enlace VIP de un solo uso que vence en 7 días (/invitar Juan 30 para 30 días)\n"
+    "/anular Juan · anula ese enlace\n"
     "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
     "/ayuda · esta lista\n\n"
     "El escaneo automático sigue saliendo todos los días a las 09:07."
@@ -1392,7 +1444,7 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
-    if owner and state.get("cmds_v") != 6:
+    if owner and state.get("cmds_v") != 7:
         try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
             telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
                 {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
@@ -1401,9 +1453,10 @@ def poll() -> None:
                 {"command": "titular", "description": "Cambiar el titular de la imagen post partido"},
                 {"command": "postpartido", "description": "Imagen post partido de cualquier partido (ej. Vasco vs Boca)"},
                 {"command": "adelanto", "description": "Adelanto del pick para historias (ej. /adelanto 8 10:00)"},
+                {"command": "invitar", "description": "Enlace VIP de un solo uso (ej. /invitar Juan)"},
                 {"command": "estado", "description": "Pendientes, picks en juego e historial"},
                 {"command": "ayuda", "description": "Lista de comandos"}])
-            state["cmds_v"] = 6
+            state["cmds_v"] = 7
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)

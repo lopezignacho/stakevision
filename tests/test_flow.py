@@ -559,3 +559,16 @@ p8s = store.load()["picks"][p8["id"]]
 assert set(p8s["channel_msgs"]) == {"free"} and p8s["status"] == "published" and p8s["free"]
 assert buttons_set[-1][0][0][1] == f"pv:{p8['id']}" and buttons_set[-1][0][1][1] == "noop"
 print("OK solo Gratis")
+
+# 19) /invitar y /anular
+tg_calls = []
+telegram._call = lambda method, **kw: tg_calls.append((method, kw)) or {"invite_link": "https://t.me/+abc"}
+updates_q.append({"update_id": 950, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/invitar Juan Pérez 30"}})
+updates_q.append({"update_id": 951, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/anular Juan Pérez"}})
+main.poll()
+mk = [kw for m_, kw in tg_calls if m_ == "createChatInviteLink"][0]
+assert mk["member_limit"] == 1 and mk["name"] == "Juan Pérez" and mk["chat_id"] == VIP
+assert any(m_ == "revokeChatInviteLink" for m_, _ in tg_calls)
+assert any("https://t.me/+abc" in t for _, t, *_ in sent) and "anulado" in sent[-1][1]
+telegram._call = lambda *a, **k: True
+print("OK invitar")
