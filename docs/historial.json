@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-21T03:00:39.466554+00:00",
+ "updated_at": "2026-10-21T03:05:30.488490+00:00",
  "summary": {
   "picks": 4,
   "wins": 3,
@@ -10,6 +10,33 @@
   "units": 5.07
  },
  "picks": [
+  {
+   "id": "17",
+   "published_at": "2026-10-21T03:05:26Z",
+   "kickoff": "2026-10-21T19:00:00.000Z",
+   "kind": "simple",
+   "price": 1.65,
+   "stake": 4,
+   "prob": 0.6033,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Club Brugge",
+     "away": "Racing Club De Lens",
+     "league": "Champions League",
+     "market": "Más/Menos Tiempo Completo",
+     "outcome": "Más",
+     "price": 1.65,
+     "label": "Más de 3 goles (con 3 exactos se devuelve)",
+     "mtype": "totals",
+     "handicap": 3.0,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "Más de 3 goles (con 3 exactos se devuelve) en Club Brugge vs Racing Club De Lens: cuota justa estimada 1.66, cuota disponible 1.65 (en línea con la cuota justa).\nProbabilidad estimada: 60,3%. Para no perder a esta cuota se necesita 60,6%."
+  },
   {
    "id": "7",
    "published_at": "2026-10-20T21:50:22Z",
