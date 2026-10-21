@@ -23,8 +23,11 @@ def _clean(html: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", html or "")).strip()
 
 
-def candidates(name: str, limit: int = 30) -> list[dict]:
-    """Fotos de Commons que nombran al jugador, con licencia apta, de la más reciente a la más antigua."""
+SKIP = ("logo", "escudo", "crest", "badge", "emblem", "kit", "shirt", "camiseta", "map", "mapa", "flag", "bandera")
+
+
+def candidates(name: str, limit: int = 30, team: bool = False) -> list[dict]:
+    """Fotos de Commons que nombran al jugador (o al equipo), con licencia apta, de la más reciente a la más antigua."""
     if not name.strip():
         return []
     params = {"action": "query", "format": "json", "generator": "search", "gsrnamespace": 6,
@@ -34,7 +37,7 @@ def candidates(name: str, limit: int = 30) -> list[dict]:
         pages = (requests.get(API, params=params, headers=UA, timeout=25).json().get("query") or {}).get("pages") or {}
     except Exception:  # noqa: BLE001
         return []
-    surname = _plain(name.split()[-1])
+    surname = _plain(name) if team else _plain(name.split()[-1])
     out = []
     for p in pages.values():
         title = p.get("title") or ""
@@ -42,6 +45,8 @@ def candidates(name: str, limit: int = 30) -> list[dict]:
         meta = info.get("extmetadata") or {}
         lic = (meta.get("LicenseShortName") or {}).get("value") or ""
         if surname not in _plain(title) or not LICENSE_OK.match(lic):
+            continue
+        if team and any(w in _plain(title) for w in SKIP):
             continue
         if not title.lower().endswith((".jpg", ".jpeg", ".png")):
             continue
@@ -60,9 +65,9 @@ def candidates(name: str, limit: int = 30) -> list[dict]:
     return out
 
 
-def photo(name: str) -> tuple[bytes, dict] | None:
-    """(jpeg, crédito) de la mejor foto libre del jugador, o None."""
-    for c in candidates(name)[:3]:
+def photo(name: str, team: bool = False) -> tuple[bytes, dict] | None:
+    """(jpeg, crédito) de la mejor foto libre del jugador (o del equipo), o None."""
+    for c in candidates(name, team=team)[:3]:
         try:
             r = requests.get(c["url"], headers=UA, timeout=40)
             if r.ok and len(r.content) > 20000:

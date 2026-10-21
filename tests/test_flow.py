@@ -447,3 +447,36 @@ assert "🎯" not in nw["recap"]["ig"] and "Boca" in nw["recap"]["ig"]
 pub = json.load(open(config.PUBLIC_HISTORY))
 assert all(str(x.get("id")) != "N1" for x in pub["picks"])
 print("OK /postpartido")
+
+# 14) adelanto para historias y versión del pick con foto
+fx7 = te.fixture("f7", "Benfica", "Sporting", hours=12)
+oddspapi.upcoming_fixtures = lambda frm, to: [fx7]
+oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "f7", "bookmakerOdds": {
+    "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
+    "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}}]
+main.scan()
+st = store.load()
+p7 = next(p for p in st["picks"].values() if p["legs"][0].get("fixture_id") == "f7")
+stories = []
+instagram.publish_story = lambda state, url: stories.append(url) or "id"
+espn.preview = lambda *a, **k: None
+commons.photo = lambda name, team=False: (buf.getvalue(), {"text": "Foto: Autor / Wikimedia Commons · CC BY 4.0 · modificada"})
+n = len(photos)
+for i, act in enumerate(("s", "ad", "ia")):
+    updates_q.append({"update_id": 500 + i, "callback_query": {"id": f"t{i}", "data": f"{act}:{p7['id']}",
+                                                               "message": {"chat": {"id": OWNER}, "message_id": 90 + i}}})
+main.poll()
+assert any("Adelanto del pick" in (c or "") for ch, c in photos[n:]), photos[n:]
+assert os.path.exists(os.path.join(tmp, "docs", "ig", f"pick-story-{p7['id']}.jpg"))
+assert stories and stories[-1].endswith(f"pick-story-{p7['id']}.jpg")
+assert store.load()["picks"][p7["id"]]["ig_story_status"] == "posted"
+updates_q.append({"update_id": 510, "message": {"chat": {"id": OWNER, "type": "private"}, "text": f"/adelanto {p7['id']} 10:00"}})
+main.poll()
+assert "Se revela a las 10:00" in photos[-1][1]
+updates_q.append({"update_id": 511, "callback_query": {"id": "t9", "data": f"st:{p7['id']}",
+                                                       "message": {"chat": {"id": OWNER}, "message_id": 95}}})
+main.poll()
+p7s = store.load()["picks"][p7["id"]]
+assert p7s["pick_style"] == "photo" and "listo para compartir" in photos[-1][1]
+assert main._pick_image(p7s) == open(main._pick_photo_file(p7s), "rb").read()
+print("OK adelanto + pick con foto")

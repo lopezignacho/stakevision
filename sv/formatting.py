@@ -312,7 +312,11 @@ def instagram_pick_caption(pick: dict) -> str:
     keep = [x for x in ana.split("\n") if x.startswith("📊") or x.startswith("🎯")]
     if keep:
         lines += [""] + keep[:3]
-    lines += ["", "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio).",
-              "🔞 +18 · Juega con responsabilidad. Apostar implica riesgo de pérdida.", "",
+    lines += ["", "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio)."]
+    cr = pick.get("pick_photo_credit") if pick.get("pick_style") == "photo" else None
+    if cr and cr.get("author"):
+        lines += [f"📸 Foto: {cr['author']} / Wikimedia Commons ({cr['license']}), modificada. "
+                  "Esta imagen se comparte bajo la misma licencia."]
+    lines += ["🔞 +18 · Juega con responsabilidad. Apostar implica riesgo de pérdida.", "",
               "#Stakevision #PronosticosDeportivos #Futbol #ApuestasDeportivas"]
     return "\n".join(lines)

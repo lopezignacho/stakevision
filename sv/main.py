@@ -34,6 +34,9 @@ def SHARE_BUTTONS(p: dict) -> list:
     st = p.get("ig_pre_status")
     rows.append([("✅ Instagram" if st == "posted" else "⏳ Instagram en cola" if st == "queued"
                   else "📸 Compartir en Instagram", "noop" if st in ("queued", "posted") else f"pi:{pid}")])
+    photo = p.get("pick_style") == "photo"
+    rows.append([("🧾 Volver al cupón" if photo else "📰 Versión con foto", f"st:{pid}"),
+                 ("📲 Adelanto (historia)", f"ad:{pid}")])
     if not msgs and not st:
         rows.append([("❌ Descartar", f"r:{pid}")])
     return rows
@@ -277,7 +280,37 @@ def _post(chat, text: str, image: bytes | None) -> int:
     return telegram.send(chat, text)["message_id"]
 
 
+def _pick_photo_file(p: dict) -> str:
+    return os.path.join(config.ROOT, "data", "pickimg", f"{p['id']}.jpg")
+
+
+def _make_pick_photo(p: dict) -> bool:
+    """Versión del pick con foto real del equipo (Commons) y colores de ESPN. Se guarda para reutilizarla."""
+    from . import commons, espn, postimage, teaser
+    l = p["legs"][0]
+    teams = espn.preview(l["home"], l["away"], l["kickoff"])
+    side = {"1": "home", "2": "away"}.get(str(l.get("outcome")), "home")
+    names = [l[side], l["away" if side == "home" else "home"]]
+    if teams:
+        names = [teams[side]["name"], teams["away" if side == "home" else "home"]["name"]] + names
+    photo = None
+    for n in dict.fromkeys(names):
+        photo = commons.photo(n, team=True)
+        if photo:
+            break
+    image = postimage.render_pick_photo(teaser.pick_photo_data(p, teams, photo))
+    path = _pick_photo_file(p)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(image)
+    p["pick_photo_credit"] = photo[1] if photo else None
+    return True
+
+
 def _pick_image(p: dict) -> bytes | None:
+    if p.get("pick_style") == "photo" and os.path.exists(_pick_photo_file(p)):
+        with open(_pick_photo_file(p), "rb") as f:
+            return f.read()
     try:
         from . import postimage
         return postimage.render(p)
@@ -439,18 +472,27 @@ def _instagram_queue(state: dict, now) -> None:
             jobs.append((p, "ig_pre_status", f"pre-{p['id']}", p.get("ig_pre_caption") or ""))
         if p.get("ig_res_status") == "queued":
             jobs.append((p, "ig_res_status", f"res-{p['id']}", p.get("ig_res_caption") or ""))
+        if p.get("ig_story_status") == "queued":
+            jobs.append((p, "ig_story_status", f"story-{p['id']}", None))
     for p, field, key, caption in jobs:
         if not instagram.image_live(key):
             continue   # la web aún no la publica; se reintenta en la próxima revisión
         try:
-            link = instagram.publish(state, key, caption)
+            if field == "ig_story_status":
+                instagram.publish_story(state, instagram.image_url(key))
+                link = ""
+            else:
+                link = instagram.publish(state, key, caption)
             p[field] = "posted"
+            if field == "ig_story_status" and (p.get("teaser") or {}).get("msg") and owner:
+                telegram.set_buttons(owner, p["teaser"]["msg"], TEASER_BUTTONS(p))
             if field == "ig_pre_status" and p.get("share_msg") and owner:
                 telegram.set_buttons(owner, p["share_msg"], SHARE_BUTTONS(p))
             if field == "ig_res_status" and (p.get("recap") or {}).get("panel") and owner:
                 telegram.set_buttons(owner, p["recap"]["panel"], RECAP_BUTTONS(p))
             if owner:
-                telegram.send(owner, f"✅ Publicado en Instagram (pick #{p['id']})" + (f"\n{link}" if link else ""))
+                what = "Historia publicada" if field == "ig_story_status" else "Publicado"
+                telegram.send(owner, f"✅ {what} en Instagram (pick #{p['id']})" + (f"\n{link}" if link else ""))
         except instagram.InstagramError as e:
             tries = field.replace("status", "tries")
             p[tries] = p.get(tries, 0) + 1
@@ -628,6 +670,52 @@ def _recap_share(state: dict, p: dict, where: str) -> None:
         telegram.send(chat, text)
 
 
+def _teaser(state: dict, p: dict, reveal: str | None, vip: bool = False) -> None:
+    """Adelanto en modo día para historias: pistas del pick y el pick tapado hasta la revelación."""
+    from . import instagram, postimage, teaser
+    owner = state["owner_chat"]
+    image = postimage.render_teaser(teaser.teaser_data(p, reveal, vip))
+    instagram.save_image(f"story-{p['id']}", image)
+    p["teaser"] = {"reveal": reveal, "vip": vip}
+    p.pop("ig_story_status", None)
+    msg = telegram.send_photo(owner, image, caption=(
+        f"📲 <b>Adelanto del pick #{p['id']}</b> (historia)\n"
+        + (f"Se revela a las {reveal}." if reveal else
+           f"Sin hora de revelación. Para ponerla: /adelanto {p['id']} 10:00")))
+    p["teaser"]["msg"] = msg["message_id"]
+    telegram.set_buttons(owner, msg["message_id"], TEASER_BUTTONS(p))
+
+
+def TEASER_BUTTONS(p: dict) -> list:
+    pid, st = p["id"], p.get("ig_story_status")
+    return [[("✅ Historia publicada" if st == "posted" else "⏳ Historia en cola" if st == "queued"
+              else "📲 Subir historia a Instagram", "noop" if st in ("queued", "posted") else f"ia:{pid}")],
+            [("✅ En Gratis", "noop") if (p.get("teaser") or {}).get("free_msg")
+             else ("🎁 Enviar también al canal Gratis", f"ag:{pid}")]]
+
+
+def _teaser_command(state: dict, text: str) -> None:
+    """/adelanto [N] [HH:MM] [vip]"""
+    from . import teaser
+    owner = state["owner_chat"]
+    parts = text.split()[1:]
+    now = store.now_utc()
+    pid = next((x.lstrip("#") for x in parts if x.lstrip("#").isdigit()), None)
+    if pid:
+        p = state["picks"].get(pid)
+    else:
+        live = [x for x in state["picks"].values() if x["status"] in ("selected", "published")
+                and store.parse_ts(x["kickoff"]) > now]
+        live.sort(key=lambda x: (bool(x.get("free")), x.get("created_at") or ""), reverse=True)
+        p = live[0] if live else None
+    if not p or p["status"] not in ("selected", "published") or store.parse_ts(p["kickoff"]) <= now:
+        telegram.send(owner, "Usa /adelanto, el número del pick y (si quieres) la hora en que lo revelas. "
+                             "Ejemplo: /adelanto 8 10:00\nEl pick tiene que estar elegido y su partido aún no empieza.")
+        return
+    _teaser(state, p, teaser.parse_reveal(" ".join(x for x in parts if x.lstrip("#") != pid)),
+            vip=any(x.lower() == "vip" for x in parts))
+
+
 def _news_command(state: dict, text: str) -> None:
     """/postpartido Vasco vs Boca | Sudamericana — post partido de cualquier partido terminado (sin pick)."""
     import re as _re
@@ -747,6 +835,8 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith("/adelanto"):
+            _teaser_command(state, text)
         elif chat == owner and text.lower().startswith("/postpartido"):
             _news_command(state, text)
         elif chat == owner and text.lower().startswith("/titular"):
@@ -852,6 +942,55 @@ def _handle_update(state: dict, u: dict) -> None:
         note = "✅ Publicado en VIP + Gratis" if action == "f" else "✅ Publicado en VIP"
         telegram.edit_buttons_off(owner, cb["message"]["message_id"], note)
         telegram.answer(cb["id"], "Publicado")
+
+    elif action in ("st", "ad", "ia", "ag"):   # estilo de la imagen del pick y adelanto para historias
+        if action == "st":
+            if p["status"] not in ("selected", "published"):
+                telegram.answer(cb["id"], "Este pick ya no está disponible")
+                return
+            if p.get("pick_style") == "photo":
+                p["pick_style"] = "coupon"
+            else:
+                telegram.answer(cb["id"], "Armando la versión con foto…")
+                try:
+                    _make_pick_photo(p)
+                    p["pick_style"] = "photo"
+                except Exception:
+                    traceback.print_exc()
+                    telegram.send(owner, "⚠️ No pude armar la versión con foto. Sigue la del cupón.")
+                    return
+            if p.get("share_msg"):
+                telegram.edit_buttons_off(owner, p["share_msg"], "↪️ Reemplazada por la versión de abajo")
+            _share_panel(state, p)
+            telegram.answer(cb["id"])
+            return
+        if action == "ad":
+            if store.parse_ts(p["kickoff"]) <= store.now_utc():
+                telegram.answer(cb["id"], "El partido ya empezó")
+                return
+            telegram.answer(cb["id"], "Generando el adelanto…")
+            _teaser(state, p, None)
+            return
+        if not p.get("teaser"):
+            telegram.answer(cb["id"], "Primero genera el adelanto")
+            return
+        if action == "ia":
+            from . import instagram
+            if not instagram.enabled(state):
+                telegram.answer(cb["id"], "Instagram no está conectado")
+                return
+            p["ig_story_status"] = "queued"
+            telegram.answer(cb["id"], "La historia se publica en un par de minutos")
+        else:
+            if p["teaser"].get("free_msg"):
+                telegram.answer(cb["id"], "Ya estaba en Gratis")
+                return
+            from . import instagram
+            with open(instagram.image_path(f"story-{p['id']}"), "rb") as f:
+                p["teaser"]["free_msg"] = telegram.send_photo(config.FREE_CHANNEL, f.read())["message_id"]
+            telegram.answer(cb["id"], "Enviado al canal Gratis")
+        telegram.set_buttons(owner, cb["message"]["message_id"], TEASER_BUTTONS(p))
+        return
 
     elif action in ("xp", "xd", "xr", "xc"):   # tu propia imagen para el post partido
         if not p.get("recap"):
@@ -960,6 +1099,7 @@ HELP_TEXT = (
     "/compartir 8 · vuelve a mandarte la imagen del pick #8 (o su post partido, si ya terminó)\n"
     "/titular 8 MARACA-NAZO · cambia el titular de la imagen post partido del pick #8\n"
     "/postpartido Vasco vs Boca | Sudamericana · imagen post partido de cualquier partido terminado\n"
+    "/adelanto 8 10:00 · adelanto del pick #8 para historias (pistas + pick tapado hasta las 10:00)\n"
     "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
     "/ayuda · esta lista\n\n"
     "El escaneo automático sigue saliendo todos los días a las 09:07."
@@ -1096,7 +1236,7 @@ def listen(seconds: int = 270) -> None:
                 from . import instagram
                 if instagram.enabled(state) and any(
                         p.get(f) == "queued" for p in state["picks"].values()
-                        for f in ("ig_status", "ig_pre_status", "ig_res_status")):
+                        for f in ("ig_status", "ig_pre_status", "ig_res_status", "ig_story_status")):
                     _instagram_queue(state, store.now_utc())
                     store.save(state)
                     _checkpoint()
@@ -1110,7 +1250,7 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
-    if owner and state.get("cmds_v") != 5:
+    if owner and state.get("cmds_v") != 6:
         try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
             telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
                 {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
@@ -1118,9 +1258,10 @@ def poll() -> None:
                 {"command": "compartir", "description": "Imagen de un pick para VIP, Gratis o Instagram"},
                 {"command": "titular", "description": "Cambiar el titular de la imagen post partido"},
                 {"command": "postpartido", "description": "Imagen post partido de cualquier partido (ej. Vasco vs Boca)"},
+                {"command": "adelanto", "description": "Adelanto del pick para historias (ej. /adelanto 8 10:00)"},
                 {"command": "estado", "description": "Pendientes, picks en juego e historial"},
                 {"command": "ayuda", "description": "Lista de comandos"}])
-            state["cmds_v"] = 5
+            state["cmds_v"] = 6
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)

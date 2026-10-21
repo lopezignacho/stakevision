@@ -156,3 +156,13 @@ def find_recent(team_a: str, team_b: str, days: int = 3, sport: str = "soccer"):
                 ko = (ko + ":00" if len(ko) == 16 else ko) + "Z"
                 return r, ko
     return None
+
+
+def preview(home: str, away: str, kickoff_iso: str, sport: str = "soccer") -> dict | None:
+    """Equipos (nombre, sigla y colores) de un partido por jugarse."""
+    found = _find(home, away, kickoff_iso, sport)
+    if not found:
+        return None
+    _e, c, h, a = found
+    return {"home": _side({"side": "home"}, h, {}), "away": _side({"side": "away"}, a, {}),
+            "venue": ((c.get("venue") or {}).get("fullName") or "")}

@@ -1000,3 +1000,197 @@ def render_recap(m: dict, theme: str = "dark") -> bytes:
 def _enhance(ph: Image.Image) -> Image.Image:
     from PIL import ImageEnhance
     return ImageEnhance.Color(ImageEnhance.Contrast(ph).enhance(1.08)).enhance(1.1)
+
+
+# ---------------------------------------------------------------- adelanto (historia, modo día)
+L_BG, L_TEXT, L_GREEN, L_BTN, L_GREY = (244, 244, 240), (17, 19, 24), (47, 122, 18), (62, 154, 28), (122, 128, 121)
+
+
+def _rich(d, x, y, parts, fonts, colors):
+    """Texto en una línea con tramos normal/negrita."""
+    for txt, f, c in zip(parts, fonts, colors):
+        if txt:
+            d.text((x, y), txt, font=f, fill=c, anchor="ls")
+            x += d.textlength(txt, font=f)
+    return x
+
+
+def _lock_icon(d, x, y, h, color):
+    w = h * 0.75
+    d.rounded_rectangle((x, y + h * 0.42, x + w, y + h), round(h * 0.12), fill=color)
+    d.arc((x + w * 0.18, y, x + w * 0.82, y + h * 0.75), 180, 360, fill=color, width=max(3, round(h * 0.12)))
+    d.line((x + w * 0.18, y + h * 0.37, x + w * 0.18, y + h * 0.48), fill=color, width=max(3, round(h * 0.12)))
+    d.line((x + w * 0.82, y + h * 0.37, x + w * 0.82, y + h * 0.48), fill=color, width=max(3, round(h * 0.12)))
+
+
+def render_teaser(m: dict) -> bytes:
+    """Historia 1080x1920 en modo día: pistas del pick y el pick tapado hasta la hora de revelación.
+    m = {"pill", "line1", "line2", "clues": [(normal, negrita, normal)], "lock", "cta": (l1, l2)}"""
+    H = 1920
+    im = Image.new("RGBA", (W, H), L_BG + (255,))
+    _glow(im, (190, 40, 890, 900), (150, 230, 110, 120), 140)
+    g = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd = ImageDraw.Draw(g)
+    for x in range(0, W, 90):
+        gd.line((x, 0, x, H), fill=(17, 19, 24, 7), width=2)
+    for y in range(0, H, 90):
+        gd.line((0, y, W, y), fill=(17, 19, 24, 7), width=2)
+    im.alpha_composite(g)
+    lg = _logo_t(300, "light")
+    im.alpha_composite(lg, ((W - lg.width) // 2, 80))
+    d = ImageDraw.Draw(im)
+    fp = _oswald(30)
+    pw = _spaced_len(d, m["pill"], fp, 4.2) + 68
+    d.rounded_rectangle(((W - pw) / 2, 300, (W + pw) / 2, 368), 34, fill=L_BTN)
+    _spaced(d, ((W - pw) / 2 + 34, 347), m["pill"], fp, (255, 255, 255), 4.2)
+
+    size = 240
+    while size > 140 and max(d.textlength(m["line1"], font=_bebas(size)), d.textlength(m["line2"], font=_bebas(size))) > 960:
+        size -= 6
+    fb = _bebas(size)
+    b1 = 420 + round(0.714 * size) + 30
+    d.text(((W - d.textlength(m["line1"], font=fb)) / 2, b1), m["line1"], font=fb, fill=L_TEXT, anchor="ls")
+    b2 = b1 + round(0.84 * size)
+    x2 = (W - d.textlength(m["line2"], font=fb)) / 2
+    outer, inner = Image.new("L", (W, H), 0), Image.new("L", (W, H), 0)
+    ImageDraw.Draw(outer).text((x2, b2), m["line2"], font=fb, fill=255, anchor="ls", stroke_width=4, stroke_fill=255)
+    ImageDraw.Draw(inner).text((x2, b2), m["line2"], font=fb, fill=255, anchor="ls")
+    im.paste(L_GREEN + (255,), (0, 0), ImageChops.subtract(outer, inner))
+
+    # tarjeta de pistas
+    x0, y0, x1, y1 = 70, 880, 1010, 1545
+    sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(sh).rounded_rectangle((x0, y0 + 24, x1, y1 + 24), 34, fill=(17, 19, 24, 50))
+    im.alpha_composite(sh.filter(ImageFilter.GaussianBlur(28)))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle((x0, y0, x1, y1), 34, fill=(255, 255, 255))
+    _spaced(d, (118, 950), "LAS PISTAS", _oswald(26), L_GREY, 4.7)
+    fr, fbold, fnum = _font("Medium", 33), _font("Bold", 33), _bebas(40)
+    y = 1000
+    for i, clue in enumerate(m["clues"][:4]):
+        d.ellipse((118, y, 176, y + 58), fill=(226, 244, 220))
+        n = str(i + 1)
+        d.text((147 - d.textlength(n, font=fnum) / 2, y + 45), n, font=fnum, fill=L_GREEN, anchor="ls")
+        parts = list(clue)
+        while sum(d.textlength(t, font=f) for t, f in zip(parts, (fr, fbold, fr))) > 760 and len(parts[0]) > 4:
+            parts[0] = parts[0][:-2].rstrip() + " "
+        _rich(d, 202, y + 41, parts, (fr, fbold, fr), (L_TEXT, L_TEXT, L_TEXT))
+        y += 96
+        if i < 3:
+            d.line((118, y - 16, 962, y - 16), fill=(238, 240, 234), width=2)
+    # el pick, tapado
+    d.rounded_rectangle((118, 1383, 962, 1507), 22, fill=L_TEXT)
+    _spaced(d, (150, 1438), "EL PICK", _oswald(24), (154, 160, 149), 3.8)
+    bx = 150
+    for wbar in (180, 110, 150):
+        d.rounded_rectangle((bx, 1455, bx + wbar, 1481), 6, fill=(42, 47, 42))
+        bx += wbar + 12
+    fl = _bebas(48)
+    lw = d.textlength(m["lock"], font=fl) + 92
+    d.rounded_rectangle((930 - lw, 1411, 930, 1479), 16, fill=BRAND)
+    _lock_icon(d, 930 - lw + 26, 1428, 32, (11, 26, 6))
+    d.text((930 - lw + 70, 1466), m["lock"], font=fl, fill=(11, 26, 6), anchor="ls")
+
+    # llamado
+    fc = _font("Bold", 32)
+    _ctext(d, 1585, m["cta"][0], fc, L_TEXT)
+    _ctext(d, 1627, m["cta"][1], fc, L_TEXT)
+    fbt = _font("Bold", 46)
+    t = "t.me/stakevision"
+    bw = d.textlength(t, font=fbt) + 140
+    d.rounded_rectangle(((W - bw) / 2, 1690, (W + bw) / 2, 1798), 54, fill=L_BTN)
+    d.text(((W - d.textlength(t, font=fbt)) / 2, 1762), t, font=fbt, fill=(255, 255, 255), anchor="ls")
+    _ctext(d, 1810, "+18 · Juega con responsabilidad", _font("Medium", 22), L_GREY)
+    return _jpeg(im)
+
+
+# ---------------------------------------------------------------- pick con foto (estilo revista)
+def _wrap_fit(d, text, font_name, size, max_w, min_size=18):
+    while size > min_size and d.textlength(text, font=_font(font_name, size)) > max_w:
+        size -= 1
+    f = _font(font_name, size)
+    if d.textlength(text, font=f) > max_w:
+        while d.textlength(text + "…", font=f) > max_w and len(text) > 8:
+            text = text[:-1]
+        text = text.rstrip(" ,.;") + "…"
+    return text, f
+
+
+def render_pick_photo(m: dict) -> bytes:
+    """Pick antes del partido con foto real del equipo/jugador (formato revista, oscuro).
+    m = {"eyebrow", "headline", "teams": {"home", "away"}, "selection", "odds", "stake", "lines", "photo", "credit"}"""
+    H = 1350
+    home, away = m["teams"]["home"], m["teams"]["away"]
+    _hf, hacc = team_palette(home)
+    _af, aacc = team_palette(away)
+    if m.get("photo"):
+        im = Image.new("RGBA", (W, H), _DARK + (255,))
+        im.paste(_enhance(_cover(m["photo"], (W, H), (0.6, 0.2))), (0, 0))
+    else:
+        im = _bg(H, "dark")
+        _glow(im, (500, 80, 1300, 900), tuple(hacc) + (70,), 160)
+        _glow(im, (-300, 300, 500, 1000), tuple(aacc) + (40,), 160)
+    dark = Image.new("RGBA", (W, H), _DARK + (255,))
+    im = Image.composite(dark, im, _alpha_ramp((W, H), [(0, 255), (0.30, 217), (0.62, 0), (1, 0)], True))
+    im = Image.composite(dark, im, _alpha_ramp((W, H), [(0, 0), (0.45, 0), (0.72, 255), (1, 255)], False))
+    d = ImageDraw.Draw(im)
+    im.alpha_composite(_logo(150), (60, 44))
+    _spaced(d, (60, 248), m["eyebrow"].upper(), _oswald(28), BRAND, spacing=3.9)
+    l1, l2 = split_headline(m["headline"])
+    size = 210
+    while size > 120 and max(d.textlength(l1, font=_bebas(size)), d.textlength(l2, font=_bebas(size))) > 640:
+        size -= 6
+    fb = _bebas(size)
+    b1 = 262 + round(0.714 * size)
+    d.text((52, b1), l1, font=fb, fill=(241, 243, 239), anchor="ls")
+    if l2:
+        b2 = b1 + round(0.84 * size)
+        outer, inner = Image.new("L", (W, H), 0), Image.new("L", (W, H), 0)
+        ImageDraw.Draw(outer).text((52, b2), l2, font=fb, fill=255, anchor="ls", stroke_width=3, stroke_fill=255)
+        ImageDraw.Draw(inner).text((52, b2), l2, font=fb, fill=255, anchor="ls")
+        im.paste(BRAND + (255,), (0, 0), ImageChops.subtract(outer, inner))
+    # cruce
+    y0 = 668
+    im.alpha_composite(shield(home, 96), (60, y0))
+    fv = _bebas(110)
+    d.text((60 + 96 + 34, y0 + 100), "VS", font=fv, fill=BRAND, anchor="ls")
+    im.alpha_composite(shield(away, 96), (round(60 + 96 + 68 + d.textlength("VS", font=fv)), y0))
+    names = f"{(home.get('short') or home.get('name') or '').strip()} vs {(away.get('short') or away.get('name') or '').strip()}"
+    names, fn = _wrap_fit(d, names, "Medium", 28, 600)
+    d.text((62, 836), names, font=fn, fill=(201, 206, 198), anchor="ls")
+    # tarjeta del pick
+    card = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(card).rounded_rectangle((40, 880, 1040, 1200), 24, fill=(18, 22, 18, 215), outline=BRAND + (64,), width=1)
+    im.alpha_composite(card)
+    d = ImageDraw.Draw(im)
+    _spaced(d, (70, 930), "EL PICK", _oswald(22), (154, 160, 149), 3.5)
+    fo = _bebas(64)
+    ow = d.textlength(m["odds"], font=fo) + 56
+    d.rounded_rectangle((1010 - ow, 905, 1010, 985), 18, fill=BRAND)
+    d.text((1010 - ow + 28, 970), m["odds"], font=fo, fill=(11, 26, 6), anchor="ls")
+    if m.get("stake"):
+        st = f"STAKE {m['stake']}/10"
+        fs = _oswald(20)
+        _spaced(d, (1010 - _spaced_len(d, st, fs, 2), 1012), st, fs, (154, 160, 149), 2)
+    sel = m["selection"].upper()
+    size = 76
+    while size > 40 and d.textlength(sel, font=_bebas(size)) > 1010 - ow - 100:
+        size -= 2
+    d.text((70, 1004), sel, font=_bebas(size), fill=(241, 243, 239), anchor="ls")
+    d.line((70, 1034, 1010, 1034), fill=(42, 51, 42), width=2)
+    y = 1074
+    for ln in m["lines"][:3]:
+        t, f = _wrap_fit(d, ln, "Medium", 22, 900)
+        d.ellipse((72, y - 13, 82, y - 3), fill=BRAND)
+        d.text((96, y), t, font=f, fill=(201, 206, 198), anchor="ls")
+        y += 42
+    fcta = _font("Bold", 24)
+    _ctext(d, 1218, "Análisis completo en Telegram · t.me/stakevision", fcta, BRAND)
+    _ctext(d, 1306, "+18 · Juega con responsabilidad", _font("Medium", 17), (154, 160, 149))
+    if m.get("credit"):
+        fc = _font("Regular", 14)
+        tw = round(d.textlength(m["credit"], font=fc)) + 8
+        tmp = Image.new("RGBA", (tw, 22), (0, 0, 0, 0))
+        ImageDraw.Draw(tmp).text((0, 2), m["credit"], font=fc, fill=(255, 255, 255, 160))
+        im.alpha_composite(tmp.rotate(-90, expand=True), (1040, 180))
+    return _jpeg(im)
