@@ -109,9 +109,9 @@ def render(pick: dict) -> bytes:
     card_h = pad + legs_h + 24 + 86          # + barra de stake/cuota
     logo_w = 540
     top = 60
-    logo = Image.open(LOGO).convert("RGBA")
-    logo = logo.resize((logo_w, round(logo.height * logo_w / logo.width)), Image.LANCZOS)
-    card_y = top + logo.height + 46
+    logo = _logo_t(logo_w, "dark")
+    lpad = logo.info["pad"]
+    card_y = top + logo.height - 2 * lpad + 46
     icon_size = 150
     icon_y = card_y + card_h + 60
     footer_y = icon_y + icon_size + 70
@@ -125,7 +125,7 @@ def render(pick: dict) -> bytes:
     gd = ImageDraw.Draw(glow)
     gd.ellipse((W / 2 - 300, top - 20, W / 2 + 300, top + 200), fill=(90, 255, 60, 38))
     im.alpha_composite(glow.filter(ImageFilter.GaussianBlur(60)))
-    im.alpha_composite(logo, ((W - logo.width) // 2, top))
+    im.alpha_composite(logo, ((W - logo.width) // 2, max(0, top - lpad)))
 
     # tarjeta con sombra
     shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -265,13 +265,11 @@ def render_win(pick: dict, streak: int = 1, result: str = "W") -> bytes:
     if not nula:
         _confetti(im, (30, 120, W - 50, 660 if not compact else 480), 46, seed=int(pick.get("id") or 0) * 7 + 3)
 
-    logo = Image.open(LOGO).convert("RGBA")
     lw = 330 if not compact else 260
-    logo = logo.resize((lw, round(logo.height * lw / logo.width)), Image.LANCZOS)
-    im.alpha_composite(logo, ((W - lw) // 2, 50))
+    logo = _put_logo(im, lw, "dark", "center", 50)
 
     # titular
-    y = 50 + logo.height + (40 if not compact else 10)
+    y = 50 + logo.height - 2 * logo.info["pad"] + (40 if not compact else 10)
     if not compact:
         badge = _return_badge(120) if nula else _check_badge(120)
         im.alpha_composite(badge, ((W - 120) // 2, y))
@@ -410,13 +408,59 @@ def _bg(h: int, theme: str) -> Image.Image:
     return Image.composite(Image.new("RGB", (W, h), (222, 224, 218)), base, vg).convert("RGBA")
 
 
+_LOGO_CACHE: dict = {}
+
+
 def _logo_t(w: int, theme: str) -> Image.Image:
-    lg = Image.open(LOGO if theme == "dark" else LOGO_LIGHT).convert("RGBA")
-    return lg.resize((w, round(lg.height * w / lg.width)), Image.LANCZOS)
+    """Logo reforzado: bordes nítidos, ojos verde neón con brillo y letras en blanco (o negro) puro.
+    La imagen trae un margen para el brillo; su tamaño está en lg.info["pad"]."""
+    key = (w, theme)
+    if key in _LOGO_CACHE:
+        return _LOGO_CACHE[key].copy()
+    from PIL import ImageEnhance
+    src = Image.open(LOGO if theme == "dark" else LOGO_LIGHT).convert("RGBA")
+    s = 3
+    big_w = w * s
+    big = src.resize((big_w, round(src.height * big_w / src.width)), Image.LANCZOS)
+    pad = round(w * 0.16) * s
+    r, g, b, a = big.split()
+    a = a.point(lambda v: max(0, min(255, (v - 70) * 255 // 110)))       # bordes nítidos
+    green = ImageChops.multiply(
+        ImageChops.subtract(g, ImageChops.lighter(r, b)).point(lambda v: 255 if v > 25 else 0), a)
+    text = ImageChops.subtract(a, green)
+    light = theme != "dark"
+    vivid = ImageEnhance.Brightness(ImageEnhance.Color(big.convert("RGB")).enhance(2.6 if light else 2.0)).enhance(
+        0.68 if light else 1.35)
+    out = Image.new("RGBA", (big.width + 2 * pad, big.height + 2 * pad), (0, 0, 0, 0))
+    for radius, alpha in (((22, 0.3), (9, 0.45)) if light else ((22, 0.55), (9, 0.85))):   # brillo neón
+        glow = Image.new("L", out.size, 0)
+        glow.paste(green, (pad, pad))
+        glow = glow.filter(ImageFilter.GaussianBlur(radius * s * w / 300)).point(lambda v, k=alpha: round(min(255, v * 1.6) * k))
+        tint = (70, 210, 30) if light else (110, 255, 60)
+        out.alpha_composite(Image.merge("RGBA", (*Image.new("RGB", out.size, tint).split(), glow)))
+    ink = (255, 255, 255) if theme == "dark" else (12, 14, 16)
+    layer = Image.new("RGBA", big.size, ink + (0,))
+    layer.putalpha(text)
+    out.alpha_composite(layer, (pad, pad))
+    eyes = vivid.convert("RGBA")
+    eyes.putalpha(green)
+    out.alpha_composite(eyes, (pad, pad))
+    small = out.resize((out.width // s, out.height // s), Image.LANCZOS)
+    small.info["pad"] = pad // s
+    _LOGO_CACHE[key] = small
+    return small.copy()
 
 def _logo(w: int) -> Image.Image:
-    lg = Image.open(LOGO).convert("RGBA")
-    return lg.resize((w, round(lg.height * w / lg.width)), Image.LANCZOS)
+    return _logo_t(w, "dark")
+
+
+def _put_logo(im, w: int, theme: str, x, y) -> Image.Image:
+    """Pega el logo con su brillo. x="center" lo centra. Devuelve el logo (alto útil: lg.height - 2*pad)."""
+    lg = _logo_t(w, theme)
+    p = lg.info.get("pad", 0)
+    xx = (W - lg.width) // 2 if x == "center" else x - p
+    im.alpha_composite(lg, (xx, max(0, y - p)))
+    return lg
 
 
 def _glow(im, box, color=(90, 255, 60, 55), blur=90):
@@ -449,10 +493,9 @@ def render_weekly(week: dict, theme: str = "dark") -> bytes:
     T = THEMES[theme]
     im = _bg(H, theme)
     _glow(im, (W / 2 - 380, -80, W / 2 + 380, 380), T["glow"], 90)
-    lg = _logo_t(260, theme)
-    im.alpha_composite(lg, ((W - lg.width) // 2, 46))
+    lg = _put_logo(im, 260, theme, "center", 46)
     d = ImageDraw.Draw(im)
-    y = 46 + lg.height + 26
+    y = 46 + lg.height - 2 * lg.info["pad"] + 26
     _ctext(d, y, "RESUMEN SEMANAL", _font("Medium", 30), T["eyebrow"])
     _ctext(d, y + 44, week["label"], _font("Bold", 54), T["text"])
     # cifras
@@ -514,12 +557,11 @@ def render_story(pick: dict, theme: str = "dark") -> bytes:
     T = THEMES[theme]
     im = _bg(H, theme)
     _glow(im, (W / 2 - 420, 120, W / 2 + 420, 760), T["glow"], 110)
-    lg = _logo_t(420, theme)
-    im.alpha_composite(lg, ((W - lg.width) // 2, 150))
+    lg = _put_logo(im, 420, theme, "center", 150)
     d = ImageDraw.Draw(im)
     legs = pick["legs"]
     block = 76 + 64 + (120 + 300 * len(legs) + 120) + 90 + 190
-    y = max(150 + lg.height + 60, (H - 140 - block) // 2 + 200)
+    y = max(150 + lg.height - 2 * lg.info["pad"] + 60, (H - 140 - block) // 2 + 200)
     d.rounded_rectangle((W / 2 - 230, y, W / 2 + 230, y + 76), 38, fill=T["btn"])
     _ctext(d, y + 14, "PICK GRATIS DE HOY", _font("Bold", 36), T["btn_text"])
     y += 140
@@ -567,10 +609,9 @@ def render_postmatch(m: dict, theme: str = "dark") -> bytes:
     T = THEMES[theme]
     im = _bg(H, theme)
     _glow(im, (W / 2 - 420, 120, W / 2 + 420, 520), T["glow"], 100)
-    lg = _logo_t(220, theme)
-    im.alpha_composite(lg, ((W - lg.width) // 2, 40))
+    lg = _put_logo(im, 220, theme, "center", 40)
     d = ImageDraw.Draw(im)
-    y = 40 + lg.height + 22
+    y = 40 + lg.height - 2 * lg.info["pad"] + 22
     _ctext(d, y, ("FINAL · " + m["league"]).upper(), _font("Medium", 26), T["eyebrow"])
     y += 56
     # marcador
@@ -817,6 +858,45 @@ def _clusters(goals: list, gap: int = 10) -> list[list]:
     return out
 
 
+def _mag(theme: str) -> dict:
+    """Colores del formato revista en modo noche (dark) o día (light)."""
+    if theme == "light":
+        return {"bg": L_BG, "fg": L_TEXT, "sub": (70, 76, 70), "muted": L_GREY, "tick": (150, 156, 148),
+                "brand": L_GREEN, "card": (255, 255, 255, 240), "card_line": (222, 226, 218, 255), "shadow": True,
+                "track": (222, 226, 218), "dot_in": (255, 255, 255), "ht": (17, 19, 24, 60),
+                "credit": (17, 19, 24, 170)}
+    return {"bg": _DARK, "fg": (241, 243, 239), "sub": (201, 206, 198), "muted": (154, 160, 149),
+            "tick": (110, 117, 106), "brand": BRAND, "card": (18, 22, 18, 205), "card_line": BRAND + (64,),
+            "shadow": False, "track": (42, 51, 42), "dot_in": _DARK, "ht": (255, 255, 255, 90),
+            "credit": (255, 255, 255, 160)}
+
+
+def _mag_card(im, box, T, r=24):
+    layer = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    if T["shadow"]:
+        x0, y0, x1, y1 = box
+        ImageDraw.Draw(layer).rounded_rectangle((x0, y0 + 16, x1, y1 + 16), r, fill=(17, 19, 24, 45))
+        layer = layer.filter(ImageFilter.GaussianBlur(22))
+    ImageDraw.Draw(layer).rounded_rectangle(box, r, fill=T["card"], outline=T["card_line"], width=1 if not T["shadow"] else 2)
+    im.alpha_composite(layer)
+
+
+def _accents(home: dict, away: dict, theme: str) -> tuple:
+    """Color de cada equipo para marcador y línea de tiempo, legible sobre el fondo del tema."""
+    out = []
+    for t in (home, away):
+        fill, acc = team_palette(t)
+        if theme == "light" and _lum(acc) > 0.62:
+            acc = fill if _lum(fill) < 0.55 else _mix(acc, (0, 0, 0), 0.5)
+        out.append(tuple(acc))
+    h, a = out
+    if sum(abs(x - y) for x, y in zip(h, a)) < 120:   # acentos casi iguales: separarlos
+        a = (L_TEXT if theme == "light" else (241, 243, 239)) if _lum(h) < 0.8 or theme == "light" else BRAND
+        if theme == "light" and _lum(h) < 0.2:
+            a = L_GREEN
+    return h, a
+
+
 def render_recap(m: dict, theme: str = "dark") -> bytes:
     """Post partido estilo revista: foto a color del protagonista, titular gigante, marcador con
     escudos propios, línea de tiempo de los goles y el resultado de nuestro pick.
@@ -828,29 +908,26 @@ def render_recap(m: dict, theme: str = "dark") -> bytes:
     H = 1350
     rep = m["report"]
     home, away = rep["home"], rep["away"]
-    _hf, hacc = team_palette(home)
-    _af, aacc = team_palette(away)
-    if sum(abs(x - y) for x, y in zip(hacc, aacc)) < 120:   # acentos casi iguales: separarlos
-        aacc = (241, 243, 239) if _lum(hacc) < 0.8 else BRAND
-    im = Image.new("RGBA", (W, H), _DARK + (255,))
+    T = _mag(theme)
+    hacc, aacc = _accents(home, away, theme)
+    im = Image.new("RGBA", (W, H), T["bg"] + (255,))
     if m.get("photo"):
         ph = _cover(m["photo"], (W, H))
         ph = _enhance(ph)
         im.paste(ph, (0, 0))
     else:
-        im = _bg(H, "dark")
+        im = _bg(H, theme)
         win = aacc if away["score"] > home["score"] else hacc
         lose = hacc if win is aacc else aacc
         _glow(im, (500, 80, 1300, 900), tuple(win) + (80,), 160)
         _glow(im, (-300, 300, 500, 1000), tuple(lose) + (35,), 160)
-    dark = Image.new("RGBA", (W, H), _DARK + (255,))
+    dark = Image.new("RGBA", (W, H), T["bg"] + (255,))
     im = Image.composite(dark, im, _alpha_ramp((W, H), [(0, 255), (0.30, 217), (0.62, 0), (1, 0)], True))
     im = Image.composite(dark, im, _alpha_ramp((W, H), [(0, 0), (0.45, 0), (0.72, 255), (1, 255)], False))
     d = ImageDraw.Draw(im)
 
-    lg = _logo(150)
-    im.alpha_composite(lg, (60, 44))
-    _spaced(d, (60, 248), m.get("eyebrow", "").upper(), _oswald(28), BRAND, spacing=28 * 0.14)
+    _put_logo(im, 165, theme, 56, 40)
+    _spaced(d, (60, 248), m.get("eyebrow", "").upper(), _oswald(28), T["brand"], spacing=28 * 0.14)
 
     l1, l2 = split_headline(m.get("headline") or "")
     size = 210
@@ -858,14 +935,14 @@ def render_recap(m: dict, theme: str = "dark") -> bytes:
         size -= 6
     fb = _bebas(size)
     b1 = 262 + round(0.714 * size)
-    d.text((52, b1), l1, font=fb, fill=(241, 243, 239), anchor="ls")
+    d.text((52, b1), l1, font=fb, fill=T["fg"], anchor="ls")
     if l2:
         b2 = b1 + round(0.84 * size)
         outer = Image.new("L", (W, H), 0)
         inner = Image.new("L", (W, H), 0)
         ImageDraw.Draw(outer).text((52, b2), l2, font=fb, fill=255, anchor="ls", stroke_width=3, stroke_fill=255)
         ImageDraw.Draw(inner).text((52, b2), l2, font=fb, fill=255, anchor="ls")
-        im.paste(BRAND + (255,), (0, 0), ImageChops.subtract(outer, inner))
+        im.paste(T["brand"] + (255,), (0, 0), ImageChops.subtract(outer, inner))
 
     # marcador
     y0 = 668
@@ -877,48 +954,45 @@ def render_recap(m: dict, theme: str = "dark") -> bytes:
     hs, as_ = str(home["score"]), str(away["score"])
     winner = "home" if home["score"] > away["score"] else "away" if away["score"] > home["score"] else ""
     base = y0 + 106
-    d.text((x, base), hs, font=fs, fill=hacc if winner == "home" else (241, 243, 239), anchor="ls")
+    d.text((x, base), hs, font=fs, fill=hacc if winner == "home" else T["fg"], anchor="ls")
     x += d.textlength(hs, font=fs) + 34
-    d.rectangle((x, base - 64, x + 44, base - 54), fill=BRAND)
+    d.rectangle((x, base - 64, x + 44, base - 54), fill=T["brand"])
     x += 44 + 34
-    d.text((x, base), as_, font=fs, fill=aacc if winner == "away" else (241, 243, 239), anchor="ls")
+    d.text((x, base), as_, font=fs, fill=aacc if winner == "away" else T["fg"], anchor="ls")
     x += d.textlength(as_, font=fs) + 30
     im.alpha_composite(sh_a, (round(x), y0))
     sub_n, sub_b = m.get("subline") or ("", "")
     fsub, fsubb = _oswald(28, 500), _oswald(28, 600)
-    xx = _spaced(d, (62, 836), sub_n, fsub, (201, 206, 198), spacing=1.6)
-    _spaced(d, (xx + 6, 836), sub_b, fsubb, (241, 243, 239), spacing=1.6)
+    xx = _spaced(d, (62, 836), sub_n, fsub, T["sub"], spacing=1.6)
+    _spaced(d, (xx + 6, 836), sub_b, fsubb, T["fg"], spacing=1.6)
 
     # línea de tiempo
-    card = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    cd = ImageDraw.Draw(card)
-    cd.rounded_rectangle((40, 880, 1040, 1180), 24, fill=(18, 22, 18, 205), outline=BRAND + (64,), width=1)
-    im.alpha_composite(card)
+    _mag_card(im, (40, 880, 1040, 1180), T)
     d = ImageDraw.Draw(im)
     end = max(90, max([g["min"] for g in rep["goals"]] + [0]))
     end = 120 if end > 100 else end
-    _spaced(d, (70, 930), f"EL PARTIDO EN {end}'", _oswald(22), (154, 160, 149), spacing=22 * 0.16)
+    _spaced(d, (70, 930), f"EL PARTIDO EN {end}'", _oswald(22), T["muted"], spacing=22 * 0.16)
     fl = _oswald(19, 400)
     lx = 1010
     for team, col in ((away, aacc), (home, hacc)):
         name = (team.get("short") or team.get("name") or "").strip()
         tw = d.textlength(name, font=fl)
-        d.text((lx - tw, 930), name, font=fl, fill=(201, 206, 198), anchor="ls")
+        d.text((lx - tw, 930), name, font=fl, fill=T["sub"], anchor="ls")
         d.ellipse((lx - tw - 20, 917, lx - tw - 8, 929), fill=col)
         lx = lx - tw - 40
     L, R, ly = 110, 930, 1050
-    track = _vgrad((6, R - L), BRAND, (42, 51, 42)).rotate(-90, expand=True)
+    track = _vgrad((6, R - L), T["brand"], T["track"]).rotate(-90, expand=True)
     mask = Image.new("L", track.size, 0)
     ImageDraw.Draw(mask).rounded_rectangle((0, 0, track.width - 1, track.height - 1), 3, fill=255)
     im.paste(track, (L, ly - 3), mask)
     d = ImageDraw.Draw(im)
     hx = L + (R - L) * 45 / end
-    d.line((hx, ly - 20, hx, ly + 26), fill=(255, 255, 255, 90), width=2)
+    d.line((hx, ly - 20, hx, ly + 26), fill=T["ht"], width=2)
     ft = _oswald(18, 400)
     for t in range(0, end + 1, 15):
         tx = L + (R - L) * t / end
         lab = f"{t}'"
-        d.text((tx - d.textlength(lab, font=ft) / 2, ly + 34), lab, font=ft, fill=(110, 117, 106), anchor="ls")
+        d.text((tx - d.textlength(lab, font=ft) / 2, ly + 34), lab, font=ft, fill=T["tick"], anchor="ls")
     fmin, fname = _bebas(40), _oswald(19)
 
     def label_x(cx, wdt):
@@ -930,7 +1004,7 @@ def render_recap(m: dict, theme: str = "dark") -> bytes:
             xs = [L + (R - L) * min(g["min"], end) / end for g in cl]
             for gx in xs:
                 d.ellipse((gx - 13, ly - 13, gx + 13, ly + 13), fill=col)
-                d.ellipse((gx - 9, ly - 9, gx + 9, ly + 9), fill=_DARK)
+                d.ellipse((gx - 9, ly - 9, gx + 9, ly + 9), fill=T["dot_in"])
                 d.ellipse((gx - 6, ly - 6, gx + 6, ly + 6), fill=col)
             mins = " · ".join(g["label"] for g in cl)
             players = []
@@ -952,7 +1026,7 @@ def render_recap(m: dict, theme: str = "dark") -> bytes:
                 _spaced(d, (label_x(cx, wn), ly + 116), who, fname, col, 0.8)
     if not rep["goals"]:
         msg = "Sin goles: el cero no se movió en todo el partido"
-        _ctext(d, ly - 52, msg, _oswald(24, 500), (201, 206, 198))
+        _ctext(d, ly - 52, msg, _oswald(24, 500), T["sub"])
 
     # nuestro pick / el dato
     pk = m.get("pick")
@@ -965,9 +1039,9 @@ def render_recap(m: dict, theme: str = "dark") -> bytes:
         tag_txt = tag[0].split(" ", 1)[1]
         total = d.textlength(lead, font=fb_) + d.textlength(body, font=fr_) + d.textlength(tag_txt, font=ftag) + 58
         x = (W - total) / 2
-        d.text((x, 1238), lead, font=fb_, fill=BRAND, anchor="ls")
+        d.text((x, 1238), lead, font=fb_, fill=T["brand"], anchor="ls")
         x += d.textlength(lead, font=fb_)
-        d.text((x, 1238), body, font=fr_, fill=(201, 206, 198), anchor="ls")
+        d.text((x, 1238), body, font=fr_, fill=T["sub"], anchor="ls")
         x += d.textlength(body, font=fr_)
         tw = d.textlength(tag_txt, font=ftag) + 58
         d.rounded_rectangle((x, 1212, x + tw, 1248), 18, fill=tag[1])
@@ -984,15 +1058,15 @@ def render_recap(m: dict, theme: str = "dark") -> bytes:
         lead, body = "El dato:", " " + m["dato"]
         total = d.textlength(lead, font=fb_) + d.textlength(body, font=fr_)
         x = (W - total) / 2
-        d.text((x, 1238), lead, font=fb_, fill=BRAND, anchor="ls")
-        d.text((x + d.textlength(lead, font=fb_), 1238), body, font=fr_, fill=(201, 206, 198), anchor="ls")
-    _ctext(d, 1306, "+18 · Juega con responsabilidad", _font("Medium", 17), (154, 160, 149))
+        d.text((x, 1238), lead, font=fb_, fill=T["brand"], anchor="ls")
+        d.text((x + d.textlength(lead, font=fb_), 1238), body, font=fr_, fill=T["sub"], anchor="ls")
+    _ctext(d, 1306, "+18 · Juega con responsabilidad", _font("Medium", 17), T["muted"])
 
     if m.get("credit"):
         fc = _font("Regular", 14)
         tw = round(d.textlength(m["credit"], font=fc)) + 8
         tmp = Image.new("RGBA", (tw, 22), (0, 0, 0, 0))
-        ImageDraw.Draw(tmp).text((0, 2), m["credit"], font=fc, fill=(255, 255, 255, 160))
+        ImageDraw.Draw(tmp).text((0, 2), m["credit"], font=fc, fill=T["credit"])
         im.alpha_composite(tmp.rotate(-90, expand=True), (1040, 180))
     return _jpeg(im)
 
@@ -1036,8 +1110,7 @@ def render_teaser(m: dict) -> bytes:
     for y in range(0, H, 90):
         gd.line((0, y, W, y), fill=(17, 19, 24, 7), width=2)
     im.alpha_composite(g)
-    lg = _logo_t(300, "light")
-    im.alpha_composite(lg, ((W - lg.width) // 2, 80))
+    _put_logo(im, 300, "light", "center", 80)
     d = ImageDraw.Draw(im)
     fp = _oswald(30)
     pw = _spaced_len(d, m["pill"], fp, 4.2) + 68
@@ -1116,54 +1189,52 @@ def _wrap_fit(d, text, font_name, size, max_w, min_size=18):
     return text, f
 
 
-def render_pick_photo(m: dict) -> bytes:
+def render_pick_photo(m: dict, theme: str = "dark") -> bytes:
     """Pick antes del partido con foto real del equipo/jugador (formato revista, oscuro).
     m = {"eyebrow", "headline", "teams": {"home", "away"}, "selection", "odds", "stake", "lines", "photo", "credit"}"""
     H = 1350
     home, away = m["teams"]["home"], m["teams"]["away"]
-    _hf, hacc = team_palette(home)
-    _af, aacc = team_palette(away)
+    T = _mag(theme)
+    hacc, aacc = _accents(home, away, theme)
     if m.get("photo"):
-        im = Image.new("RGBA", (W, H), _DARK + (255,))
+        im = Image.new("RGBA", (W, H), T["bg"] + (255,))
         im.paste(_enhance(_cover(m["photo"], (W, H), (0.6, 0.2))), (0, 0))
     else:
-        im = _bg(H, "dark")
+        im = _bg(H, theme)
         _glow(im, (500, 80, 1300, 900), tuple(hacc) + (70,), 160)
         _glow(im, (-300, 300, 500, 1000), tuple(aacc) + (40,), 160)
-    dark = Image.new("RGBA", (W, H), _DARK + (255,))
+    dark = Image.new("RGBA", (W, H), T["bg"] + (255,))
     im = Image.composite(dark, im, _alpha_ramp((W, H), [(0, 255), (0.30, 217), (0.62, 0), (1, 0)], True))
     im = Image.composite(dark, im, _alpha_ramp((W, H), [(0, 0), (0.45, 0), (0.72, 255), (1, 255)], False))
     d = ImageDraw.Draw(im)
-    im.alpha_composite(_logo(150), (60, 44))
-    _spaced(d, (60, 248), m["eyebrow"].upper(), _oswald(28), BRAND, spacing=3.9)
+    _put_logo(im, 165, theme, 56, 40)
+    _spaced(d, (60, 248), m["eyebrow"].upper(), _oswald(28), T["brand"], spacing=3.9)
     l1, l2 = split_headline(m["headline"])
     size = 210
     while size > 120 and max(d.textlength(l1, font=_bebas(size)), d.textlength(l2, font=_bebas(size))) > 640:
         size -= 6
     fb = _bebas(size)
     b1 = 262 + round(0.714 * size)
-    d.text((52, b1), l1, font=fb, fill=(241, 243, 239), anchor="ls")
+    d.text((52, b1), l1, font=fb, fill=T["fg"], anchor="ls")
     if l2:
         b2 = b1 + round(0.84 * size)
         outer, inner = Image.new("L", (W, H), 0), Image.new("L", (W, H), 0)
         ImageDraw.Draw(outer).text((52, b2), l2, font=fb, fill=255, anchor="ls", stroke_width=3, stroke_fill=255)
         ImageDraw.Draw(inner).text((52, b2), l2, font=fb, fill=255, anchor="ls")
-        im.paste(BRAND + (255,), (0, 0), ImageChops.subtract(outer, inner))
+        im.paste(T["brand"] + (255,), (0, 0), ImageChops.subtract(outer, inner))
     # cruce
     y0 = 668
     im.alpha_composite(shield(home, 96), (60, y0))
     fv = _bebas(110)
-    d.text((60 + 96 + 34, y0 + 100), "VS", font=fv, fill=BRAND, anchor="ls")
+    d.text((60 + 96 + 34, y0 + 100), "VS", font=fv, fill=T["brand"], anchor="ls")
     im.alpha_composite(shield(away, 96), (round(60 + 96 + 68 + d.textlength("VS", font=fv)), y0))
     names = f"{(home.get('short') or home.get('name') or '').strip()} vs {(away.get('short') or away.get('name') or '').strip()}"
     names, fn = _wrap_fit(d, names, "Medium", 28, 600)
-    d.text((62, 836), names, font=fn, fill=(201, 206, 198), anchor="ls")
+    d.text((62, 836), names, font=fn, fill=T["sub"], anchor="ls")
     # tarjeta del pick
-    card = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    ImageDraw.Draw(card).rounded_rectangle((40, 880, 1040, 1200), 24, fill=(18, 22, 18, 215), outline=BRAND + (64,), width=1)
-    im.alpha_composite(card)
+    _mag_card(im, (40, 880, 1040, 1200), T)
     d = ImageDraw.Draw(im)
-    _spaced(d, (70, 930), "EL PICK", _oswald(22), (154, 160, 149), 3.5)
+    _spaced(d, (70, 930), "EL PICK", _oswald(22), T["muted"], 3.5)
     fo = _bebas(64)
     ow = d.textlength(m["odds"], font=fo) + 56
     d.rounded_rectangle((1010 - ow, 905, 1010, 985), 18, fill=BRAND)
@@ -1171,26 +1242,26 @@ def render_pick_photo(m: dict) -> bytes:
     if m.get("stake"):
         st = f"STAKE {m['stake']}/10"
         fs = _oswald(20)
-        _spaced(d, (1010 - _spaced_len(d, st, fs, 2), 1012), st, fs, (154, 160, 149), 2)
+        _spaced(d, (1010 - _spaced_len(d, st, fs, 2), 1012), st, fs, T["muted"], 2)
     sel = m["selection"].upper()
     size = 76
     while size > 40 and d.textlength(sel, font=_bebas(size)) > 1010 - ow - 100:
         size -= 2
-    d.text((70, 1004), sel, font=_bebas(size), fill=(241, 243, 239), anchor="ls")
-    d.line((70, 1034, 1010, 1034), fill=(42, 51, 42), width=2)
+    d.text((70, 1004), sel, font=_bebas(size), fill=T["fg"], anchor="ls")
+    d.line((70, 1034, 1010, 1034), fill=T["track"], width=2)
     y = 1074
     for ln in m["lines"][:3]:
         t, f = _wrap_fit(d, ln, "Medium", 22, 900)
-        d.ellipse((72, y - 13, 82, y - 3), fill=BRAND)
-        d.text((96, y), t, font=f, fill=(201, 206, 198), anchor="ls")
+        d.ellipse((72, y - 13, 82, y - 3), fill=T["brand"])
+        d.text((96, y), t, font=f, fill=T["sub"], anchor="ls")
         y += 42
     fcta = _font("Bold", 24)
-    _ctext(d, 1218, "Análisis completo en Telegram · t.me/stakevision", fcta, BRAND)
-    _ctext(d, 1306, "+18 · Juega con responsabilidad", _font("Medium", 17), (154, 160, 149))
+    _ctext(d, 1218, "Análisis completo en Telegram · t.me/stakevision", fcta, T["brand"])
+    _ctext(d, 1306, "+18 · Juega con responsabilidad", _font("Medium", 17), T["muted"])
     if m.get("credit"):
         fc = _font("Regular", 14)
         tw = round(d.textlength(m["credit"], font=fc)) + 8
         tmp = Image.new("RGBA", (tw, 22), (0, 0, 0, 0))
-        ImageDraw.Draw(tmp).text((0, 2), m["credit"], font=fc, fill=(255, 255, 255, 160))
+        ImageDraw.Draw(tmp).text((0, 2), m["credit"], font=fc, fill=T["credit"])
         im.alpha_composite(tmp.rotate(-90, expand=True), (1040, 180))
     return _jpeg(im)
