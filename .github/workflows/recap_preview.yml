@@ -7,7 +7,7 @@ on:
       kickoff: {description: "Inicio en UTC, ej. 2026-10-21T00:30:00Z", required: true}
       league: {description: "Liga", required: false, default: ""}
 permissions:
-  contents: write
+  contents: read
 jobs:
   preview:
     runs-on: ubuntu-latest
@@ -19,9 +19,7 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python tools/recap_preview.py "${{ inputs.home }}" "${{ inputs.away }}" "${{ inputs.kickoff }}" "${{ inputs.league }}"
-      - run: |
-          git config user.name "stakevision-bot"
-          git config user.email "bot@users.noreply.github.com"
-          git add media/preview
-          git commit -m "vista previa post partido" || echo "sin cambios"
-          git pull --rebase && git push
+      - uses: actions/upload-artifact@v4
+        with:
+          name: post-partido
+          path: media/preview/recap.jpg
