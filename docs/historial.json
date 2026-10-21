@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-21T20:10:25.877719+00:00",
+ "updated_at": "2026-10-21T20:15:30.466408+00:00",
  "summary": {
-  "picks": 4,
-  "wins": 3,
+  "picks": 5,
+  "wins": 4,
   "losses": 1,
-  "hit_rate": 0.75,
-  "yield": 0.39,
-  "avg_odds": 1.81,
-  "units": 5.07
+  "hit_rate": 0.8,
+  "yield": 0.4631,
+  "avg_odds": 1.8,
+  "units": 7.41
  },
  "picks": [
   {
@@ -46,7 +46,7 @@
    "stake": 3,
    "prob": 0.5602,
    "free": true,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Levante UD",
@@ -59,7 +59,10 @@
      "mtype": "spreads",
      "handicap": 0.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      3,
+      1
+     ]
     }
    ],
    "analysis": "Levante UD +0.5 (hándicap asiático) en Levante UD vs Athletic Bilbao: cuota justa estimada 1.78, cuota disponible 1.78 (en línea con la cuota justa).\nProbabilidad estimada: 56,0%. Para no perder a esta cuota se necesita 56,2%."
