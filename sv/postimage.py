@@ -386,6 +386,34 @@ def fit_instagram(jpeg: bytes) -> bytes:
 
 
 # ---------------------------------------------------------------- piezas de contenido
+LOGO_LIGHT = os.path.join(config.ROOT, "docs", "assets", "logo-full-light.png")
+THEMES = {
+    "dark": dict(text=(240, 240, 242), text2=(225, 225, 228), sub=(170, 172, 178), faint=(150, 150, 155),
+                 tile=(22, 24, 26), tile_line=(52, 58, 52), eyebrow=(150, 230, 120), pos=(150, 255, 110),
+                 neg=(255, 120, 110), bar2=(110, 116, 124), glow=(90, 255, 60, 50), btn=(124, 220, 90),
+                 btn_text=(10, 14, 10), pickbox=(28, 52, 26), pickbox_neutral=(40, 42, 46), pick_text=(150, 255, 110)),
+    "light": dict(text=(17, 19, 24), text2=(40, 44, 50), sub=(96, 102, 110), faint=(120, 124, 130),
+                  tile=(255, 255, 255), tile_line=(220, 223, 216), eyebrow=(47, 122, 18), pos=(47, 122, 18),
+                  neg=(194, 38, 26), bar2=(196, 200, 206), glow=(126, 217, 87, 70), btn=(62, 154, 28),
+                  btn_text=(255, 255, 255), pickbox=(226, 244, 220), pickbox_neutral=(236, 237, 240),
+                  pick_text=(30, 110, 30)),
+}
+
+
+def _bg(h: int, theme: str) -> Image.Image:
+    if theme == "dark":
+        return _background(h).convert("RGBA")
+    base = Image.new("RGB", (W, h), (244, 244, 240))
+    noise = Image.effect_noise((W // 6, h // 6), 30).resize((W, h), Image.BICUBIC).filter(ImageFilter.GaussianBlur(4))
+    base = Image.composite(Image.new("RGB", (W, h), (236, 237, 232)), base, noise.point(lambda v: max(0, v - 110)))
+    vg = Image.radial_gradient("L").resize((W, h)).point(lambda v: int(v * 0.35))
+    return Image.composite(Image.new("RGB", (W, h), (222, 224, 218)), base, vg).convert("RGBA")
+
+
+def _logo_t(w: int, theme: str) -> Image.Image:
+    lg = Image.open(LOGO if theme == "dark" else LOGO_LIGHT).convert("RGBA")
+    return lg.resize((w, round(lg.height * w / lg.width)), Image.LANCZOS)
+
 def _logo(w: int) -> Image.Image:
     lg = Image.open(LOGO).convert("RGBA")
     return lg.resize((w, round(lg.height * w / lg.width)), Image.LANCZOS)
@@ -415,17 +443,18 @@ def _jpeg(im) -> bytes:
     return out.getvalue()
 
 
-def render_weekly(week: dict) -> bytes:
+def render_weekly(week: dict, theme: str = "dark") -> bytes:
     """Resumen semanal 1080x1350. week = {label, picks:[{home,away,res,price,stake}], units, yield, hits, total}."""
     H = 1350
-    im = _background(H).convert("RGBA")
-    _glow(im, (W / 2 - 380, -80, W / 2 + 380, 380), (90, 255, 60, 45), 90)
-    lg = _logo(260)
+    T = THEMES[theme]
+    im = _bg(H, theme)
+    _glow(im, (W / 2 - 380, -80, W / 2 + 380, 380), T["glow"], 90)
+    lg = _logo_t(260, theme)
     im.alpha_composite(lg, ((W - lg.width) // 2, 46))
     d = ImageDraw.Draw(im)
     y = 46 + lg.height + 26
-    _ctext(d, y, "RESUMEN SEMANAL", _font("Medium", 30), (150, 230, 120))
-    _ctext(d, y + 44, week["label"], _font("Bold", 54), (240, 240, 242))
+    _ctext(d, y, "RESUMEN SEMANAL", _font("Medium", 30), T["eyebrow"])
+    _ctext(d, y + 44, week["label"], _font("Bold", 54), T["text"])
     # cifras
     y += 140
     units = week["units"]
@@ -435,14 +464,14 @@ def render_weekly(week: dict) -> bytes:
     tw, gap = 286, 21
     for i, (lab, val) in enumerate(tiles):
         x = 90 + i * (tw + gap)
-        d.rounded_rectangle((x, y, x + tw, y + 150), 26, fill=(22, 24, 26), outline=(52, 58, 52), width=2)
+        d.rounded_rectangle((x, y, x + tw, y + 150), 26, fill=T["tile"], outline=T["tile_line"], width=2)
         fv = _font("Bold", 56)
-        col = (150, 255, 110) if (i != 1 and (units >= 0 if i == 0 else week["yield"] >= 0)) else (240, 240, 242)
+        col = T["pos"] if (i != 1 and (units >= 0 if i == 0 else week["yield"] >= 0)) else T["text"]
         if i != 1 and (units < 0 if i == 0 else week["yield"] < 0):
-            col = (255, 120, 110)
+            col = T["neg"]
         d.text((x + (tw - d.textlength(val, font=fv)) / 2, y + 24), val, font=fv, fill=col)
         fl = _font("Medium", 26)
-        d.text((x + (tw - d.textlength(lab, font=fl)) / 2, y + 98), lab, font=fl, fill=(170, 172, 178))
+        d.text((x + (tw - d.textlength(lab, font=fl)) / 2, y + 98), lab, font=fl, fill=T["sub"])
     # lista de picks
     y += 190
     rows = week["picks"][:8]
@@ -474,24 +503,25 @@ def render_weekly(week: dict) -> bytes:
         yy += 84
     # pie
     d = ImageDraw.Draw(im)
-    _ctext(d, H - 150, "Historial completo en la web · link en la bio", _font("Medium", 30), (225, 225, 228))
-    _ctext(d, H - 96, "@stakevision · +18 · Juega con responsabilidad", _font("Regular", 24), (150, 150, 155))
+    _ctext(d, H - 150, "Historial completo en la web · link en la bio", _font("Medium", 30), T["text2"])
+    _ctext(d, H - 96, "@stakevision · +18 · Juega con responsabilidad", _font("Regular", 24), T["faint"])
     return _jpeg(im)
 
 
-def render_story(pick: dict) -> bytes:
+def render_story(pick: dict, theme: str = "dark") -> bytes:
     """Historia vertical 1080x1920 del pick gratis del día."""
     H = 1920
-    im = _background(H).convert("RGBA")
-    _glow(im, (W / 2 - 420, 120, W / 2 + 420, 760), (90, 255, 60, 60), 110)
-    lg = _logo(420)
+    T = THEMES[theme]
+    im = _bg(H, theme)
+    _glow(im, (W / 2 - 420, 120, W / 2 + 420, 760), T["glow"], 110)
+    lg = _logo_t(420, theme)
     im.alpha_composite(lg, ((W - lg.width) // 2, 150))
     d = ImageDraw.Draw(im)
     legs = pick["legs"]
     block = 76 + 64 + (120 + 300 * len(legs) + 120) + 90 + 190
     y = max(150 + lg.height + 60, (H - 140 - block) // 2 + 200)
-    d.rounded_rectangle((W / 2 - 230, y, W / 2 + 230, y + 76), 38, fill=(124, 220, 90))
-    _ctext(d, y + 14, "PICK GRATIS DE HOY", _font("Bold", 36), (10, 14, 10))
+    d.rounded_rectangle((W / 2 - 230, y, W / 2 + 230, y + 76), 38, fill=T["btn"])
+    _ctext(d, y + 14, "PICK GRATIS DE HOY", _font("Bold", 36), T["btn_text"])
     y += 140
     card_h = 120 + 300 * len(legs) + 120
     _card(im, (80, y, W - 80, y + card_h), 40)
@@ -524,33 +554,34 @@ def render_story(pick: dict) -> bytes:
     # llamado
     d = ImageDraw.Draw(im)
     cy = y + card_h + 90
-    _ctext(d, cy, "Análisis completo en Telegram", _font("Bold", 46), (240, 240, 242))
-    d.rounded_rectangle((W / 2 - 290, cy + 90, W / 2 + 290, cy + 190), 50, fill=(124, 220, 90))
-    _ctext(d, cy + 112, "t.me/stakevision", _font("Bold", 48), (10, 14, 10))
-    _ctext(d, H - 130, "+18 · Juega con responsabilidad", _font("Regular", 30), (150, 150, 155))
+    _ctext(d, cy, "Análisis completo en Telegram", _font("Bold", 46), T["text"])
+    d.rounded_rectangle((W / 2 - 290, cy + 90, W / 2 + 290, cy + 190), 50, fill=T["btn"])
+    _ctext(d, cy + 112, "t.me/stakevision", _font("Bold", 48), T["btn_text"])
+    _ctext(d, H - 130, "+18 · Juega con responsabilidad", _font("Regular", 30), T["faint"])
     return _jpeg(im)
 
 
-def render_postmatch(m: dict) -> bytes:
+def render_postmatch(m: dict, theme: str = "dark") -> bytes:
     """Noticia post partido 1080x1350 con datos reales: marcador, goles, estadísticas y el dato curioso."""
     H = 1350
-    im = _background(H).convert("RGBA")
-    _glow(im, (W / 2 - 420, 120, W / 2 + 420, 520), (90, 255, 60, 45), 100)
-    lg = _logo(220)
+    T = THEMES[theme]
+    im = _bg(H, theme)
+    _glow(im, (W / 2 - 420, 120, W / 2 + 420, 520), T["glow"], 100)
+    lg = _logo_t(220, theme)
     im.alpha_composite(lg, ((W - lg.width) // 2, 40))
     d = ImageDraw.Draw(im)
     y = 40 + lg.height + 22
-    _ctext(d, y, ("FINAL · " + m["league"]).upper(), _font("Medium", 26), (150, 230, 120))
+    _ctext(d, y, ("FINAL · " + m["league"]).upper(), _font("Medium", 26), T["eyebrow"])
     y += 56
     # marcador
     fs = _font("Bold", 124)
     sc = f"{m['hg']}  -  {m['ag']}"
-    _ctext(d, y, sc, fs, (245, 245, 247))
+    _ctext(d, y, sc, fs, T["text"])
     fh = _font("Bold", 40)
     home, f1 = _fit(d, m["home"], "Bold", 40, 300)
     away, f2 = _fit(d, m["away"], "Bold", 40, 300)
-    d.text((90, y + 52), home, font=f1, fill=(240, 240, 242))
-    d.text((W - 90 - d.textlength(away, font=f2), y + 52), away, font=f2, fill=(240, 240, 242))
+    d.text((90, y + 52), home, font=f1, fill=T["text"])
+    d.text((W - 90 - d.textlength(away, font=f2), y + 52), away, font=f2, fill=T["text"])
     y += 170
     # titular
     _card(im, (70, y, W - 70, y + 150), 30)
@@ -571,38 +602,38 @@ def render_postmatch(m: dict) -> bytes:
         yy += 52
     y += 180
     # goles
-    d.text((90, y), "GOLES", font=_font("Medium", 26), fill=(150, 230, 120))
+    d.text((90, y), "GOLES", font=_font("Medium", 26), fill=T["eyebrow"])
     y += 44
     for g in m["goals"][:5]:
-        d.text((90, y), g["min"], font=_font("Bold", 30), fill=(150, 255, 110))
+        d.text((90, y), g["min"], font=_font("Bold", 30), fill=T["pos"])
         t, fg = _fit(d, f"{g['player']} ({g['team']})", "Medium", 30, W - 300)
-        d.text((200, y), t, font=fg, fill=(240, 240, 242))
+        d.text((200, y), t, font=fg, fill=T["text"])
         y += 46
     y += 14
     # estadísticas: barras enfrentadas
-    d.text((90, y), "ESTADÍSTICAS", font=_font("Medium", 26), fill=(150, 230, 120))
+    d.text((90, y), "ESTADÍSTICAS", font=_font("Medium", 26), fill=T["eyebrow"])
     y += 48
     for lab, a, b, fmt in m["stats"][:3]:
         tot = (a + b) or 1
-        d.text((90, y), fmt(a), font=_font("Bold", 32), fill=(240, 240, 242))
+        d.text((90, y), fmt(a), font=_font("Bold", 32), fill=T["text"])
         bt = fmt(b)
-        d.text((W - 90 - d.textlength(bt, font=_font("Bold", 32)), y), bt, font=_font("Bold", 32), fill=(240, 240, 242))
-        _ctext(d, y + 4, lab, _font("Medium", 26), (170, 172, 178))
+        d.text((W - 90 - d.textlength(bt, font=_font("Bold", 32)), y), bt, font=_font("Bold", 32), fill=T["text"])
+        _ctext(d, y + 4, lab, _font("Medium", 26), T["sub"])
         bx0, bx1, by = 90, W - 90, y + 48
         split = bx0 + (bx1 - bx0) * a / tot
-        d.rounded_rectangle((bx0, by, split - 3, by + 12), 6, fill=(124, 220, 90))
-        d.rounded_rectangle((split + 3, by, bx1, by + 12), 6, fill=(110, 116, 124))
+        d.rounded_rectangle((bx0, by, split - 3, by + 12), 6, fill=T["btn"])
+        d.rounded_rectangle((split + 3, by, bx1, by + 12), 6, fill=T["bar2"])
         y += 74
     # nuestro pick
     if m.get("pick"):
         p = m["pick"]
         y = H - 190
         ok = p["res"] == "W"
-        d.rounded_rectangle((90, y, W - 90, y + 96), 26, fill=(28, 52, 26) if ok else (40, 42, 46))
+        d.rounded_rectangle((90, y, W - 90, y + 96), 26, fill=T["pickbox"] if ok else T["pickbox_neutral"])
         if ok:
             im.alpha_composite(_check_badge(52), (120, int(y + 22)))
         d = ImageDraw.Draw(im)
         txt, fp = _fit(d, f"Nuestro pick: {p['label']} @ {p['price']:.2f}", "Bold", 34, W - 320)
-        d.text((190, y + 26), txt, font=fp, fill=(150, 255, 110) if ok else (230, 230, 232))
-    _ctext(d, H - 70, "@stakevision · +18 · Juega con responsabilidad", _font("Regular", 24), (150, 150, 155))
+        d.text((190, y + 26), txt, font=fp, fill=T["pos"] if ok else T["text2"])
+    _ctext(d, H - 70, "@stakevision · +18 · Juega con responsabilidad", _font("Regular", 24), T["faint"])
     return _jpeg(im)
