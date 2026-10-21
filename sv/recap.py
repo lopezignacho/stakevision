@@ -131,9 +131,38 @@ def build(p: dict, rep: dict, photo: tuple[bytes, dict] | None, title: str | Non
     title = (title or headline(rep)).upper()
     data = {"report": rep, "eyebrow": eyebrow(rep, l.get("league") or ""), "headline": title,
             "subline": subline(rep, l["kickoff"]),
-            "pick": {"label": pick_label(p), "odds": formatting.odds(p["price"]), "result": p.get("result") or "V"},
+            "pick": None if p.get("news") else
+            {"label": pick_label(p), "odds": formatting.odds(p["price"]), "result": p.get("result") or "V"},
+            "dato": dato(rep),
             "photo": photo[0] if photo else None, "credit": photo[1]["text"] if photo and photo[1] else None}
     return data
+
+
+def dato(rep: dict) -> str:
+    """Una línea de contexto para los partidos que no fueron pick."""
+    w = _winner(rep)
+    sw = _series_winner(rep)
+    total = rep["home"]["score"] + rep["away"]["score"]
+    if sw and w == sw:
+        loser = "away" if sw == "home" else "home"
+        wb = (rep[sw].get("agg") or 0) - rep[sw]["score"]
+        lb = (rep[loser].get("agg") or 0) - rep[loser]["score"]
+        if wb < lb:
+            return f"{_team(rep[sw])} dio vuelta el {wb}-{lb} de la ida"
+    run, trailed = {"home": 0, "away": 0}, False
+    for g in rep["goals"]:
+        run[g["side"]] += 1
+        if w and run[w] < run["away" if w == "home" else "home"]:
+            trailed = True
+    if w and trailed:
+        return f"{_team(rep[w])} lo dio vuelta después de ir perdiendo"
+    if total >= 5:
+        return f"{total} goles en un partidazo"
+    if rep["goals"] and rep["goals"][-1]["min"] >= 85:
+        return f"Se definió en el minuto {rep['goals'][-1]['label']}"
+    if total == 0:
+        return "Ninguno pudo romper el cero"
+    return f"Triunfo de {_team(rep[w])}" if w else "Reparto de puntos"
 
 
 RESULT_TXT = {"W": "✅ VERDE", "L": "❌ ROJA", "V": "↩️ NULA"}
@@ -156,9 +185,10 @@ def telegram_caption(p: dict, rep: dict, title: str) -> str:
     sub = subline(rep, p["legs"][0]["kickoff"])
     if sub[0] in ("Global", "Ida"):
         lines += ["", esc(" ".join(sub))]
-    lines += ["", f"🎯 Nuestro pick: {esc(pick_label(p))} @ {formatting.odds(p['price'])} → "
-                  f"<b>{RESULT_TXT.get(p.get('result'), '')}</b>",
-              "🔞 +18 · Juega con responsabilidad."]
+    if not p.get("news"):
+        lines += ["", f"🎯 Nuestro pick: {esc(pick_label(p))} @ {formatting.odds(p['price'])} → "
+                      f"<b>{RESULT_TXT.get(p.get('result'), '')}</b>"]
+    lines += ["", "🔞 +18 · Juega con responsabilidad."]
     return "\n".join(lines)
 
 
@@ -169,8 +199,11 @@ def instagram_caption(p: dict, rep: dict, title: str, credit: dict | None) -> st
     sub = subline(rep, p["legs"][0]["kickoff"])
     if sub[0] in ("Global", "Ida"):
         lines += ["", " ".join(sub)]
-    lines += ["", f"🎯 Nuestro pick: {pick_label(p)} @ {formatting.odds(p['price'])} → {RESULT_TXT.get(p.get('result'), '')}",
-              "", "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio)."]
+    if not p.get("news"):
+        lines += ["", f"🎯 Nuestro pick: {pick_label(p)} @ {formatting.odds(p['price'])} → "
+                      f"{RESULT_TXT.get(p.get('result'), '')}"]
+    lines += ["", "¿Quién se lleva el próximo? 👇", "",
+              "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio)."]
     if credit:
         lines += ["", f"📸 Foto: {credit['author']} / Wikimedia Commons ({credit['license']}), modificada. "
                       f"Esta imagen se comparte bajo la misma licencia."]

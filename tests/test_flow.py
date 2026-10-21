@@ -420,3 +420,18 @@ updates_q.append({"update_id": 312, "message": {"chat": {"id": OWNER, "type": "p
 main.poll()
 assert "primero toca" in sent[-1][1]
 print("OK imagen propia")
+
+# 13) /postpartido de un partido que no fue pick
+espn.find_recent = lambda a, b, days=3: (rep_, "2026-10-21T00:30:00Z")
+commons.photo = lambda name: None
+n = len(photos)
+updates_q.append({"update_id": 400, "message": {"chat": {"id": OWNER, "type": "private"},
+                                                "text": "/postpartido Vasco vs Boca | CONMEBOL · Sudamericana"}})
+main.poll()
+st = store.load()
+nw = st["picks"]["N1"]
+assert nw["status"] == "news" and len(photos) == n + 1 and "Post partido · partido N1" in photos[-1][1]
+assert "Nuestro pick" not in nw["recap"]["ig"] and "Boca" in nw["recap"]["ig"]
+pub = json.load(open(config.PUBLIC_HISTORY))
+assert all(str(x.get("id")) != "N1" for x in pub["picks"])
+print("OK /postpartido")

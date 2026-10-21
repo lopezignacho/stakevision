@@ -131,3 +131,28 @@ def match_report(home: str, away: str, kickoff_iso: str, sport: str = "soccer") 
         return None
     r = report_from_event(*found)
     return r if r["state"] == "post" else None
+
+
+def find_recent(team_a: str, team_b: str, days: int = 3, sport: str = "soccer"):
+    """Busca un partido terminado entre dos equipos en los últimos días (en cualquier orden).
+    Devuelve (resumen, inicio ISO) o None."""
+    from datetime import datetime, timedelta
+    now = datetime.now(ZoneInfo("America/New_York"))
+    for back in range(days + 1):
+        day = (now - timedelta(days=back)).strftime("%Y%m%d")
+        for e in _scoreboard(day, sport):
+            c = (e.get("competitions") or [{}])[0]
+            comp = c.get("competitors") or []
+            h = next((x for x in comp if x.get("homeAway") == "home"), None)
+            a = next((x for x in comp if x.get("homeAway") == "away"), None)
+            if not h or not a:
+                continue
+            if not ((_match(team_a, h["team"]) and _match(team_b, a["team"]))
+                    or (_match(team_b, h["team"]) and _match(team_a, a["team"]))):
+                continue
+            r = report_from_event(e, c, h, a)
+            if r["state"] == "post":
+                ko = (e.get("date") or "").replace("Z", "")
+                ko = (ko + ":00" if len(ko) == 16 else ko) + "Z"
+                return r, ko
+    return None

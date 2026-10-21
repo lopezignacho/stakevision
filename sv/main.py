@@ -73,7 +73,7 @@ def _share_command(state: dict, text: str) -> None:
         return
     if p["status"] in ("selected", "published"):
         _share_panel(state, p)
-    elif p["status"] == "settled" and p.get("recap") and os.path.exists(_recap_file(p)):
+    elif p["status"] in ("settled", "news") and p.get("recap") and os.path.exists(_recap_file(p)):
         _recap_panel(state, p)
     elif p["status"] == "settled" and p.get("result") == "W":
         p["ig_kit_sent"] = False
@@ -493,8 +493,9 @@ def _recap_panel(state: dict, p: dict) -> None:
     r = p["recap"]
     if r.get("panel"):
         telegram.edit_buttons_off(owner, r["panel"], "↪️ Reemplazada por la versión de abajo")
-    label = {"W": "✅ verde", "L": "❌ roja", "V": "↩️ nula"}.get(p.get("result"), "")
-    cap = (f"📰 <b>Post partido · pick #{p['id']}</b> ({label})\n"
+    label = {"W": " (✅ verde)", "L": " (❌ roja)", "V": " (↩️ nula)"}.get(p.get("result"), "")
+    who = "partido " + p["id"] if p.get("news") else "pick #" + p["id"]
+    cap = (f"📰 <b>Post partido · {who}</b>{label}\n"
            f"Titular: <b>{formatting.escape(r['title'])}</b> · para cambiarlo: /titular {p['id']} TU TITULAR\n"
            "Elige dónde compartirlo (puedes usar varios botones).")
     if r.get("credit"):
@@ -596,6 +597,37 @@ def _recap_share(state: dict, p: dict, where: str) -> None:
         telegram.send(chat, text)
 
 
+def _news_command(state: dict, text: str) -> None:
+    """/postpartido Vasco vs Boca | Sudamericana — post partido de cualquier partido terminado (sin pick)."""
+    import re as _re
+    from . import espn
+    owner = state["owner_chat"]
+    body = text.split(maxsplit=1)[1] if len(text.split(maxsplit=1)) > 1 else ""
+    body, _, league = body.partition("|")
+    teams = _re.split(r"\s+(?:vs\.?|v|-|contra)\s+", body.strip(), maxsplit=1, flags=_re.I)
+    if len(teams) != 2 or not all(t.strip() for t in teams):
+        telegram.send(owner, "Usa: /postpartido Vasco vs Boca | Sudamericana\n"
+                             "(la liga después de la barra es opcional; busca partidos terminados de los últimos 3 días)")
+        return
+    found = espn.find_recent(teams[0].strip(), teams[1].strip())
+    if not found:
+        telegram.send(owner, "No encontré ese partido terminado en ESPN en los últimos 3 días. "
+                             "Revisa los nombres (como aparecen en ESPN).")
+        return
+    rep, kickoff = found
+    state["news_seq"] = state.get("news_seq", 0) + 1
+    nid = f"N{state['news_seq']}"
+    state["picks"][nid] = {"id": nid, "status": "news", "news": True, "kind": "news", "price": 0, "stake": 0,
+                           "created_at": _iso(store.now_utc()), "kickoff": kickoff, "result": None,
+                           "legs": [{"home": rep["home"]["name"], "away": rep["away"]["name"], "kickoff": kickoff,
+                                     "league": league.strip(), "sport": "soccer"}],
+                           "recap": {"report": rep}}
+    telegram.send(owner, f"⚽ {formatting.escape(rep['home']['name'])} {rep['home']['score']}-"
+                         f"{rep['away']['score']} {formatting.escape(rep['away']['name'])}: armando la imagen…")
+    if not _recap(state, state["picks"][nid], reuse=True):
+        telegram.send(owner, "⚠️ No pude armar la imagen. Intenta de nuevo en un rato.")
+
+
 def _title_command(state: dict, text: str) -> None:
     owner = state["owner_chat"]
     parts = text.split(maxsplit=2)
@@ -684,6 +716,8 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith("/postpartido"):
+            _news_command(state, text)
         elif chat == owner and text.lower().startswith("/titular"):
             _title_command(state, text)
         elif chat == owner and text.lower().startswith("/compartir"):
@@ -894,6 +928,7 @@ HELP_TEXT = (
     "/envivo · busca valor en partidos que se están jugando ahora\n"
     "/compartir 8 · vuelve a mandarte la imagen del pick #8 (o su post partido, si ya terminó)\n"
     "/titular 8 MARACA-NAZO · cambia el titular de la imagen post partido del pick #8\n"
+    "/postpartido Vasco vs Boca | Sudamericana · imagen post partido de cualquier partido terminado\n"
     "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
     "/ayuda · esta lista\n\n"
     "El escaneo automático sigue saliendo todos los días a las 09:07."
@@ -980,16 +1015,17 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
-    if owner and state.get("cmds_v") != 4:
+    if owner and state.get("cmds_v") != 5:
         try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
             telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
                 {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
                 {"command": "envivo", "description": "Buscar valor en partidos que se están jugando"},
                 {"command": "compartir", "description": "Imagen de un pick para VIP, Gratis o Instagram"},
                 {"command": "titular", "description": "Cambiar el titular de la imagen post partido"},
+                {"command": "postpartido", "description": "Imagen post partido de cualquier partido (ej. Vasco vs Boca)"},
                 {"command": "estado", "description": "Pendientes, picks en juego e historial"},
                 {"command": "ayuda", "description": "Lista de comandos"}])
-            state["cmds_v"] = 4
+            state["cmds_v"] = 5
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)
