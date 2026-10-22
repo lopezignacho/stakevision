@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-22T01:42:22.396210+00:00",
+ "updated_at": "2026-10-22T01:42:32.040965+00:00",
  "summary": {
-  "picks": 6,
-  "wins": 4,
+  "picks": 7,
+  "wins": 5,
   "losses": 1,
-  "hit_rate": 0.8,
-  "yield": 0.4631,
-  "avg_odds": 1.8,
-  "units": 7.41
+  "hit_rate": 0.8333,
+  "yield": 0.5105,
+  "avg_odds": 1.78,
+  "units": 10.21
  },
  "picks": [
   {
@@ -36,6 +36,33 @@
     }
    ],
    "analysis": "Más de 3 goles (con 3 exactos se devuelve) en Club Brugge vs Racing Club De Lens: cuota justa estimada 1.66, cuota disponible 1.65 (en línea con la cuota justa).\nProbabilidad estimada: 60,3%. Para no perder a esta cuota se necesita 60,6%."
+  },
+  {
+   "id": "21",
+   "published_at": "2026-10-21T16:14:25Z",
+   "kickoff": "2026-10-21T19:00:00.000Z",
+   "kind": "simple",
+   "price": 1.7,
+   "stake": 4,
+   "prob": null,
+   "free": false,
+   "result": "W",
+   "legs": [
+    {
+     "home": "Real Betis Seville",
+     "away": "Feyenoord Rotterdam",
+     "league": "Champions League",
+     "market": "Resultado Tiempo Completo",
+     "outcome": "1",
+     "price": 1.7,
+     "label": "Gana Real Betis Seville",
+     "mtype": "1x2",
+     "handicap": 0.0,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": null
   },
   {
    "id": "16",
