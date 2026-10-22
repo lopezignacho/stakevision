@@ -1,7 +1,7 @@
 {
- "updated_at": "2026-10-22T01:40:23.605125+00:00",
+ "updated_at": "2026-10-22T01:42:22.396210+00:00",
  "summary": {
-  "picks": 5,
+  "picks": 6,
   "wins": 4,
   "losses": 1,
   "hit_rate": 0.8,
@@ -19,7 +19,7 @@
    "stake": 4,
    "prob": 0.6033,
    "free": true,
-   "result": null,
+   "result": "V",
    "legs": [
     {
      "home": "Club Brugge",
