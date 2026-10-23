@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-23T04:25:23.767073+00:00",
+ "updated_at": "2026-10-23T04:30:33.806309+00:00",
  "summary": {
   "picks": 8,
   "wins": 6,
@@ -10,6 +10,33 @@
   "units": 12.81
  },
  "picks": [
+  {
+   "id": "37",
+   "published_at": "2026-10-23T04:30:28Z",
+   "kickoff": "2026-10-24T02:00:00.000Z",
+   "kind": "simple",
+   "price": 1.85,
+   "stake": 3,
+   "prob": 0.546,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Los Angeles Lakers",
+     "away": "LA Clippers",
+     "league": "USA · NBA",
+     "market": "Más/Menos (incl. tiempo extra)",
+     "outcome": "Más",
+     "price": 1.85,
+     "label": "Más de 226.5 puntos",
+     "mtype": "totals",
+     "handicap": 226.5,
+     "sport": "basketball",
+     "score": null
+    }
+   ],
+   "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.83): el mercado no la regala, la elección se apoya en los datos de abajo.\n⚠️ <b>En contra:</b>\n• Promedios recientes: Los Angeles Lakers anota 115.2 y recibe 109.7; LA Clippers anota 114.1 y recibe 112.0 → proyección 225.5 pts (línea 226.5).\nProbabilidad estimada: 54,6%. Para no perder a esta cuota se necesita 54,1%."
+  },
   {
    "id": "22",
    "published_at": "2026-10-22T13:08:51Z",
