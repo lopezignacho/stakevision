@@ -30,7 +30,7 @@ types = {}
 for m in bm:
     key = (m.get("marketType"), m.get("period"))
     types.setdefault(str(key), []).append(m.get("marketId"))
-out["basket_market_types"] = {k: v[:6] for k, v in types.items()}
+out["basket_market_types_n"] = len(types)
 os.makedirs("data", exist_ok=True)
 with open("data/markets_basketball.json", "w", encoding="utf-8") as f:
     json.dump({str(m["marketId"]): {"name": m.get("marketName"), "type": m.get("marketType"), "period": m.get("period"),
@@ -86,4 +86,4 @@ for name, url in (("injuries", f"{E}/injuries"), ("news", f"{E}/news?limit=5"), 
                                      "odds": json.dumps(c.get("odds"))[:600]}
     except Exception as e:  # noqa: BLE001
         out[f"espn_{name}_error"] = str(e)
-print(json.dumps(out, ensure_ascii=False, indent=1, default=str)[:20000])
+print(json.dumps(out, ensure_ascii=False, indent=1, default=str))
