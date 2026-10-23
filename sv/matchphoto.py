@@ -28,10 +28,15 @@ def referent(team_names: list[str], sport: str = "soccer", tries: int = 8):
             sq = []
         if not sq:
             continue
-        for pl in sq[:tries]:
+        for pl in sq[:tries]:   # 1) la foto nombra al club
             got = commons.player_photo(pl["name"], team_names, since=pl.get("since") or 0)
             if got:
                 return got
+        for pl in sq[:tries]:   # 2) foto de cuando ya jugaba en el club (y no con su selección)
+            if pl.get("since"):
+                got = commons.player_photo(pl["name"], team_names, since=pl["since"], need_team=False)
+                if got:
+                    return got
         return None
     return None
 
@@ -53,9 +58,23 @@ def for_pick(leg: dict, teams: dict | None):
     return None
 
 
-def for_scorer(full_name: str, team_names: list[str]):
-    """El goleador / la figura, con la camiseta de su club (foto de los últimos 2 años)."""
-    return commons.player_photo(full_name, team_names) if full_name else None
+def for_scorer(full_name: str, team_names: list[str], sport: str = "soccer"):
+    """El goleador / la figura con la camiseta de su club. Si en Wikidata figura en el plantel, también vale
+    una foto de cuando ya jugaba ahí aunque no nombre al club."""
+    if not full_name:
+        return None
+    got = commons.player_photo(full_name, team_names)
+    if got:
+        return got
+    try:
+        sq = players.squad(team_names[0], sport, n=25) if team_names else []
+    except Exception:  # noqa: BLE001
+        sq = []
+    key = commons._plain(full_name)
+    pl = next((x for x in sq if commons._plain(x["name"]) == key), None)
+    if pl and pl.get("since"):
+        return commons.player_photo(full_name, team_names, since=pl["since"], need_team=False)
+    return None
 
 
 def for_halftime(rep: dict):

@@ -66,7 +66,7 @@ def team_qid(name: str, sport: str = "soccer") -> str | None:
 def squad(team: str, sport: str = "soccer", n: int = 8) -> list[dict]:
     """Referentes del plantel actual: [{'name', 'image', 'links', 'since' (año en que llegó)}], el más conocido primero.
     Se descartan los que después pasaron a otro club (datos viejos) y los mayores de 40 años."""
-    key = ("squad", _plain(team), sport)
+    key = ("squad", _plain(team), sport, n)
     if key in _cache:
         return _cache[key]
     qid = team_qid(team, sport)

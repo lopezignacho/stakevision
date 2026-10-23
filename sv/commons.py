@@ -138,6 +138,9 @@ def player_candidates(name: str, teams: list[str], since: int = 0) -> list[dict]
         words_all = set(re.split(r"[^a-z0-9]+", f"{title} {c['desc']} {c['cats']}"))
         if any((n in words_t) if " " not in n else (n in title) for n in NATIONAL) and not (toks & words_t):
             continue   # con la selección
+        blob = f" {c['desc']} {c['cats']} "
+        c["national"] = any(w in blob for w in ("national", "selección", "seleccion", "world cup", "olympic",
+                                                "eurobasket", "fiba", "copa america", "copa américa"))
         if not c["year"] or c["year"] < since:
             continue   # de antes de llegar al club: puede tener otra camiseta
         c["team_hit"] = bool(toks & words_t) or bool(toks & words_all)
@@ -160,8 +163,10 @@ def _download(c: dict) -> tuple[bytes, dict] | None:
 
 def player_photo(name: str, teams: list[str], since: int = 0, need_team: bool = True) -> tuple[bytes, dict] | None:
     """(jpeg, crédito) del jugador con la camiseta de su club; o None."""
-    for c in player_candidates(name, teams, since)[:4]:
+    for c in player_candidates(name, teams, since)[:6]:
         if need_team and not c["team_hit"]:
+            continue
+        if not c["team_hit"] and c.get("national"):
             continue
         got = _download(c)
         if got:

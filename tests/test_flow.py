@@ -865,7 +865,8 @@ print("OK NBA solo VIP + previa + corrección")
 
 # 27) NBA: entretiempo (solo VIP) y final (VIP + Instagram, sin Gratis)
 from sv import matchphoto, nbagame  # noqa: E402
-matchphoto.for_scorer = lambda name, teams: None
+matchphoto.for_scorer = lambda name, teams, sport='soccer': None
+matchphoto.referent = lambda names, sport='soccer', tries=8: None
 
 
 def _play(per, team, who, typ, text, shoot=False, made=False, val=0, ast=None):

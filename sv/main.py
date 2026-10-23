@@ -1546,7 +1546,7 @@ def _nba_board(state: dict, p: dict, rep: dict, kind: str, photo=None, half_rep=
                  if not fig or x["name"] != fig[0]["name"]]
         try:
             for name, s_ in tries[:5]:
-                photo = matchphoto.for_scorer(name, [rep[s_]["name"], rep[s_]["short"]])
+                photo = matchphoto.for_scorer(name, [rep[s_]["name"], rep[s_]["short"]], "basketball")
                 if photo:
                     break
             for s_ in ([fig[1]] if fig else []) + ["home", "away"]:
