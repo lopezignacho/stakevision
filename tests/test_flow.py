@@ -622,3 +622,11 @@ assert store.load()["picks"][p8["id"]]["ht_done"] == "sent"
 main.poll()
 assert not any(c and "ENTRETIEMPO" in c for ch, c in photos[n + len(new):])
 print("OK entretiempo")
+
+# 22) /entretiempo (vista previa solo para el dueño)
+espn.find_recent = lambda a, b, days=3, finished_only=True: (rep_ht, "2026-10-21T00:30:00Z")
+n = len(photos)
+updates_q.append({"update_id": 1100, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/entretiempo Vasco vs Boca"}})
+main.poll()
+assert photos[n:] and all(ch == OWNER for ch, _ in photos[n:]) and "Vista previa" in (photos[n][1] or sent[-1][1])
+print("OK vista previa entretiempo")

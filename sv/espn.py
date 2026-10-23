@@ -148,7 +148,7 @@ def live_report(home: str, away: str, kickoff_iso: str, sport: str = "soccer") -
     return report_from_event(*found) if found else None
 
 
-def find_recent(team_a: str, team_b: str, days: int = 3, sport: str = "soccer"):
+def find_recent(team_a: str, team_b: str, days: int = 3, sport: str = "soccer", finished_only: bool = True):
     """Busca un partido terminado entre dos equipos en los últimos días (en cualquier orden).
     Devuelve (resumen, inicio ISO) o None."""
     from datetime import datetime, timedelta
@@ -166,7 +166,7 @@ def find_recent(team_a: str, team_b: str, days: int = 3, sport: str = "soccer"):
                     or (_match(team_b, h["team"]) and _match(team_a, a["team"]))):
                 continue
             r = report_from_event(e, c, h, a)
-            if r["state"] == "post":
+            if r["state"] == "post" or (not finished_only and r["state"] == "in"):
                 ko = (e.get("date") or "").replace("Z", "")
                 ko = (ko + ":00" if len(ko) == 16 else ko) + "Z"
                 return r, ko

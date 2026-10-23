@@ -746,6 +746,44 @@ def _halftime_check(state: dict, p: dict, now) -> None:
                                            f"({rep['home']['score']}-{rep['away']['score']}).")
 
 
+def _halftime_preview(state: dict, text: str) -> None:
+    """/entretiempo Local vs Visita — vista previa SOLO para ti, con el marcador actual (no publica en canales)."""
+    import re as _re
+    from . import commons, espn, halftime, layouts
+    owner = state["owner_chat"]
+    body = text.split(maxsplit=1)[1] if len(text.split(maxsplit=1)) > 1 else ""
+    teams = _re.split(r"\s+(?:vs\.?|v|-|contra)\s+", body.strip(), maxsplit=1, flags=_re.I)
+    if len(teams) != 2:
+        telegram.send(owner, "Usa: /entretiempo Vasco vs Boca (un partido en juego o de los últimos 3 días). "
+                             "Es solo una vista previa para ti.")
+        return
+    found = espn.find_recent(teams[0].strip(), teams[1].strip(), finished_only=False)
+    if not found:
+        telegram.send(owner, "No encontré ese partido en ESPN (en juego o de los últimos 3 días).")
+        return
+    rep, _ko = found
+    l = {"home": rep["home"]["name"], "away": rep["away"]["name"], "mtype": "totals", "outcome": "Más de",
+         "handicap": 2.5}
+    st = halftime.status(l, rep["home"]["score"], rep["away"]["score"], grade_leg)
+    scorers = [g["full"] for g in reversed(rep["goals"]) if g["kind"] != "own" and g["full"]]
+    photo = None
+    for name, team in [(n, False) for n in scorers[:2]] + [(rep["home"]["name"], True), (rep["away"]["name"], True)]:
+        photo = commons.photo(name, team=team)
+        if photo:
+            break
+    data = {"report": rep, "eyebrow": "Vista previa", "photo": photo[0] if photo else None,
+            "credit": photo[1]["text"] if photo and photo[1] else None, "stats": halftime.stats(rep),
+            "pick_label": "Más de 2.5 goles (ejemplo)", "odds": "1.85", "status": st}
+    image = layouts.halftime(data, "dark")
+    p = {"price": 1.85, "legs": [dict(l, label="Más de 2.5 goles (pick de ejemplo)")]}
+    cap = "🧪 <b>Vista previa (solo tú la ves)</b>\n\n" + halftime.caption(p, rep, st)
+    if formatting.caption_fits(cap):
+        telegram.send_photo(owner, image, caption=cap)
+    else:
+        telegram.send_photo(owner, image)
+        telegram.send(owner, cap)
+
+
 def _recap_share(state: dict, p: dict, where: str) -> None:
     chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
     r = p["recap"]
@@ -986,6 +1024,8 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith("/entretiempo"):
+            _halftime_preview(state, text)
         elif chat == owner and text.lower().startswith("/enlace"):
             from . import guests
             guests.link_command(state, text)
