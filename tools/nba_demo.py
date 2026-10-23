@@ -28,7 +28,8 @@ for k in range(0, 3):
         break
 if not ev:
     log.append("No encontré Nuggets vs Thunder en los próximos 3 días en ESPN")
-    raise SystemExit(open(f"{OUT}/demo.txt", "w").write("\n".join(log)))
+    open(f"{OUT}/demo.txt", "w").write("\n".join(log))
+    raise SystemExit(0)
 comp = ev["competitions"][0]["competitors"]
 home = next(x for x in comp if x["homeAway"] == "home")["team"]["displayName"]
 away = next(x for x in comp if x["homeAway"] == "away")["team"]["displayName"]
