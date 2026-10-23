@@ -133,7 +133,8 @@ def context(home: str, away: str, kickoff_iso: str) -> dict | None:
     for side in ("home", "away"):
         x = by_side.get(side) or {}
         tid = str((x.get("team") or {}).get("id") or "")
-        games = _team_games(tid, now) if tid else []
+        games = [g for g in (_team_games(tid, now, 14) if tid else [])
+                 if g["date"] and datetime.fromisoformat(g["date"].replace("Z", "+00:00")) < ko - timedelta(hours=2)][:10]
         last = next((g for g in games if g["date"]), None)
         rest = None
         if last:
@@ -321,16 +322,21 @@ def digest(now: datetime | None = None) -> str:
         games.append(f"• {t:%H:%M} {esc(a['team']['shortDisplayName'])} ({_record(a, 'total')}) @ "
                      f"{esc(h['team']['shortDisplayName'])} ({_record(h, 'total')})")
     lines += [f"📅 <b>Partidos de hoy</b> (hora Chile): {len(games)}"] + (games or ["• No hay partidos hoy."])
+    playing = set()
+    for e in sb.get("events") or []:
+        for x in e["competitions"][0]["competitors"]:
+            playing.add(x["team"].get("displayName"))
     inj = _get("/injuries")
     rows = []
-    for t in inj.get("injuries") or []:
+    teams = sorted(inj.get("injuries") or [], key=lambda t: t.get("displayName") not in playing)
+    for t in teams:
         for i in t.get("injuries") or []:
             if recent(i.get("date")) and (i.get("status") or "").lower() in ("out", "doubtful", "day-to-day",
                                                                                 "questionable"):
                 rows.append(f"• {esc((i.get('athlete') or {}).get('displayName', '?'))} "
                             f"({esc(t.get('displayName', ''))}): {esc(i.get('status', ''))}"
                             + (f" · {esc((i.get('details') or {}).get('type', ''))}" if (i.get('details') or {}).get('type') else ""))
-    lines += ["", f"🚑 <b>Lesiones actualizadas (24 h)</b>: {len(rows)}"] + (rows[:15] or ["• Sin novedades."])
+    lines += ["", f"🚑 <b>Lesiones actualizadas (24 h)</b>: {len(rows)} (primero, equipos que juegan hoy)"] + (rows[:15] or ["• Sin novedades."])
     tx = _get("/transactions", limit=40)
     trows = [f"• {esc((x.get('team') or {}).get('abbreviation', ''))}: {esc(x.get('description', ''))}"
              for x in tx.get("transactions") or [] if recent(x.get("date"))]
