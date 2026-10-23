@@ -17,7 +17,7 @@ now = datetime.now(timezone.utc)
 
 # 1) partido de hoy en ESPN
 ev = None
-for k in range(0, 3):
+for k in (0, -1, 1, 2):
     day = (now + timedelta(days=k)).astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d")
     for e in nba._get("/scoreboard", dates=day).get("events") or []:
         names = [x["team"]["displayName"] for x in e["competitions"][0]["competitors"]]
@@ -27,7 +27,7 @@ for k in range(0, 3):
     if ev:
         break
 if not ev:
-    log.append("No encontré Nuggets vs Thunder en los próximos 3 días en ESPN")
+    log.append("No encontré Nuggets vs Thunder entre ayer y pasado mañana en ESPN")
     open(f"{OUT}/demo.txt", "w").write("\n".join(log))
     raise SystemExit(0)
 comp = ev["competitions"][0]["competitors"]
@@ -81,8 +81,8 @@ except Exception:
     log.append(traceback.format_exc())
 
 # 4) último cruce real terminado (para entretiempo y final)
-last = None
-for season in (2027, 2026, 2025):
+last = ev if ((ev.get("status") or {}).get("type") or {}).get("completed") else None
+for season in ((2027, 2026, 2025) if not last else ()):
     data = nba._get("/teams/25/schedule", season=season)
     for e in data.get("events") or []:
         c = e["competitions"][0]
