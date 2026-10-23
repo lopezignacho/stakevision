@@ -263,8 +263,10 @@ def owner_candidate(pick: dict) -> str:
     if pick.get("live"):
         live = (f"🔴 <b>EN VIVO</b>" + (f" · {escape(pick['live_info'])}" if pick.get("live_info") else "")
                 + f"\n⏱ Vence en {config.LIVE_CANDIDATE_MIN} min: las cuotas en vivo cambian rápido.\n")
+    from . import evidence
+    evl = "\n".join(evidence.line(l.get("evidence")) for l in pick["legs"] if (l.get("sport") or "soccer") == "soccer")
     return (f"🆕 <b>Candidato #{pick['id']}</b> ({pick['kind']})\n{live}{tag}\n\n"
-            f"{_legs_block(pick)}\n\n"
+            f"{_legs_block(pick)}\n\n" + (f"{evl}\n\n" if evl else "") +
             f"📈 Cuota: <b>{odds(pick['price'])}</b> · Valor: <b>{sign}{pct(pick['edge'])}</b> · "
             f"Stake sugerido: {pick['stake']}/10\n\n"
             f"<i>{pick['analysis']}</i>\n\n"

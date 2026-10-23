@@ -174,6 +174,12 @@ def body(pick: dict) -> str:
                 facts.append(f"El mercado de referencia le da {pct(fp)} de probabilidad a este resultado 📊")
             if o == "1" and l.get("mtype") in ("1x2", "drawnobet", "moneyline", "spreads"):
                 facts.append(f"{escape(l['home'])} juega de local 🏟")
+        ev = l.get("evidence") or {}
+        hh, hn = (ev.get("h2h") or [0, 0])
+        if hn >= 3 and hh * 2 >= hn:   # el cara a cara respalda el pick: va primero
+            g = ev.get("h2h_goals")
+            facts.insert(0, f"Cara a cara: se habría cumplido en {hh} de los últimos {hn} enfrentamientos"
+                            + (f" ({str(g).replace('.', ',')} goles por partido)" if g is not None else "") + " 🤝")
         blocks.append(f"🧠 {summary}")
         blocks += [f"• {f}" for f in facts[:3]]
     edge = pick.get("edge", 0)

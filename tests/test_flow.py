@@ -1078,3 +1078,18 @@ telegram.delete_message = lambda c, m: deleted_.append((c, m)) or True
 main._cancel_pick(st, "902", delete_posts=True)
 assert (config.FREE_CHANNEL, 5) in deleted_ and (VIP, 6) in deleted_ and not st["picks"]["902"]["channel_msgs"]
 print("OK gratis del día + cancelar")
+
+# 32) contraste con datos: H2H y forma recientes
+from sv import evidence  # noqa: E402
+leg_j = {"home": "CD Junior FC", "away": "Aguilas Doradas", "kickoff": "2026-10-24T01:10:00Z", "sport": "soccer",
+         "mtype": "teamtotals-team1", "outcome": "Menos", "handicap": 1.5,
+         "context": {"v": 2, "home": [{"gf": g, "ga": 1} for g in (1, 0, 2, 1, 0, 1)],
+                     "away": [{"gf": 1, "ga": g} for g in (2, 3, 1, 2)]}}
+evidence._h2h = lambda h, a, k: [(3, 0), (3, 2), (2, 2), (3, 4), (2, 0), (1, 1)]
+ev_j = evidence.check(leg_j)
+assert ev_j["h2h"] == [1, 6] and ev_j["verdict"] in ("contra", "debil"), ev_j
+leg_t = dict(leg_j, mtype="totals", outcome="Más", handicap=1.5)
+ev_t = evidence.check(leg_t)
+assert ev_t["h2h"] == [6, 6] and ev_t["verdict"] == "ok", ev_t
+assert evidence.blend(0.55, ev_t) > 0.55 and "cara a cara 6/6" in evidence.line(ev_t)
+print("OK contraste con datos")

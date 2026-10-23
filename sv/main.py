@@ -217,9 +217,27 @@ def _auto_pool(state: dict, publish_at) -> list:
                 continue
             if not (config.ODDS_MIN <= d["price"] <= config.ODDS_MAX) or d["edge"] < config.AUTO_FREE_MIN_EDGE:
                 continue
-            pool.append((d["prob"], d["edge"], p["id"], opt))
-    pool.sort(key=lambda x: (round(x[0], 3), x[1]), reverse=True)   # más probable; a igualdad, más valor
-    return [[pid, opt] for _pr, _ed, pid, opt in pool]
+            ev = _leg_evidence(d["legs"][0])
+            if ev and ev["verdict"] == "contra":
+                continue   # el gratis nunca va contra lo que dicen los datos (H2H y forma reciente)
+            rank = 2 if ev and ev["verdict"] == "ok" else 1 if not ev else 0
+            from . import evidence
+            pool.append((rank, evidence.blend(d["prob"], ev), d["edge"], p["id"], opt))
+    # primero los que los datos respaldan; luego la probabilidad final (mercado + datos); luego el valor
+    pool.sort(key=lambda x: (x[0], round(x[1], 3), x[2]), reverse=True)
+    return [[pid, opt] for _rk, _pr, _ed, pid, opt in pool]
+
+
+def _leg_evidence(l: dict) -> dict | None:
+    """Contraste con datos (forma reciente + cara a cara), calculado una vez y guardado en la selección."""
+    if "evidence" not in l:
+        try:
+            from . import evidence
+            l["evidence"] = evidence.check(l)
+        except Exception:
+            traceback.print_exc()
+            l["evidence"] = None
+    return l["evidence"]
 
 
 def _free_given_today(state: dict) -> bool:
@@ -667,8 +685,20 @@ def _cancel_file(state: dict) -> None:
     if not req.get("id") or req["id"] in (state.get("cancel_done") or []):
         return
     state.setdefault("cancel_done", []).append(req["id"])
-    err = _cancel_pick(state, str(req.get("pid", "")).lstrip("#"), bool(req.get("refree")),
-                       bool(req.get("delete_posts")))
+    pid = str(req.get("pid", "")).lstrip("#")
+    if req.get("only_if_data_against"):   # revisar con H2H y forma reciente; solo se cambia si no lo respaldan
+        p = state["picks"].get(pid)
+        if not p:
+            telegram.send(state["owner_chat"], f"⚠️ No encontré el pick #{pid}.")
+            return
+        from . import evidence
+        evs = [_leg_evidence(l) for l in p["legs"]]
+        txt = "\n".join(evidence.line(e) for e in evs)
+        if all(e and e["verdict"] == "ok" for e in evs):
+            telegram.send(state["owner_chat"], f"🔍 Revisé el pick #{pid} con los datos y se mantiene:\n{txt}")
+            return
+        telegram.send(state["owner_chat"], f"🔍 Revisé el pick #{pid}: los datos no lo respaldan, lo reemplazo.\n{txt}")
+    err = _cancel_pick(state, pid, bool(req.get("refree")), bool(req.get("delete_posts")))
     if err:
         telegram.send(state["owner_chat"], "⚠️ " + formatting.escape(err))
 
@@ -774,7 +804,26 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
     busy = {l["fixture_id"] for p in state["picks"].values()
             if p["status"] in ("candidate", "published") for l in p["legs"]}
     selections = [x for x in selections if x.fixture_id not in busy]
-    picks = build_picks(selections, max_n=top, min_n=top)
+    want = top or config.MAX_CANDIDATES
+    picks = build_picks(selections, max_n=want * 2, min_n=(top or config.MIN_DAILY_CANDIDATES) * 2)
+    # Segunda opinión con datos: los que el H2H y la forma reciente contradicen van al final (o fuera)
+    scored = []
+    for pk in picks:
+        evs = []
+        for leg in pk.legs:
+            dd = {**leg.__dict__, "context": None}
+            try:
+                dd["context"] = apifootball.context(leg.home, leg.away, leg.kickoff)
+            except Exception:
+                traceback.print_exc()
+            evs.append(_leg_evidence(dd))
+        bad = any(e and e["verdict"] == "contra" for e in evs)
+        good = all(e and e["verdict"] == "ok" for e in evs)
+        scored.append((bad, not good, pk, evs))
+    scored.sort(key=lambda x: (x[0], x[1]))
+    keep = [x for x in scored if not x[0]][:want] or [x for x in scored][:max(1, min(want, len(scored)))]
+    picks = [x[2] for x in keep]
+    ev_by_pick = {id(x[2]): x[3] for x in keep}
 
     in_range = sorted((x for x in selections if config.ODDS_MIN <= x.price <= config.ODDS_MAX),
                       key=lambda x: x.edge, reverse=True)[:3]
@@ -807,9 +856,10 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
         traceback.print_exc()
     for p in picks:
         d = p.to_dict()
-        for leg in d["legs"]:
+        for leg, ev in zip(d["legs"], ev_by_pick.get(id(p), [None] * len(d["legs"]))):
             leg["label"] = formatting.outcome_label(leg)
             leg["context"] = apifootball.context(leg["home"], leg["away"], leg["kickoff"])
+            leg["evidence"] = ev
         state["seq"] += 1
         pid = str(state["seq"])
         d.update(id=pid, status="candidate", created_at=_iso(now), stake_v=2)
