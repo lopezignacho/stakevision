@@ -18,12 +18,12 @@ LAYOUT_NAMES = {"revista": "Revista", "marcador": "Marcador", "poster": "Póster
 
 
 # ---------------------------------------------------------------- piezas comunes
-def _photo_area(im, m, box, T, side="center", fade=("bottom",)):
+def _photo_area(im, m, box, T, side="center", fade=("bottom",), focus=None):
     """Pega la foto en una zona y la funde con el fondo por los lados indicados."""
     x0, y0, x1, y1 = box
     w, h = x1 - x0, y1 - y0
     if m.get("photo"):
-        ph = P._enhance(P._cover(m["photo"], (w, h), side=side)).convert("RGBA")
+        ph = P._enhance(P._cover(m["photo"], (w, h), focus=focus, side=side)).convert("RGBA")
     else:
         ph = Image.new("RGBA", (w, h), T["bg"] + (255,))
     bg = Image.new("RGBA", (w, h), T["bg"] + (255,))
@@ -462,7 +462,14 @@ def nba_board(m: dict, theme: str = "dark") -> bytes:
     hacc, aacc = P._accents(home, away, theme)
     ink_brand = (11, 26, 6) if theme == "dark" else (255, 255, 255)
     im = Image.new("RGBA", (W, H), T["bg"] + (255,))
-    _photo_area(im, m, (0, 0, W, 610), T, side="center", fade=("bottom", "top"))
+    focus = None
+    if m.get("photo"):   # foto vertical: mostrar la parte de arriba (la cara), no el centro
+        from PIL import Image as _I
+        import io as _io
+        pw, ph_ = _I.open(_io.BytesIO(m["photo"])).size
+        if ph_ / pw > 610 / W:
+            focus = (0.5, 0.12)
+    _photo_area(im, m, (0, 0, W, 610), T, side="center", fade=("bottom", "top"), focus=focus)
     d = ImageDraw.Draw(im)
     P._put_logo(im, 165, theme, 56, 40)
     if m.get("eyebrow"):
