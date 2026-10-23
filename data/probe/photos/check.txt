@@ -1,0 +1,59 @@
+== Los Angeles Lakers (basketball) qid=Q121783 referentes=['Luka Dončić', 'Dennis Schröder', 'Rui Hachimura', 'Danny Green', 'Andre Drummond', 'Deandre Ayton']
+   foto: Luka Dončić | club en título: None | Foto: Erik Drost / Wikimedia Commons · CC BY 2.0 · modificada | https://commons.wikimedia.org/wiki/File:Luka_Doncic_(51914951721)_(cropped1).jpg
+== LA Clippers (basketball) qid=Q976396 referentes=['Nicolas Batum', 'Darius Garland', 'Jerome Robinson', 'Keaton Wagler', 'Baba Miller', 'Nick Martinelli']
+   foto: Darius Garland | club en título: None | Foto: Erik Drost / Wikimedia Commons · CC BY 2.0 · modificada | https://commons.wikimedia.org/wiki/File:Darius_Garland_(48885374141).jpg
+== Colo-Colo (soccer) qid=Q207373 referentes=['Arturo Vidal', 'Vozinha', 'Matías Fernández', 'Pedro Morales', 'Ángel Romero Villamayor', 'Paulo Garcés']
+   foto: Vozinha | club en título: True | Foto: Cavilese / Wikimedia Commons · CC BY-SA 4.0 · modificada | https://commons.wikimedia.org/wiki/File:Vozinha_en_Colo-Colo.jpg
+== Universidad de Chile (soccer) qid=Q737753 referentes=['Charles Aránguiz', 'Marcelo Díaz', 'Felipe Gutiérrez', 'Gabriel Torres', 'Darío yutronic', 'Guzmán Pereira']
+   foto: Charles Aránguiz | club en título: None | Foto: Fuguito / Wikimedia Commons · CC BY-SA 3.0 · modificada | https://commons.wikimedia.org/wiki/File:Charles-Aranguiz-2018-08-19.jpg
+== Boca Juniors (soccer) qid=Q170703 referentes=['Enner Valencia', 'Leandro Paredes', 'Wilfredo Caballero', 'Marcos Acuña', 'Gustavo Gómez Portillo', 'Facundo Roncaglia']
+   foto: Enner Valencia | club en título: None | Foto: Bryan Berlin / Wikimedia Commons · CC BY-SA 4.0 · modificada | https://commons.wikimedia.org/wiki/File:Enner_Valencia_Cote_D%27Ivoire_v_Ecuador_14_June_2026-95.jpg
+== Real Madrid (soccer) qid=Q8682 referentes=['Kylian Mbappé', 'Thibaut Courtois', 'Vinícius Júnior', 'Jude Bellingham', 'Federico Valverde', 'Arda Güler']
+   foto: Vinícius Júnior | club en título: True | Foto: Unknown authorUnknown author / Wikimedia Commons · CC0 · modificada | https://commons.wikimedia.org/wiki/File:Vin%C3%ADcius_J%C3%BAnior_-_Real_Madrid_CF_(2024-25).jpg
+== Evento ESPN 401909851 2026-10-24T02:00Z
+   preview: {'home': ('LAL', (85, 37, 131), 'Los Angeles Lakers'), 'away': ('LAC', (18, 23, 63), 'LA Clippers')}
+== PREVIA VIP (texto real)
+🏀 <b>PREVIA VIP · faltan 25 min</b>
+Los Angeles Lakers (1-0) vs LA Clippers (1-0) · 23:00
+🎯 Nuestro pick: <b>Más de 226.5 puntos</b> @ 1.85
+
+🚑 <b>Bajas y dudas (al minuto)</b>
+• Los Angeles Lakers: Adou Thiero — Fuera (Knee); Cameron Carr — Fuera (Oblique); Jake LaRavia — Día a día (Ankle)
+• LA Clippers: Bradley Beal — Fuera (Knee); Max Strus — Fuera (Foot); Yanic Konan Niederhauser — Fuera (Foot); Brandon Ingram — Fuera (Heel); Jordan Miller — Fuera (Shoulder)
+
+📊 <b>Cómo llegan</b>
+• Los Angeles Lakers: 7-3 en sus últimos 10 (incluye la temporada pasada), anota 115.2 y recibe 109.7 · 2 días de descanso · 4 victorias seguidas
+• LA Clippers: 6-4 en sus últimos 10 (incluye la temporada pasada), anota 114.1 y recibe 112.0 · 2 días de descanso
+🔮 El pronóstico de ESPN favorece a Los Angeles Lakers (73,9%).
+
+🧠 <b>Nuestro pick a minutos del inicio</b>
+⚠️ Promedios recientes: Los Angeles Lakers anota 115.2 y recibe 109.7; LA Clippers anota 114.1 y recibe 112.0 → proyección 225.5 pts (línea 226.5).
+
+📰 <b>Últimas noticias</b> (ESPN, en inglés)
+• Which NBA father-son duos have the most points?
+• Sacramento Kings vs. LA Clippers: Game Highlights
+• Warriors&#x27; Yaxel Lendeborg: &#x27;Lost all respect&#x27; for Luka Doncic
+• Why Warriors-Lakers was the quiet end of an incredible NBA era
+
+Exclusivo VIP 👑 · 🔞 +18 · Juega con responsabilidad.
+Traceback (most recent call last):
+  File "/home/runner/work/stakevision/stakevision/tools/photo_check.py", line 56, in <module>
+    main._make_pick_photo(pick)
+  File "/home/runner/work/stakevision/stakevision/sv/main.py", line 1095, in _make_pick_photo
+    image = layouts.render_pick(teaser.pick_photo_data(p, teams, photo), p.get("pick_layout") or "revista",
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/stakevision/stakevision/sv/layouts.py", line 361, in render_pick
+    return {"ticket": pick_ticket, "dividido": pick_dividido}.get(layout, P.render_pick_photo)(m, theme)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/stakevision/stakevision/sv/postimage.py", line 1260, in render_pick_photo
+    _put_logo(im, 165, theme, 56, 40)
+  File "/home/runner/work/stakevision/stakevision/sv/postimage.py", line 475, in _put_logo
+    lg = _logo_t(w, theme)
+         ^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/stakevision/stakevision/sv/postimage.py", line 437, in _logo_t
+    src = Image.open(LOGO if theme == "dark" else LOGO_LIGHT).convert("RGBA")
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/PIL/Image.py", line 3469, in open
+    fp = builtins.open(filename, "rb")
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/runner/work/stakevision/stakevision/data/probe/root/docs/assets/logo-full-dark.png'
