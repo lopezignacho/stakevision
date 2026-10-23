@@ -8,7 +8,13 @@ from sv import evidence  # noqa: E402
 leg = {"home": "CD Junior FC", "away": "Aguilas Doradas Rionegro", "kickoff": "2026-10-24T01:10:00Z", "sport": "soccer",
        "mtype": "teamtotals-team1", "outcome": "Menos", "handicap": 1.5}
 fh, fa, h2h = evidence._espn(leg["home"], leg["away"], leg["kickoff"])
-out = [f"forma Junior ({len(fh)}): {fh}", f"forma Águilas ({len(fa)}): {fa}", f"cara a cara ({len(h2h)}): {h2h}"]
+out = [f"forma Junior ({len(fh)}): {fh}", f"forma Águilas ({len(fa)}): {fa}", f"cara a cara ({len(h2h)}): {h2h}",
+       f"tabla: {evidence._LAST_TABLE}"]
+import requests, json  # noqa: E402
+from sv import espn  # noqa: E402
+f_ = espn._find(leg["home"], leg["away"], leg["kickoff"])
+sm = requests.get(evidence.ESPN_SUMMARY, params={"event": f_[0]["id"]}, timeout=25).json()
+out.append("standings raw: " + json.dumps(sm.get("standings"))[:600])
 for mt, o, ln in (("teamtotals-team1", "Menos", 1.5), ("totals", "Menos", 1.5), ("totals", "Más", 1.5),
                   ("totals", "Menos", 2.5), ("totals", "Menos", 3.5), ("bothteamsscore", "Sí", None), ("1x2", "1", None)):
     ev = evidence.check(dict(leg, mtype=mt, outcome=o, handicap=ln))
