@@ -1,0 +1,13 @@
+NBA keys: ["minutes", "points", "fieldGoalsMade-fieldGoalsAttempted", "threePointFieldGoalsMade-threePointFieldGoalsAttempted", "freeThrowsMade-freeThrowsAttempted", "rebounds", "assists", "turnovers", "steals", "blocks", "offensiveRebounds", "defensiveRebounds", "fouls", "plusMinus"]
+NBA names: ["MIN", "PTS", "FG", "3PT", "FT", "REB", "AST", "TO", "STL", "BLK", "OREB", "DREB", "PF", "+/-"]
+NBA ejemplo: "Jarrett Allen" ["28", "14", "6-10", "0-0", "2-4", "7", "0", "1", "0", "2", "3", "4", "1", "-2"]
+NBA injuries sample: [{"team": {"id": "20", "uid": "s:40~l:46~t:20", "displayName": "Philadelphia 76ers", "abbreviation": "PHI", "links": [{"href": "\u2026", "text": "\u2026"}], "logo": "https://a.espncdn.com/i/teamlogos/nba/50", "logos": [{"href": "\u2026", "width": "\u2026", "height": "\u2026", "alt": "\u2026", "rel": "\u2026", "lastUpdated": "\u2026"}]}, "injuries": [{"status": "Day-To-Day", "date": "2026-10-23T05:21Z", "athlete": {"id": "\u2026", "uid": "\u2026", "guid": "\u2026", "lastName": "\u2026", "fullName": "\u2026", "displayName": "\u2026", "shortName": "\u2026", "links": "\u2026", "headshot": "\u2026"
+NBA gamelog top keys: ["filters", "labels", "names", "displayNames", "events", "seasonTypes", "glossary"]
+NBA gamelog names: ["minutes", "fieldGoalsMade-fieldGoalsAttempted", "fieldGoalPct", "threePointFieldGoalsMade-threePointFieldGoalsAttempted", "threePointPct", "freeThrowsMade-freeThrowsAttempted", "freeThrowPct", "totalRebounds", "assists", "blocks", "steals", "fouls", "turnovers", "points"]
+Fútbol eventos ayer: 100
+Fútbol event keys: ["id", "uid", "date", "name", "shortName", "season", "competitions", "status", "venue", "links"]
+Fútbol uid: s:600~l:776~e:401915548
+Fútbol season: {"year": 2026, "type": 14540, "slug": "league-phase"}
+Fútbol comp keys: ["id", "uid", "date", "startDate", "attendance", "timeValid", "recent", "status", "venue", "format", "altGameNote", "notes", "geoBroadcasts", "broadcasts", "broadcast", "competitors", "details", "odds", "wasSuspended", "playByPlayAvailable", "playByPlayAthletes"]
+Fútbol leagues top: [[null, null, null]]
+soccer/all/summary: ["boxscore", "format", "gameInfo", "lastFiveGames", "leaders", "broadcasts", "pickcenter", "odds", "hasOdds", "rosters", "news", "videos"]
