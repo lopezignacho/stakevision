@@ -231,6 +231,11 @@ def _auto_pool(state: dict, publish_at) -> list:
 EVIDENCE_V = 2   # versión del contraste: si cambia la forma de calcularlo, se recalcula
 
 
+def _evidence_note(l: dict) -> str:
+    from . import evidence
+    return evidence.line(_leg_evidence(l)) + "\n\n"
+
+
 def _leg_evidence(l: dict) -> dict | None:
     """Contraste con datos (forma reciente + cara a cara), calculado una vez y guardado en la selección."""
     if "evidence" not in l or l.get("evidence_v") != EVIDENCE_V:
@@ -333,6 +338,7 @@ def _auto_free_choose(state: dict, skip: list | None = None) -> bool:
            f"🎯 <b>{esc(formatting.outcome_label(l))}</b> @ {formatting.odds(p['price'])}\n"
            f"📈 Probabilidad justa {formatting.pct(p['prob'])} · valor {'+' if p['edge'] >= 0 else ''}"
            f"{formatting.pct(p['edge'])}\n\n"
+           + _evidence_note(l) +
            f"Es la opción más probable de las {len(pool)} que cumplen hoy. "
            f"Se publica sola a las <b>{hhmm}</b> en {where}.\n"
            "Revisa la cuota en tu app. Puedes publicarlo ya, cambiarlo por la siguiente opción"
