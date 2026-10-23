@@ -1085,7 +1085,7 @@ leg_j = {"home": "CD Junior FC", "away": "Aguilas Doradas", "kickoff": "2026-10-
          "mtype": "teamtotals-team1", "outcome": "Menos", "handicap": 1.5,
          "context": {"v": 2, "home": [{"gf": g, "ga": 1} for g in (1, 0, 2, 1, 0, 1)],
                      "away": [{"gf": 1, "ga": g} for g in (2, 3, 1, 2)]}}
-evidence._h2h = lambda h, a, k: [(3, 0), (3, 2), (2, 2), (3, 4), (2, 0), (1, 1)]
+evidence._espn = lambda h, a, k: ([], [], [(3, 0), (3, 2), (2, 2), (3, 4), (2, 0), (1, 1)])
 ev_j = evidence.check(leg_j)
 assert ev_j["h2h"] == [1, 6] and ev_j["verdict"] in ("contra", "debil"), ev_j
 leg_t = dict(leg_j, mtype="totals", outcome="Más", handicap=1.5)
