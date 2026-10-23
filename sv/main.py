@@ -254,7 +254,21 @@ def _nba_option_block(d: dict, role: str) -> str:
     sign = "+" if d["edge"] >= 0 else ""
     return (f"<b>Opción {role}</b> · 🎯 <b>{formatting.escape(l['label'])}</b> @ {formatting.odds(d['price'])} "
             f"· valor {sign}{formatting.pct(d['edge'])} · stake {d['stake']}/10\n"
-            f"<i>{formatting.escape(d.get('why', ''))}</i>\n{nba.arguments_text(l, l.get('nba_ctx'))}")
+            f"<i>{formatting.escape(d.get('why', ''))}</i>\n{_args_html(l)}")
+
+
+def _args_html(l: dict) -> str:
+    """Argumentos a favor / en contra según el deporte."""
+    if l.get("sport") == "basketball":
+        from . import nba
+        return nba.arguments_text(l, l.get("nba_ctx"))
+    pros, cons = formatting.soccer_arguments(l)
+    out = []
+    if pros:
+        out.append("✅ <b>A favor:</b>\n" + "\n".join(f"• {p}" for p in pros))
+    if cons:
+        out.append("⚠️ <b>En contra:</b>\n" + "\n".join(f"• {c}" for c in cons))
+    return "\n".join(out)
 
 
 def nba_candidate_text(d: dict) -> str:
@@ -264,7 +278,8 @@ def nba_candidate_text(d: dict) -> str:
         live = (f"🔴 <b>EN VIVO</b>" + (f" · {formatting.escape(d['live_info'])}" if d.get("live_info") else "")
                 + f"\n⏱ Vence en {config.LIVE_CANDIDATE_MIN} min: las cuotas en vivo cambian rápido.\n")
     tag = "🟢 <b>Con valor</b>" if d.get("tier") == "valor" else "⚖️ <b>Cuota justa</b>"
-    parts = [f"🏀 <b>NBA · Candidato #{d['id']}</b>\n{live}{tag}",
+    head = "🏀 <b>NBA" if l.get("sport") == "basketball" else "⚽ <b>Partido"
+    parts = [f"{head} · Candidato #{d['id']}</b>\n{live}{tag}",
              f"<b>{formatting.escape(l['home'])} vs {formatting.escape(l['away'])}</b> · 🕒 {formatting.local_time(l['kickoff'])}",
              "", _nba_option_block(d, "A")]
     if d.get("alt"):
@@ -351,6 +366,114 @@ def scan_nba(top: int | None = None, manual: bool = False, live: bool = False) -
         d["owner_msg"] = msg["message_id"]
         state["picks"][pid] = d
         store.save(state)
+
+
+def _name_hit(query: str, name: str) -> bool:
+    from . import espn
+    q, n = set(espn._toks(query)), set(espn._toks(name))
+    return bool(q & n)
+
+
+def scan_match(query: str, sport: str | None = None) -> None:
+    """/partido Celtics vs Knicks — analiza un partido específico (en juego o de las próximas 47 h),
+    de fútbol o NBA, y te manda la opción A y B con sus argumentos."""
+    import re as _re
+    from . import espn, nba
+    from .value import Pick
+    state = store.load()
+    owner = state.get("owner_chat")
+    now = store.now_utc()
+    teams = [t.strip() for t in _re.split(r"\s+(?:vs\.?|v|-|contra)\s+", query, maxsplit=1, flags=_re.I) if t.strip()]
+    if not teams:
+        telegram.send(owner, "Usa: /partido Celtics vs Knicks (o solo un equipo: /partido Colo-Colo)")
+        return
+
+    def fits(fx):
+        h, a = fx.get("participant1Name") or "", fx.get("participant2Name") or ""
+        if len(teams) == 1:
+            return _name_hit(teams[0], h) or _name_hit(teams[0], a)
+        return ((_name_hit(teams[0], h) and _name_hit(teams[1], a)) or
+                (_name_hit(teams[0], a) and _name_hit(teams[1], h)))
+
+    sports = [sport] if sport else []
+    if not sports:   # sin decir el deporte: si calza con un partido NBA de hoy/mañana en ESPN, es NBA
+        is_nba = False
+        for d in (0, 1):
+            day = (now + timedelta(days=d)).astimezone(__import__("zoneinfo").ZoneInfo("America/New_York")).strftime("%Y%m%d")
+            for e in nba._get("/scoreboard", dates=day).get("events") or []:
+                names = [x["team"]["displayName"] for x in e["competitions"][0]["competitors"]]
+                if all(any(_name_hit(t, n) for n in names) for t in teams):
+                    is_nba = True
+        sports = ["basketball"] if is_nba else ["soccer"]
+    sp = sports[0]
+    sid = config.NBA_SPORT_ID if sp == "basketball" else 10
+    found, live = None, False
+    for is_live in (True, False):
+        frm, to = (now - timedelta(hours=3), now) if is_live else (now, now + timedelta(hours=47))
+        fxs = (oddspapi.live_fixtures if is_live else oddspapi.upcoming_fixtures)(_iso(frm), _iso(to), sport_id=sid)
+        found = next((f for f in fxs if fits(f)), None)
+        if found:
+            live = is_live
+            break
+    if not found:
+        telegram.send(owner, f"🔎 No encontré «{formatting.escape(query)}» con cuotas, ni en juego ni en las próximas 47 horas.")
+        return
+    markets = oddspapi.markets(sport_id=sid)
+    rows = oddspapi.odds_by_tournaments([found["tournamentId"]])
+    row = next((r for r in rows if r.get("fixtureId") == found["fixtureId"]), None)
+    sels = selections_for_fixture(found, row, markets, sp) if row and len(row.get("bookmakerOdds") or {}) == 2 else []
+    opt = nba.options_for_game(sels) if sels else None
+    title = f"{found.get('participant1Name')} vs {found.get('participant2Name')}"
+    if not opt:
+        near = sorted(sels, key=lambda s: s.edge, reverse=True)[:3]
+        lines = "\n".join(f"• {formatting.escape(formatting.outcome_label({**x.__dict__}))} @ {x.price:.2f}: "
+                          f"{'+' if x.edge >= 0 else ''}{formatting.pct(x.edge)}" for x in near)
+        telegram.send(owner, f"🔎 <b>{formatting.escape(title)}</b>{' 🔴 en vivo' if live else ''}: no hay una apuesta en "
+                             f"{config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f} cerca de la cuota justa."
+                             + (f"\n\nLo mejor que hay ahora:\n{lines}" if lines else
+                                "\nNo hay cuotas comparables de las dos casas para este partido."))
+        return
+    a, b, tier = opt
+    ctx = None
+    try:
+        ctx = (nba.context(a.home, a.away, a.kickoff) if sp == "basketball"
+               else apifootball.context(a.home, a.away, a.kickoff))
+    except Exception:
+        traceback.print_exc()
+
+    def build(sel, t, role):
+        d = Pick("simple", [sel], tier=t).to_dict()
+        leg = d["legs"][0]
+        leg["label"] = formatting.outcome_label(leg)
+        leg["nba_ctx" if sp == "basketball" else "context"] = ctx
+        d["why"] = nba.why_line(sel, role)
+        d["analysis"] = formatting.analysis(d)
+        return d
+
+    d = build(a, tier, "A")
+    if b:
+        d["alt"] = build(b, "valor" if b.edge >= config.MIN_EDGE else "justa", "B")
+    state["seq"] += 1
+    pid = str(state["seq"])
+    d.update(id=pid, status="candidate", created_at=_iso(now), stake_v=2, sport=sp)
+    if live:
+        d["live"] = True
+        if sp == "basketball":
+            ev = nba.find_event(a.home, a.away, a.kickoff)
+            if ev:
+                st = ev[0].get("status") or {}
+                comp = ev[0]["competitions"][0]["competitors"]
+                hs = next(x for x in comp if x["homeAway"] == "home").get("score")
+                as_ = next(x for x in comp if x["homeAway"] == "away").get("score")
+                d["live_info"] = f"{as_ + '-' + hs if ev[1] else hs + '-' + as_} · {st.get('period', '?')}º cuarto {st.get('displayClock', '')}"
+        else:
+            info = espn.live_info(a.home, a.away, a.kickoff)
+            if info:
+                d["live_info"] = f"{info['score']} · {info['clock']}"
+    msg = telegram.send(owner, nba_candidate_text(d), NBA_BUTTONS(pid, bool(d.get("alt"))))
+    d["owner_msg"] = msg["message_id"]
+    state["picks"][pid] = d
+    store.save(state)
 
 
 def _nba_daily(state: dict) -> None:
@@ -1177,6 +1300,8 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith("/partido"):
+            _request_search(state, text)
         elif chat == owner and text.lower().startswith("/entretiempo"):
             _halftime_preview(state, text)
         elif chat == owner and text.lower().startswith("/enlace"):
@@ -1565,6 +1690,7 @@ HELP_TEXT = (
     "/buscar · analiza ahora los partidos de las próximas 30 h y te manda el top 3\n"
     "/buscar 40 · igual, pero mirando 40 horas hacia adelante (máximo 47)\n"
     "/buscar nba · picks de NBA (opción A y B con argumentos) · /envivo nba · NBA en juego\n"
+    "/partido Celtics vs Knicks · analiza un partido específico, en vivo o próximo (fútbol o NBA)\n"
     "/envivo · busca valor en partidos que se están jugando ahora\n"
     "/compartir 8 · vuelve a mandarte la imagen del pick #8 (o su post partido, si ya terminó)\n"
     "/titular 8 MARACA-NAZO · cambia el titular de la imagen post partido del pick #8\n"
@@ -1586,7 +1712,18 @@ def _request_search(state: dict, text: str, live: bool = False) -> None:
     parts = text.split()
     hours = config.WINDOW_END_H
     is_nba = any(x.lower() in ("nba", "basket", "basquet", "básquet", "baloncesto") for x in parts[1:])
-    if is_nba:
+    match_q = None
+    if parts[0].lower().startswith("/partido"):
+        words = [w for w in parts[1:] if w.lower() not in ("nba", "futbol", "fútbol", "basket", "basquet", "básquet",
+                                                           "baloncesto")]
+        match_q = " ".join(words).strip()
+        if not match_q:
+            telegram.send(owner, "Usa: /partido Celtics vs Knicks · /partido Colo-Colo · /partido nba Lakers\n"
+                                 "Busca ese partido en juego o en las próximas 47 horas y te da la opción A y B.")
+            return
+    if match_q is not None:
+        pass
+    elif is_nba:
         live = live or any(x.lower() in ("vivo", "envivo", "live") for x in parts[1:])
     elif len(parts) > 1 and parts[1].lower() in ("vivo", "envivo", "live"):
         live = True
@@ -1606,6 +1743,12 @@ def _request_search(state: dict, text: str, live: bool = False) -> None:
         return
     m["n"] += 1
     state["manual"] = m
+    if match_q is not None:
+        sport = "basketball" if is_nba else ("soccer" if any(x.lower() in ("futbol", "fútbol") for x in parts[1:]) else None)
+        state["scan_request"] = {"match": match_q, "sport": sport}
+        telegram.send(owner, f"🔎 Buscando «{formatting.escape(match_q)}»… te llega en un par de minutos. "
+                             f"(Búsqueda {m['n']} de {config.MANUAL_SEARCHES_PER_DAY} hoy)")
+        return
     if is_nba:
         state["scan_request"] = "nba-live" if live else "nba"
         telegram.send(owner, "🏀 Buscando en la NBA" + (" (partidos en juego)" if live else "")
@@ -1686,7 +1829,9 @@ def _run_scan_request(state: dict) -> dict:
     if not request:
         return state
     store.save(state)
-    if request in ("nba", "nba-live"):
+    if isinstance(request, dict) and request.get("match"):
+        scan_match(request["match"], request.get("sport"))
+    elif request in ("nba", "nba-live"):
         scan_nba(top=config.MANUAL_TOP, manual=True, live=request == "nba-live")
     elif request == "live":
         scan(top=config.MANUAL_TOP, manual=True, live=True)
@@ -1734,7 +1879,7 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
-    if owner and state.get("cmds_v") != 8:
+    if owner and state.get("cmds_v") != 9:
         try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
             telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
                 {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
@@ -1747,9 +1892,10 @@ def poll() -> None:
                 {"command": "enlace", "description": "Enlace personal al bot para un contacto (ej. /enlace Juan)"},
                 {"command": "mensaje", "description": "Escribirle a un contacto (ej. /mensaje Juan hola)"},
                 {"command": "contactos", "description": "Quiénes iniciaron el bot"},
+                {"command": "partido", "description": "Analizar un partido específico (ej. /partido Celtics vs Knicks)"},
                 {"command": "estado", "description": "Pendientes, picks en juego e historial"},
                 {"command": "ayuda", "description": "Lista de comandos"}])
-            state["cmds_v"] = 8
+            state["cmds_v"] = 9
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)

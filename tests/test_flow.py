@@ -696,3 +696,31 @@ al = nba.live_alerts(st)
 assert al and "Posible remontada" in al[0] and "4.55" in al[0], al
 assert not nba.live_alerts(st)   # una sola vez por cuarto
 print("OK NBA")
+
+# 24) /partido: un partido específico (NBA detectado por nombre y fútbol)
+nba._get = lambda path, **kw: ({"events": [{"competitions": [{"competitors": [
+    {"team": {"displayName": "Boston Celtics"}}, {"team": {"displayName": "New York Knicks"}}]}]}]}
+    if path == "/scoreboard" else {})
+oddspapi.live_fixtures = lambda frm, to, sport_id=10: []
+fxn2 = dict(fxn, fixtureId="n1")
+oddspapi.upcoming_fixtures = lambda frm, to, sport_id=10: [fxn2] if sport_id == 11 else [te.fixture("f1", "Colo-Colo", "U. de Chile", hours=6)]
+st = store.load()
+for p_ in st["picks"].values():   # liberar el partido de prueba
+    if p_["legs"][0].get("fixture_id") == "n1":
+        p_["status"] = "settled"
+store.save(st)
+n = len(sent)
+updates_q.append({"update_id": 1300, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/partido Celtics vs Knicks"}})
+main.poll()
+got = [t for _, t, b, _ in sent[n:] if b and "Candidato" in t]
+assert got and "🏀" in got[0] and "Opción A" in got[0], sent[n:]
+oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "f1", "bookmakerOdds": {
+    "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
+    "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}}]
+oddspapi.markets = lambda force=False, sport_id=10: NBA_MARKETS if sport_id == 11 else te.MARKETS
+n = len(sent)
+updates_q.append({"update_id": 1301, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/partido Colo-Colo"}})
+main.poll()
+got = [t for _, t, b, _ in sent[n:] if b and "Candidato" in t]
+assert got and "⚽" in got[0] and "Ambos marcan" in got[0], sent[n:]
+print("OK /partido")
