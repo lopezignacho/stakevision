@@ -1373,7 +1373,9 @@ def _render_builder(pick: dict, tier: str | None) -> bytes:
     lpad = logo.info["pad"]
     im.alpha_composite(logo, ((W - logo.width) // 2, max(0, 50 - lpad)))
     y0 = 50 + logo.height - 2 * lpad + 70
-    card = (80, y0, W - 80, y0 + 760)
+    card_h = 70 + 58 + 64 + 120 * len(b["legs"]) + 150
+    y0 += max(0, (H - 200 - y0 - card_h) // 2)   # centrar la tarjeta en el espacio libre
+    card = (80, y0, W - 80, y0 + card_h)
     sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ImageDraw.Draw(sh).rounded_rectangle((card[0], card[1] + 14, card[2], card[3] + 14), 34, fill=(0, 0, 0, 150))
     im.alpha_composite(sh.filter(ImageFilter.GaussianBlur(22)))
