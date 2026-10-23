@@ -587,6 +587,9 @@ def _repair_file(state: dict) -> None:
         return
     state.setdefault("repair_done", []).append(req["id"])
     try:
+        rp = state["picks"].get(str(req.get("pid", "")).lstrip("#"))
+        if rp and req.get("layout"):
+            rp["pick_layout"] = req["layout"]
         err = _repair_pick(state, str(req.get("pid", "")).lstrip("#"))
     except Exception as e:  # noqa: BLE001
         traceback.print_exc()
