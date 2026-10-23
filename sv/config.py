@@ -85,7 +85,8 @@ AUTO_FREE_MIN_LEAD_MIN = 90      # el partido debe empezar al menos 90 min despu
 AUTO_FREE_MIN_EDGE = -0.02       # cuota disponible como mucho un 2 % por debajo de la justa
 AUTO_FREE_VIP_TOO = True         # también sale en VIP (cuenta dentro de los 2-4 del día)
 AUTO_FREE_INSTAGRAM = True       # y en el feed de Instagram, si está conectado
-AUTO_FREE_RECAP_DELAY_MIN = 20   # el post partido se comparte solo 20 min después del resultado
+AUTO_FREE_RECAP_DELAY_MIN = 20
+DAILY_BUILDERS = True           # tras el escaneo diario: 1 Bet Builder de NBA y 1 de fútbol para revisar   # el post partido se comparte solo 20 min después del resultado
 # --- NBA ------------------------------------------------------------------
 NBA_ENABLED = True
 NBA_SPORT_ID = 11

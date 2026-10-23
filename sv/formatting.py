@@ -214,6 +214,13 @@ def soccer_arguments(l: dict) -> tuple[list[str], list[str]]:
 
 def _legs_block(pick: dict) -> str:
     rows = []
+    if pick.get("kind") == "builder":
+        l0 = pick["legs"][0]
+        emoji = "🏀" if l0.get("sport") == "basketball" else "⚽"
+        marks = {"W": " ✅", "L": " ❌"}
+        return (f"{emoji} <b>{escape(l0['home'])} vs {escape(l0['away'])}</b> · 🧩 Bet Builder @ {odds(pick['price'])}\n"
+                + "\n".join(f"{NUM_EMOJI[i]} {escape(l['label'])}{marks.get(l.get('leg_result'), '')}"
+                            for i, l in enumerate(pick["legs"])))
     for l in pick["legs"]:
         emoji = "🏀" if l.get("sport") == "basketball" else "⚽"
         rows.append(f"{emoji} <b>{escape(l['home'])} vs {escape(l['away'])}</b>\n"
@@ -229,6 +236,8 @@ def _bank(stake: int) -> str:
 def channel_post(pick: dict, tier: str | None = None) -> str:
     """Texto del pick en los canales: partido, cuota y stake + argumento (resumen, 3 datos y probabilidad).
     tier «free» / «vip» cambia el título y el cierre."""
+    if pick.get("kind") == "builder":
+        return builder_post(pick, "vip")
     from . import argument
     if any(l.get("sport") == "basketball" for l in pick["legs"]):
         tier = "vip"
@@ -266,6 +275,8 @@ RESULT_LABEL = {"W": "✅ VERDE", "L": "❌ ROJA", "V": "↩️ NULA (devuelta)"
 
 
 def result_post(pick: dict) -> str:
+    if pick.get("kind") == "builder":
+        return f"{RESULT_LABEL[pick['result']]}\n{_legs_block(pick)}"
     names = " + ".join(f"{l['home']} vs {l['away']}" for l in pick["legs"])
     return f"{RESULT_LABEL[pick['result']]}\n{escape(names)} @ {odds(pick['price'])}"
 
@@ -389,3 +400,49 @@ def instagram_pick_caption(pick: dict) -> str:
     lines += ["", "🔞 +18 · Juega con responsabilidad. Apostar implica riesgo de pérdida.", "",
               "#Stakevision #PronosticosDeportivos #Futbol #ApuestasDeportivas"]
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------- Bet Builder
+NUM_EMOJI = ["1️⃣", "2️⃣", "3️⃣", "4️⃣"]
+
+
+def builder_post(pick: dict, tier: str | None = "vip") -> str:
+    """Texto del Bet Builder en el canal: partido, patas con su % de acierto, argumento y probabilidad."""
+    b = pick["bb"]
+    l0 = pick["legs"][0]
+    icon = "🏀" if b["sport"] == "basketball" else "⚽"
+    rows = [f"{NUM_EMOJI[i]} <b>{escape(x['label'])}</b>" for i, x in enumerate(b["legs"])]
+    facts = []
+    for x in b["legs"]:
+        facts.append(f"• {escape(x['player'])} promedia {_n(x['avg'])} {x['word']} y superó la línea en "
+                     f"{x['hits']} de sus últimos {x['n']} partidos " + ("✅" if x["hits"] == x["n"] else "🎯"))
+    summary = ("🧠 Líneas que cada jugador cumple casi de memoria: buscamos lo que repiten partido tras partido, "
+               "no la estadística de un día 📊")
+    need = 1 / pick["price"]
+    close = ("👑 Exclusivo VIP · 🔞 +18 · Apuesta con responsabilidad" if tier == "vip"
+             else "Más pronósticos en nuestro VIP 👑\n🔞 +18 · Apuesta con responsabilidad")
+    return (f"👁 <b>STAKEVISION · BET BUILDER 🧩{' · VIP 👑' if tier == 'vip' else ''}</b>\n\n"
+            f"{icon} <b>{escape(l0['home'])} vs {escape(l0['away'])}</b>\n"
+            f"🏆 {escape(l0['league'])} · 🕒 {local_time(l0['kickoff'])}\n\n"
+            + "\n".join(rows) + "\n\n"
+            f"📈 Cuota: <b>{odds(pick['price'])}</b> · 💰 Stake: <b>{pick['stake']}/10</b> "
+            f"({_bank(pick['stake'])} del bankroll)\n\n"
+            f"{summary}\n\n" + "\n\n".join(facts) + "\n\n"
+            f"📈 <b>Probabilidad estimada: {pct(pick['prob'])}</b> · a cuota {odds(pick['price'])} alcanza con {pct(need)}"
+            + (f" (valor +{pct(pick['edge'])})" if pick.get("edge", 0) > 0 else "") + "\n\n" + close)
+
+
+def builder_owner(pick: dict) -> str:
+    b = pick["bb"]
+    l0 = pick["legs"][0]
+    icon = "🏀 NBA" if b["sport"] == "basketball" else "⚽ Fútbol"
+    rows = [f"{NUM_EMOJI[i]} <b>{escape(x['label'])}</b> · {x['hits']}/{x['n']} (prom. {_n(x['avg'])})"
+            for i, x in enumerate(b["legs"])]
+    return (f"🧩 <b>Bet Builder sugerido #{pick['id']}</b> · {icon}\n"
+            f"{escape(l0['home'])} vs {escape(l0['away'])} · 🕒 {local_time(l0['kickoff'])}\n\n"
+            + "\n".join(rows) + "\n\n"
+            f"📈 Probabilidad estimada (combinada): <b>{pct(b['prob'])}</b> → cuota mínima <b>{odds(b['fair'])}</b>\n"
+            f"🎯 Objetivo ~{odds(b['target'])}. Ármalo en tu app: si la cuota es mayor que {odds(b['fair'])}, "
+            "según estos números conviene.\n\n"
+            "Cuando lo tengas, toca «Cargar cuota» y escríbeme la cuota real (ej. 3.10). "
+            "Las patas están pensadas para estar relacionadas lo menos posible, pero la casa igual puede ajustar el precio.")

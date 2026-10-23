@@ -1352,3 +1352,68 @@ def render_pick_photo(m: dict, theme: str = "dark") -> bytes:
         im.alpha_composite(tmp.rotate(-90, expand=True), (1040, 180))
     return _jpeg(im)
 
+
+
+# ---------------------------------------------------------------- Bet Builder
+def render_builder(pick: dict, tier: str | None = "vip") -> bytes:
+    with accent(tier):
+        return _render_builder(pick, tier)
+
+
+def _render_builder(pick: dict, tier: str | None) -> bytes:
+    """Cupón del Bet Builder: partido, 3 patas con su % de acierto, stake y cuota."""
+    b = pick["bb"]
+    l0 = pick["legs"][0]
+    H = 1350
+    im = _background(H).convert("RGBA")
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).ellipse((W / 2 - 300, 40, W / 2 + 300, 260), fill=BRAND + (40,))
+    im.alpha_composite(glow.filter(ImageFilter.GaussianBlur(60)))
+    logo = _logo_t(460, "dark")
+    lpad = logo.info["pad"]
+    im.alpha_composite(logo, ((W - logo.width) // 2, max(0, 50 - lpad)))
+    y0 = 50 + logo.height - 2 * lpad + 70
+    card = (80, y0, W - 80, y0 + 760)
+    sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(sh).rounded_rectangle((card[0], card[1] + 14, card[2], card[3] + 14), 34, fill=(0, 0, 0, 150))
+    im.alpha_composite(sh.filter(ImageFilter.GaussianBlur(22)))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle(card, 34, fill=(255, 255, 255), outline=BRAND if tier == "vip" else None,
+                        width=6 if tier == "vip" else 0)
+    label = "BET BUILDER · VIP" if tier == "vip" else "BET BUILDER"
+    fpl = _font("Bold", 30)
+    pw = d.textlength(label, font=fpl) + 64
+    d.rounded_rectangle(((W - pw) / 2, y0 - 30, (W + pw) / 2, y0 + 30), 30, fill=BRAND)
+    d.text((W / 2, y0 + 1), label, font=fpl, fill=(16, 20, 8), anchor="mm")
+    x0, x1 = card[0] + 48, card[2] - 48
+    y = y0 + 70
+    title, ft = _fit(d, f"{l0['home']} vs {l0['away']}", "Bold", 40, x1 - x0)
+    d.text((x0, y), title, font=ft, fill=INK)
+    y += 58
+    d.text((x0, y), f"{l0.get('league') or ''} · {formatting.local_time(l0['kickoff'])}", font=_font("Medium", 26), fill=MUTED)
+    y += 64
+    for i, x in enumerate(b["legs"]):
+        d.ellipse((x0, y + 4, x0 + 44, y + 48), fill=BRAND)
+        d.text((x0 + 22, y + 26), str(i + 1), font=_font("Bold", 26), fill=(16, 20, 8), anchor="mm")
+        lab, fl = _fit(d, x["label"], "Bold", 32, x1 - x0 - 200)
+        d.text((x0 + 64, y + 4), lab, font=fl, fill=INK)
+        rate = f"{x['hits']}/{x['n']}"
+        fr = _font("Bold", 30)
+        d.text((x1 - d.textlength(rate, font=fr), y + 6), rate, font=fr, fill=GREEN)
+        d.text((x0 + 64, y + 50), f"Promedio {formatting._n(x['avg'])} {x['word']} · cumplió {x['hits']} de {x['n']}",
+               font=_font("Medium", 23), fill=MUTED)
+        y += 120
+    by = card[3] - 110
+    d.rounded_rectangle((card[0], by, card[2], card[3]), 34, fill=(244, 245, 242))
+    d.rectangle((card[0], by, card[2], by + 34), fill=(244, 245, 242))
+    fl2, fv = _font("Medium", 26), _font("Bold", 44)
+    d.text((x0, by + 36), "STAKE", font=fl2, fill=MUTED)
+    d.text((x0 + d.textlength("STAKE", font=fl2) + 16, by + 26), f"{pick['stake']}/10", font=fv, fill=INK)
+    tot = formatting.odds(pick["price"])
+    tw = d.textlength(tot, font=fv)
+    d.text((x1 - tw, by + 26), tot, font=fv, fill=GREEN)
+    d.text((x1 - tw - 16 - d.textlength("CUOTA", font=fl2), by + 36), "CUOTA", font=fl2, fill=MUTED)
+    pr = f"Probabilidad estimada {formatting.pct(pick['prob'])}"
+    _ctext(d, card[3] + 50, pr, _font("Medium", 30), (220, 224, 218))
+    _ctext(d, H - 70, "@stakevision · +18 · Juega con responsabilidad", _font("Regular", 24), (150, 156, 148))
+    return _jpeg(im)

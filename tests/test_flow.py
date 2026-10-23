@@ -937,3 +937,49 @@ pn["recap"]["theme"] = "light"
 assert main._recap(st, pn, reuse=True)
 store.save(st)
 print("OK NBA entretiempo y final")
+
+# 28) Bet Builder: sugerencia, cuota real, publicación solo en VIP y calificación
+from sv import builder  # noqa: E402
+fake_legs = [{"player": f"Jugador {i}", "pid": str(i), "team": "Thunder", "side": "home" if i < 2 else "away",
+              "stat": st_, "line": ln, "word": w, "hits": 9, "n": 10, "avg": av, "p": builder._p(9, 10),
+              "label": f"Jugador {i}: {ln}+ {w}"}
+             for i, (st_, ln, w, av) in enumerate([("pts", 20, "puntos", 26.1), ("reb", 6, "rebotes", 8.2),
+                                                     ("tpm", 2, "triples", 3.1), ("ast", 5, "asistencias", 7.0)])]
+assert builder.choose(fake_legs)["legs"][0]["stat"] in ("pts", "reb", "tpm", "ast")
+builder.suggest = lambda h, a, k, sp: dict(builder.choose(fake_legs), home=h, away=a, event="g9", sport=sp, kickoff=k)
+st = store.load()
+ko_bb = main._iso(store.now_utc() + timedelta(hours=8))
+n = len(sent)
+assert main._builder_send(st, "Oklahoma City Thunder", "Denver Nuggets", ko_bb, "USA · NBA", "basketball")
+store.save(st)
+bb = [(t, b) for _, t, b, _ in sent[n:] if b and "Bet Builder sugerido" in (t or "")]
+assert bb and "cuota mínima" in bb[0][0], sent[n:]
+bid = bb[0][1][0][0][1].split(":")[1]
+updates_q.append({"update_id": 1700, "callback_query": {"id": "bq", "data": f"bq:{bid}",
+                                                        "message": {"chat": {"id": OWNER}, "message_id": 170}}})
+updates_q.append({"update_id": 1701, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "3,10"}})
+main.poll()
+st = store.load()
+pb = st["picks"][bid]
+assert pb["status"] == "selected" and pb["price"] == 3.1 and pb["edge"] > 0, pb
+flat = [d for row in main.SHARE_BUTTONS(pb) for _, d in row]
+assert f"pv:{bid}" in flat and not any(d.startswith(("pg:", "pf:", "pi:")) for d in flat), flat
+n = len(sent)
+updates_q.append({"update_id": 1702, "callback_query": {"id": "pv", "data": f"pv:{bid}",
+                                                        "message": {"chat": {"id": OWNER}, "message_id": 171}}})
+updates_q.append({"update_id": 1703, "callback_query": {"id": "pg", "data": f"pg:{bid}",
+                                                        "message": {"chat": {"id": OWNER}, "message_id": 171}}})
+main.poll()
+vip_posts = [t for c, t, _, _ in sent[n:] if c == VIP]
+assert vip_posts and "BET BUILDER" in vip_posts[0] and "Jugador 0" in vip_posts[0] and "Probabilidad estimada" in vip_posts[0]
+assert not any(c == config.FREE_CHANNEL for c, *_ in sent[n:])
+# calificación: las 3 patas cumplidas
+builder.final_box = lambda b: {x["pid"]: {x["stat"]: x["line"] + 1} for x in b["legs"]}
+st = store.load()
+pb = st["picks"][bid]
+res, _sc, fin = main._grade(pb)
+assert res == "W" and fin
+builder.final_box = lambda b: {b["legs"][0]["pid"]: {b["legs"][0]["stat"]: 0}}
+assert main._grade(pb)[0] == "L"
+assert "✅" in formatting.result_post(dict(pb, result="W")) or "VERDE" in formatting.result_post(dict(pb, result="W"))
+print("OK Bet Builder")

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 import traceback
 from datetime import timedelta
@@ -25,8 +26,12 @@ def SHARE_BUTTONS(p: dict) -> list:
     pid, msgs = p["id"], p.get("channel_msgs") or {}
     rows = []
     vip_done, free_done = "vip" in msgs, "free" in msgs
-    if _vip_only(p):   # NBA: exclusivo del canal VIP (sin Gratis ni Instagram antes del partido)
-        rows.append([("✅ En VIP" if vip_done else "👑 Enviar a VIP (exclusivo NBA)", "noop" if vip_done else f"pv:{pid}")])
+    if _vip_only(p):   # NBA y Bet Builder: exclusivos del canal VIP (sin Gratis ni Instagram antes del partido)
+        rows.append([("✅ En VIP" if vip_done else "👑 Enviar a VIP", "noop" if vip_done else f"pv:{pid}")])
+        if p.get("kind") == "builder":
+            if not msgs:
+                rows.append([("❌ Descartar", f"r:{pid}")])
+            return rows
         photo = p.get("pick_style") == "photo"
         rows.append([("🧾 Volver al cupón" if photo else "📰 Versión con foto", f"st:{pid}"),
                      ("🖼 Adjuntar mi imagen", f"yp:{pid}")])
@@ -64,7 +69,8 @@ def SHARE_BUTTONS(p: dict) -> list:
 
 def _vip_only(p: dict) -> bool:
     """Regla: la NBA es exclusiva del VIP; el gratis del día siempre es fútbol."""
-    return any((l.get("sport") or "soccer") == "basketball" for l in p.get("legs") or []) or p.get("sport") == "basketball"
+    return (any((l.get("sport") or "soccer") == "basketball" for l in p.get("legs") or [])
+            or p.get("sport") == "basketball" or p.get("kind") == "builder")
 
 
 def _share_panel(state: dict, p: dict) -> None:
@@ -165,6 +171,13 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False,
             try:
                 state = store.load()
                 _auto_free_choose(state)
+                store.save(state)
+            except Exception:
+                traceback.print_exc()
+        if not manual and not live and config.DAILY_BUILDERS:
+            try:
+                state = store.load()
+                _daily_builders(state)
                 store.save(state)
             except Exception:
                 traceback.print_exc()
@@ -1040,6 +1053,19 @@ def _grade(pick: dict) -> tuple[str | None, list, bool]:
     """Busca el marcador final de cada partido y califica el pick.
     Devuelve (resultado, marcadores, todos_terminados). Una doble es roja si falla
     una selección; nula si ambas se devuelven; verde en otro caso."""
+    if pick.get("kind") == "builder":
+        from . import builder
+        box = builder.final_box(pick["bb"])
+        if box is None:
+            return None, [None] * len(pick["legs"]), False
+        res = [builder.grade(x, box) for x in pick["bb"]["legs"]]
+        for l, r in zip(pick["legs"], res):
+            l["leg_result"] = r
+        if "L" in res:
+            return "L", [], True
+        if None in res:   # un jugador no jugó: lo decides tú (las casas lo tratan distinto)
+            return None, [], True
+        return "W", [], True
     scores, results = [], []
     for l in pick["legs"]:
         if l.get("sport") == "basketball":
@@ -1117,6 +1143,13 @@ def _pick_image(p: dict, tier: str | None = None) -> bytes | None:
     (verde «PICK GRATIS» / dorado «PICK VIP»). La NBA siempre es VIP."""
     if _vip_only(p):
         tier = "vip"
+    if p.get("kind") == "builder":
+        try:
+            from . import postimage
+            return postimage.render_builder(p, "vip")
+        except Exception:
+            traceback.print_exc()
+            return None
     if p.get("pick_style") == "photo" and os.path.exists(_pick_photo_file(p)):
         cache = _upload_file(p, "pickphoto")
         if tier and os.path.exists(cache) and not p.get("pick_raw"):
@@ -1548,6 +1581,138 @@ def _refresh_recap_texts(state: dict) -> None:
             p["ig_res_caption"] = r["ig"]
 
 
+# ---------------------------------------------------------------- Bet Builder
+BUILDER_BUTTONS = lambda pid: [  # noqa: E731
+    [("✏️ Cargar cuota", f"bq:{pid}")],
+    [("❌ Descartar", f"r:{pid}")],
+]
+
+
+def _builder_send(state: dict, home: str, away: str, kickoff: str, league: str, sport: str, quiet: bool = False) -> bool:
+    """Arma el Bet Builder de un partido y te lo manda. False si no hay 3 líneas que cumplan."""
+    from . import builder
+    owner = state.get("owner_chat")
+    try:
+        b = builder.suggest(home, away, kickoff, sport)
+    except Exception:
+        traceback.print_exc()
+        b = None
+    if not b:
+        if not quiet and owner:
+            telegram.send(owner, f"🧩 {formatting.escape(home)} vs {formatting.escape(away)}: no encontré 3 líneas "
+                                 "que los jugadores cumplan en al menos 8 de cada 10 partidos (o faltan datos).")
+        return False
+    state["seq"] += 1
+    pid = str(state["seq"])
+    legs = [{"home": home, "away": away, "kickoff": kickoff, "league": league, "sport": sport, "mtype": "prop",
+             "outcome": x["label"], "label": x["label"], "market": "Bet Builder", "price": None,
+             "handicap": x["line"], "fixture_id": f"bb-{b['event']}"} for x in b["legs"]]
+    p = {"id": pid, "kind": "builder", "status": "bb", "legs": legs, "bb": b, "price": b["target"],
+         "prob": b["prob"], "edge": 0.0, "stake": 2, "tier": "justa", "created_at": _iso(store.now_utc()),
+         "kickoff": kickoff, "sport": sport, "stake_v": 2}
+    msg = telegram.send(owner, formatting.builder_owner(p), BUILDER_BUTTONS(pid))
+    p["owner_msg"] = msg["message_id"]
+    state["picks"][pid] = p
+    return True
+
+
+def _builder_command(state: dict, text: str) -> None:
+    """/builder Thunder vs Nuggets · /builder Colo-Colo — Bet Builder de un partido de hoy o mañana."""
+    from . import nba
+    owner = state["owner_chat"]
+    q = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
+    words = q.lower().split()
+    sport = "basketball" if "nba" in words else "soccer" if any(w in ("futbol", "fútbol") for w in words) else None
+    q = " ".join(w for w in q.split() if w.lower() not in ("nba", "futbol", "fútbol"))
+    if not q:
+        telegram.send(owner, "Usa: /builder Thunder vs Nuggets · /builder Colo-Colo · /builder nba Lakers\n"
+                             "Busca el partido de hoy o mañana y te arma 3 líneas fáciles de cumplir.")
+        return
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo
+    now = store.now_utc()
+    found = None
+    for k in (0, 1):
+        day = (now + timedelta(days=k)).astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+        pools = []
+        if sport in (None, "basketball"):
+            pools.append(("basketball", nba._get("/scoreboard", dates=day).get("events") or [], "USA · NBA"))
+        if sport in (None, "soccer"):
+            from . import espn
+            pools.append(("soccer", espn._scoreboard(day, "soccer"), None))
+        for sp, evs, lg in pools:
+            for e in evs:
+                c = (e.get("competitions") or [{}])[0]
+                if ((c.get("status") or {}).get("type") or {}).get("state") != "pre":
+                    continue
+                comp = c.get("competitors") or []
+                h = next((x for x in comp if x.get("homeAway") == "home"), None)
+                a = next((x for x in comp if x.get("homeAway") == "away"), None)
+                if not h or not a:
+                    continue
+                hn, an = h["team"].get("displayName", ""), a["team"].get("displayName", "")
+                if all(_name_hit(part, hn) or _name_hit(part, an) for part in re.split(r"\s+(?:vs\.?|v|-|contra)\s+", q, flags=re.I)):
+                    ko = e["date"].replace("Z", ":00Z") if len(e["date"]) == 17 else e["date"]
+                    league = lg or ((e.get("season") or {}).get("slug") or "").replace("-", " ").title() or "Fútbol"
+                    found = (hn, an, ko, league, sp)
+                    break
+            if found:
+                break
+        if found:
+            break
+    if not found:
+        telegram.send(owner, f"No encontré «{formatting.escape(q)}» entre los partidos de hoy y mañana que aún no empiezan.")
+        return
+    telegram.send(owner, f"🧩 Revisando las estadísticas de {formatting.escape(found[0])} vs {formatting.escape(found[1])}… "
+                         "te llega en un par de minutos.")
+    _builder_send(state, *found)
+
+
+def _builder_odds(state: dict, text: str) -> bool:
+    """Respuesta con la cuota real del Bet Builder. True si la usó."""
+    from . import builder
+    w = state.get("await_odds") or {}
+    if not w or store.parse_ts(w["until"]) < store.now_utc():
+        return False
+    v = builder.parse_odds(text)
+    if v is None:
+        return False
+    p = state["picks"].get(w["pid"])
+    state.pop("await_odds", None)
+    if not p or p["status"] != "bb":
+        return False
+    p["price"] = v
+    p["edge"] = round(p["prob"] * v - 1, 4)
+    p["status"] = "selected"
+    telegram.send(state["owner_chat"], f"✅ Cuota {formatting.odds(v)} cargada en el Bet Builder #{p['id']} "
+                  + (f"(valor +{formatting.pct(p['edge'])} según nuestros números)." if p["edge"] > 0 else
+                     "(está por debajo de la cuota mínima: según los números no conviene, decide tú)."))
+    _share_panel(state, p)
+    return True
+
+
+def _daily_builders(state: dict) -> None:
+    """Tras el escaneo diario: un Bet Builder de NBA y uno de fútbol con los partidos de los candidatos de hoy."""
+    today = _local_today()
+    if state.get("bb_date") == today:
+        return
+    state["bb_date"] = today
+    seen = set()
+    for sport in ("basketball", "soccer"):
+        cands = [p for p in state["picks"].values() if p["status"] == "candidate" and p.get("kind") != "builder"
+                 and (p["legs"][0].get("sport") or "soccer") == sport and not p.get("live")
+                 and store.parse_ts(p["kickoff"]) > store.now_utc() + timedelta(hours=2)]
+        cands.sort(key=lambda p: p.get("prob", 0), reverse=True)
+        for p in cands[:3]:
+            l = p["legs"][0]
+            key = (l["home"], l["away"])
+            if key in seen:
+                continue
+            seen.add(key)
+            if _builder_send(state, l["home"], l["away"], l["kickoff"], l.get("league") or "", sport, quiet=True):
+                break
+
+
 def _nba_board(state: dict, p: dict, rep: dict, kind: str, photo=None, half_rep=None, title=None) -> tuple[bytes, dict]:
     """Imagen NBA (entretiempo o final) y datos usados."""
     from . import layouts, matchphoto, nbagame
@@ -1693,6 +1858,8 @@ def _recap_nba(state: dict, p: dict, reuse: bool = False) -> bool:
 
 def _halftime_check(state: dict, p: dict, now) -> None:
     """Entretiempo: publica en los canales del pick el marcador al descanso, goles, estadísticas y cómo va."""
+    if p.get("kind") == "builder":
+        return
     if _vip_only(p) and len(p["legs"]) == 1:
         _halftime_nba(state, p, now)
         return
@@ -2029,6 +2196,8 @@ def _handle_update(state: dict, u: dict) -> None:
         if chat == owner and (msg.get("photo") or msg.get("document")):
             _receive_upload(state, msg)
             return
+        if chat == owner and text and not text.startswith("/") and _builder_odds(state, text):
+            return
         if chat != owner and text.lower().startswith("/start"):
             from . import guests
             guests.handle_start(state, msg)
@@ -2041,6 +2210,8 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith(("/builder", "/combinada")):
+            _builder_command(state, text)
         elif chat == owner and text.lower().startswith("/gratis"):
             _free_command(state, text)
         elif chat == owner and text.lower().startswith("/partido"):
@@ -2171,12 +2342,22 @@ def _handle_update(state: dict, u: dict) -> None:
             telegram.answer(cb["id"], "Llegó tarde: ya no está vigente")
             return
         p["status"] = p.pop("prev_status", None) or "candidate"
-        telegram.set_buttons(owner, mid, CANDIDATE_BUTTONS(pid) if p["status"] == "candidate" else SHARE_BUTTONS(p))
+        telegram.set_buttons(owner, mid, CANDIDATE_BUTTONS(pid) if p["status"] == "candidate"
+                             else BUILDER_BUTTONS(pid) if p["status"] == "bb" else SHARE_BUTTONS(p))
         telegram.answer(cb["id"], "Recuperado")
         return
 
+    if action == "bq":   # Bet Builder: esperar la cuota real
+        if p["status"] != "bb":
+            telegram.answer(cb["id"], "Ya estaba procesado")
+            return
+        state["await_odds"] = {"pid": pid, "until": _iso(store.now_utc() + timedelta(hours=3))}
+        telegram.send(owner, f"✏️ Escríbeme la cuota real del Bet Builder #{pid} tal como sale en tu app (ej. 3.10).")
+        telegram.answer(cb["id"], "Esperando la cuota")
+        return
+
     if action in ("a", "f", "r"):
-        if p["status"] not in ("candidate", "selected") or (action != "r" and p["status"] != "candidate"):
+        if p["status"] not in ("candidate", "selected", "bb") or (action != "r" and p["status"] != "candidate"):
             telegram.answer(cb["id"], "Ya estaba procesado")
             return
         if action == "r":
@@ -2463,6 +2644,7 @@ HELP_TEXT = (
     "/anular Juan · anula ese enlace\n"
     "/enlace Juan · enlace personal al bot: al tocar Iniciar recibe su acceso VIP y te aviso\n"
     "/mensaje Juan hola · le escribe a un contacto que ya inició el bot · /contactos · la lista\n"
+    "/builder Thunder vs Nuggets · Bet Builder: 3 líneas que los jugadores cumplen casi siempre (NBA o fútbol)\n"
     "/gratis · pick gratis automático (estado) · /gratis 37 (ese pick es el gratis y sale ya) · /gratis prueba (solo tú) · /gratis ahora · /gratis apagar · /gratis encender\n"
     "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
     "/ayuda · esta lista\n\n"
@@ -2643,7 +2825,7 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
-    if owner and state.get("cmds_v") != 10:
+    if owner and state.get("cmds_v") != 11:
         try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
             telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
                 {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
@@ -2657,10 +2839,11 @@ def poll() -> None:
                 {"command": "mensaje", "description": "Escribirle a un contacto (ej. /mensaje Juan hola)"},
                 {"command": "contactos", "description": "Quiénes iniciaron el bot"},
                 {"command": "partido", "description": "Analizar un partido específico (ej. /partido Celtics vs Knicks)"},
+                {"command": "builder", "description": "Bet Builder: 3 líneas fáciles de un partido (ej. /builder Thunder)"},
                 {"command": "gratis", "description": "Pick gratis automático: estado, ahora, apagar o encender"},
                 {"command": "estado", "description": "Pendientes, picks en juego e historial"},
                 {"command": "ayuda", "description": "Lista de comandos"}])
-            state["cmds_v"] = 10
+            state["cmds_v"] = 11
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)
@@ -2681,10 +2864,10 @@ def poll() -> None:
             except Exception:
                 traceback.print_exc()
     for p in state["picks"].values():
-        if p["status"] in ("candidate", "selected") and _expires(p) <= now:
+        if p["status"] in ("candidate", "selected", "bb") and _expires(p) <= now:
             was = p["status"]
             p["status"] = "expired"
-            if owner and p.get("owner_msg") and was == "candidate":
+            if owner and p.get("owner_msg") and was in ("candidate", "bb"):
                 telegram.edit_buttons_off(owner, p["owner_msg"], "⌛ Sin aprobar a tiempo")
             if owner and p.get("share_msg"):
                 telegram.edit_buttons_off(owner, p["share_msg"], "⌛ Ya no está vigente")
