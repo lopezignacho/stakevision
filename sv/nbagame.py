@@ -71,9 +71,10 @@ def count_plays(summary: dict, upto_period: int = 99) -> tuple[dict, dict]:
                     pl.setdefault(parts[1], _blank())["ast"] += 1
                     T["ast"] += 1
         elif "rebound" in typ:
+            if "team" in typ or "team" in text or not who:
+                continue   # rebotes de equipo y de tiros libres intermedios no cuentan en la planilla
             T["reb"] += 1
-            if who and "team" not in typ:
-                P["reb"] += 1
+            P["reb"] += 1
         elif "turnover" in typ or "turnover" in text or "bad pass" in typ or "traveling" in typ:
             T["tov"] += 1
             P["tov"] += 1
@@ -151,6 +152,9 @@ def report(home: str, away: str, kickoff_iso: str, half: bool = False) -> dict |
 
     def side(x, s):
         t = espn._side({"side": s}, x, {})
+        team = x.get("team") or {}
+        t["short"] = (team.get("shortDisplayName") or team.get("name")
+                      or (team.get("displayName") or "").split()[-1] if team.get("displayName") else t["short"])
         t["lines"] = [int(float(ls.get("displayValue") or ls.get("value") or 0)) for ls in x.get("linescores") or []]
         tid = t["id"]
         t["box"] = teams.get(tid) or _blank()
@@ -159,8 +163,9 @@ def report(home: str, away: str, kickoff_iso: str, half: bool = False) -> dict |
         t["leaders"] = [dict(r, id=pid, name=names[pid]["name"], short=names[pid]["short"]) for pid, r in lead[:3]]
         return t
     H, A = side(h, "home"), side(a, "away")
-    if half:   # al descanso: el marcador es la suma de los dos primeros cuartos
-        H["score"], A["score"] = sum(H["lines"][:2]), sum(A["lines"][:2])
+    if half:   # al descanso: solo los dos primeros cuartos
+        H["lines"], A["lines"] = H["lines"][:2], A["lines"][:2]
+        H["score"], A["score"] = sum(H["lines"]), sum(A["lines"])
     return {"id": e.get("id"), "home": H, "away": A, "period": period,
             "state": (st.get("type") or {}).get("state") or "", "status_name": (st.get("type") or {}).get("name") or "",
             "clock": st.get("displayClock") or "", "completed": bool((st.get("type") or {}).get("completed")),
