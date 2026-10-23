@@ -386,6 +386,59 @@ def _auto_free_callback(state: dict, cb: dict, action: str, p: dict) -> None:
         state["auto_free"]["status"] = "none"
 
 
+def _free_preview(state: dict) -> None:
+    """/gratis prueba · muestra SOLO a ti qué pick elegiría ahora. No publica ni cambia nada del día."""
+    import copy
+    owner = state["owner_chat"]
+    at = store.now_utc() + timedelta(minutes=config.AUTO_FREE_DELAY_MIN)
+    pool = _auto_pool(state, at)
+    if not pool:
+        telegram.send(owner, "🧪 Prueba del pick gratis: no hay candidatos de hoy que cumplan (cuota 1.65–2.00, "
+                             "cerca de la cuota justa y con 2 h antes del partido).\n"
+                             "Lanza primero /buscar (o /buscar nba), espera los candidatos y repite /gratis prueba.")
+        return
+    pid, opt = pool[0]
+    p = copy.deepcopy(state["picks"][pid])
+    _use_option(p, opt)
+    p["id"] = f"{pid}-prueba"
+    try:
+        from . import layouts
+        p["pick_layout"] = layouts.next_layout({}, "pick")
+        _make_pick_photo(p)
+        p["pick_style"] = "photo"
+    except Exception:
+        traceback.print_exc()
+    l = p["legs"][0]
+    esc = formatting.escape
+    ranking = []
+    for i, (xid, xo) in enumerate(pool[:5], 1):
+        x = copy.deepcopy(state["picks"][xid])
+        _use_option(x, xo)
+        xl = x["legs"][0]
+        ranking.append(f"{i}. {esc(xl['home'])} vs {esc(xl['away'])} · {esc(formatting.outcome_label(xl))} @ "
+                       f"{formatting.odds(x['price'])} · {formatting.pct(x['prob'])}")
+    cap = (f"🧪 <b>Prueba · pick gratis automático</b> (solo tú lo ves, no se publica)\n"
+           f"{'🏀' if l.get('sport') == 'basketball' else '⚽'} {esc(l['home'])} vs {esc(l['away'])}\n"
+           f"🎯 <b>{esc(formatting.outcome_label(l))}</b> @ {formatting.odds(p['price'])}\n"
+           f"📈 Probabilidad justa {formatting.pct(p['prob'])} · valor {'+' if p['edge'] >= 0 else ''}"
+           f"{formatting.pct(p['edge'])}")
+    image = _pick_image(p)
+    if image and formatting.caption_fits(cap):
+        telegram.send_photo(owner, image, caption=cap)
+    else:
+        if image:
+            telegram.send_photo(owner, image)
+        telegram.send(owner, cap)
+    telegram.send(owner, "🏆 <b>Ranking de opciones de hoy</b> (más probable primero):\n" + "\n".join(ranking)
+                  + "\n\nCon el automático encendido, a las 09:07 elegiría el n.º 1 entre los candidatos de ese "
+                    "escaneo y te daría 30 min para cambiarlo o cancelarlo.")
+    try:
+        os.remove(_pick_photo_file(p))
+        os.remove(_upload_file(p, "pickphoto"))
+    except OSError:
+        pass
+
+
 def _free_command(state: dict, text: str) -> None:
     """/gratis · estado del pick gratis automático · /gratis apagar · /gratis encender · /gratis ahora"""
     owner = state["owner_chat"]
@@ -397,6 +450,9 @@ def _free_command(state: dict, text: str) -> None:
     if arg in ("encender", "on", "si", "sí"):
         state.pop("auto_free_off", None)
         telegram.send(owner, "▶️ Pick gratis automático encendido: sale cada día tras el escaneo de las 09:07.")
+        return
+    if arg in ("prueba", "test", "probar"):
+        _free_preview(state)
         return
     if arg in ("ahora", "elegir", "ya"):
         af = state.get("auto_free") or {}
@@ -418,7 +474,7 @@ def _free_command(state: dict, text: str) -> None:
           "none": "sin opción que cumpla"}.get(af.get("status"), "aún no se elige")
     telegram.send(owner, f"🤖 Pick gratis automático: {on}\nHoy: {st}"
                   + (f" (pick #{af['pid']})" if af.get("pid") and af.get("date") == _local_today() else "")
-                  + "\n\n/gratis ahora · elegirlo ya con los candidatos de hoy\n/gratis apagar · /gratis encender")
+                  + "\n\n/gratis prueba · ver qué elegiría (solo tú, no publica)\n/gratis ahora · elegirlo ya con los candidatos de hoy\n/gratis apagar · /gratis encender")
 
 
 def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool = False, live: bool = False) -> None:
@@ -2007,7 +2063,7 @@ HELP_TEXT = (
     "/anular Juan · anula ese enlace\n"
     "/enlace Juan · enlace personal al bot: al tocar Iniciar recibe su acceso VIP y te aviso\n"
     "/mensaje Juan hola · le escribe a un contacto que ya inició el bot · /contactos · la lista\n"
-    "/gratis · pick gratis automático (estado) · /gratis ahora · /gratis apagar · /gratis encender\n"
+    "/gratis · pick gratis automático (estado) · /gratis prueba (solo tú) · /gratis ahora · /gratis apagar · /gratis encender\n"
     "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
     "/ayuda · esta lista\n\n"
     "El escaneo automático sigue saliendo todos los días a las 09:07. Después, el bot elige solo el pick "

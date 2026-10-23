@@ -767,6 +767,15 @@ if True:
     st = store.load()
     assert st["picks"][first["id"]]["status"] == "candidate"
     assert st["auto_free"]["pid"] != first["id"] and st["auto_free"]["status"] == "pending"
+# /gratis prueba: solo al dueño, no cambia nada
+before = {k: v["status"] for k, v in st["picks"].items()}
+n = len(sent)
+updates_q.append({"update_id": 1399, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/gratis prueba"}})
+main.poll()
+st = store.load()
+assert all(c == OWNER for c, *_ in sent[n:]), sent[n:]
+assert any("Ranking de opciones" in (t_ or "") for _, t_, _, _ in sent[n:])
+assert {k: v["status"] for k, v in st["picks"].items()} == before
 # vence el plazo: se publica solo en VIP + Gratis
 st["auto_free"]["at"] = main._iso(store.now_utc() - timedelta(minutes=1))
 store.save(st)
