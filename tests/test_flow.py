@@ -770,7 +770,7 @@ if True:
 # /gratis prueba: solo al dueño, no cambia nada
 before = {k: v["status"] for k, v in st["picks"].items()}
 n = len(sent)
-updates_q.append({"update_id": 1399, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/gratis prueba"}})
+updates_q.append({"update_id": 1450, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/gratis prueba"}})
 main.poll()
 st = store.load()
 assert all(c == OWNER for c, *_ in sent[n:]), sent[n:]
@@ -790,10 +790,10 @@ assert any(c == config.FREE_CHANNEL for c, *_ in sent[n:])
 assert not main._auto_free_choose(st)
 # /gratis muestra el estado
 n = len(sent)
-updates_q.append({"update_id": 1401, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/gratis"}})
+updates_q.append({"update_id": 1451, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/gratis"}})
 main.poll()
 assert any("publicado" in (t or "") for _, t, _, _ in sent[n:])
-updates_q.append({"update_id": 1402, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/gratis apagar"}})
+updates_q.append({"update_id": 1452, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/gratis apagar"}})
 main.poll()
 assert store.load().get("auto_free_off")
 print("OK pick gratis automático")
