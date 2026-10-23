@@ -64,7 +64,8 @@ def team_qid(name: str, sport: str = "soccer") -> str | None:
 
 
 def squad(team: str, sport: str = "soccer", n: int = 8) -> list[dict]:
-    """Referentes del plantel actual: [{'name', 'image' (archivo de Commons o ''), 'links'}], el más conocido primero."""
+    """Referentes del plantel actual: [{'name', 'image', 'links', 'since' (año en que llegó)}], el más conocido primero.
+    Se descartan los que después pasaron a otro club (datos viejos) y los mayores de 40 años."""
     key = ("squad", _plain(team), sport)
     if key in _cache:
         return _cache[key]
@@ -72,13 +73,21 @@ def squad(team: str, sport: str = "soccer", n: int = 8) -> list[dict]:
     out: list[dict] = []
     if qid:
         q = f"""
-        SELECT ?p ?pLabel ?img ?links WHERE {{
+        SELECT ?p ?pLabel ?img ?links (YEAR(?start) AS ?sy) WHERE {{
           ?p p:P54 ?st . ?st ps:P54 wd:{qid} .
           FILTER NOT EXISTS {{ ?st pq:P582 ?end }}
           ?st pq:P580 ?start .
-          FILTER(YEAR(?start) >= YEAR(NOW()) - 12)
+          FILTER(YEAR(?start) >= YEAR(NOW()) - 10)
           ?p wdt:P31 wd:Q5 .
           FILTER NOT EXISTS {{ ?p wdt:P570 ?death }}
+          OPTIONAL {{ ?p wdt:P569 ?birth }}
+          FILTER(!BOUND(?birth) || YEAR(?birth) >= YEAR(NOW()) - 40)
+          FILTER NOT EXISTS {{
+            ?p p:P54 ?st2 . ?st2 ps:P54 ?t2 ; pq:P580 ?s2 .
+            FILTER(?t2 != wd:{qid} && ?s2 > ?start)
+            ?t2 rdfs:label ?l2 . FILTER(LANG(?l2) = "en")
+            FILTER(!CONTAINS(LCASE(?l2), "national") && !CONTAINS(LCASE(?l2), "olympic"))
+          }}
           OPTIONAL {{ ?p wdt:P18 ?img }}
           ?p wikibase:sitelinks ?links .
           SERVICE wikibase:label {{ bd:serviceParam wikibase:language "es,en". }}
@@ -96,7 +105,8 @@ def squad(team: str, sport: str = "soccer", n: int = 8) -> list[dict]:
             seen.add(name)
             img = r.get("img", {}).get("value", "")
             out.append({"name": name, "image": unquote(img.rsplit("/", 1)[-1]) if img else "",
-                        "links": int(r.get("links", {}).get("value", 0))})
+                        "links": int(r.get("links", {}).get("value", 0)),
+                        "since": int(r.get("sy", {}).get("value", 0) or 0)})
         out = out[:n]
     _cache[key] = out
     return out

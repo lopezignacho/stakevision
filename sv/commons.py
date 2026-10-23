@@ -30,13 +30,14 @@ GOOD = ("match", "partido", "vs", " v ", "players", "jugadores", "team", "equipo
         "gol", "stadium", "estadio", "fans", "hinchas", "afici", "torcida", "derby", "clasico", "training", "entreno")
 
 
-def candidates(name: str, limit: int = 30, team: bool = False) -> list[dict]:
+def candidates(name: str, limit: int = 30, team: bool = False, query: str | None = None) -> list[dict]:
     """Fotos de Commons que nombran al jugador (o al equipo), con licencia apta, de la más reciente a la más antigua."""
     if not name.strip():
         return []
     params = {"action": "query", "format": "json", "generator": "search", "gsrnamespace": 6,
-              "gsrsearch": f'"{name}" filetype:bitmap', "gsrlimit": limit,
-              "prop": "imageinfo", "iiprop": "url|extmetadata|size", "iiurlwidth": 1400}
+              "gsrsearch": query or f'"{name}" filetype:bitmap', "gsrlimit": limit,
+              "prop": "imageinfo|categories", "iiprop": "url|extmetadata|size", "iiurlwidth": 1400,
+              "clshow": "!hidden", "cllimit": "max"}
     try:
         pages = (requests.get(API, params=params, headers=UA, timeout=25).json().get("query") or {}).get("pages") or {}
     except Exception:  # noqa: BLE001
@@ -64,7 +65,9 @@ def candidates(name: str, limit: int = 30, team: bool = False) -> list[dict]:
                     "license": lic, "author": author[:60], "year": year, "portrait": h >= w,
                     "first": _plain(title).removeprefix("file:").startswith(_plain(name)),
                     "cropped": "(cropped)" in title.lower(),
-                    "good": team and any(w in f" {_plain(title)} " for w in GOOD)})
+                    "good": team and any(w in f" {_plain(title)} " for w in GOOD),
+                    "cats": " | ".join(_plain(c.get("title", "")) for c in p.get("categories") or []),
+                    "desc": _plain(_clean((meta.get("ImageDescription") or {}).get("value") or ""))[:400]})
     # Preferir: (equipos) fotos de partido/hinchada; reciente; el jugador como protagonista; vertical y recortada
     out.sort(key=lambda c: (c["good"], c["year"], c["first"], c["portrait"], c["cropped"]), reverse=True)
     return out
@@ -104,26 +107,41 @@ def _team_tokens(teams: list[str]) -> set[str]:
     return out
 
 
-def player_candidates(name: str, teams: list[str], min_year: int | None = None) -> list[dict]:
-    """Fotos del jugador: primero las que nombran a su club (lo muestran con esa camiseta), luego recientes."""
+NATIONAL = ("national", "seleccion", "selección", "world cup", "copa mundial", "mundial", "copa america", "eurocopa",
+            "euro 20", "qualif", "eliminatoria", "friendly", "amistoso", "olympic", "olimpic", "fiba", "nations league",
+            "argentina", "brazil", "brasil", "chile", "uruguay", "colombia", "ecuador", "peru", "paraguay", "bolivia",
+            "venezuela", "mexico", "usa", "france", "francia", "spain", "espana", "portugal", "england", "inglaterra",
+            "germany", "alemania", "italy", "italia", "netherlands", "belgium", "croatia", "serbia", "slovenia",
+            "canada", "japan", "cote", "ivoire", "morocco", "senegal", "nigeria", "cameroon", "ghana", "australia")
+
+
+def player_candidates(name: str, teams: list[str], since: int = 0) -> list[dict]:
+    """Fotos del jugador con la camiseta de SU club: que el club aparezca en el título, la descripción o
+    las categorías, que sea de cuando ya jugaba ahí y que no sea con su selección."""
     from datetime import date
     this_year = date.today().year
-    min_year = min_year or this_year - 3
+    since = since or this_year - 2
     toks = _team_tokens(teams)
+    pool: dict[str, dict] = {}
+    nick = sorted(toks, key=len, reverse=True)[0] if toks else ""
+    for q in ([f'"{name}" {nick} filetype:bitmap'] if nick else []) + [None]:
+        for c in candidates(name, limit=40, query=q):
+            pool.setdefault(c["title"], c)
     out = []
-    for c in candidates(name, limit=40):
-        t = f" {_plain(c['title'])} "
-        if _BAD_RE.search(t):
+    for c in pool.values():
+        title = f" {_plain(c['title'])} "
+        if _BAD_RE.search(title) or c["author"] in ("Autor desconocido", "") or "unknown author" in _plain(c["author"]):
             continue
-        words = set(re.split(r"[^a-z0-9]+", t))
-        hit = bool(toks & words)
-        if c["year"] and c["year"] < (this_year - 6 if hit else min_year):
-            continue    # muy antigua: puede ser de otro club o de otra época
-        if not hit and not c["year"]:
-            continue    # sin fecha ni club: no sabemos con qué camiseta sale
-        c["team_hit"] = hit
+        words_t = set(re.split(r"[^a-z0-9]+", title))
+        words_all = set(re.split(r"[^a-z0-9]+", f"{title} {c['desc']} {c['cats']}"))
+        if any((n in words_t) if " " not in n else (n in title) for n in NATIONAL) and not (toks & words_t):
+            continue   # con la selección
+        if not c["year"] or c["year"] < since:
+            continue   # de antes de llegar al club: puede tener otra camiseta
+        c["team_hit"] = bool(toks & words_t) or bool(toks & words_all)
+        c["title_hit"] = bool(toks & words_t)
         out.append(c)
-    out.sort(key=lambda c: (c["team_hit"], c["year"], c["first"], c["portrait"], c["cropped"]), reverse=True)
+    out.sort(key=lambda c: (c["title_hit"], c["team_hit"], c["year"], c["first"], c["portrait"]), reverse=True)
     return out
 
 
@@ -138,13 +156,29 @@ def _download(c: dict) -> tuple[bytes, dict] | None:
     return None
 
 
-def player_photo(name: str, teams: list[str]) -> tuple[bytes, dict] | None:
-    """(jpeg, crédito) del jugador, idealmente con la camiseta de su club; o None."""
-    for c in player_candidates(name, teams)[:3]:
+def player_photo(name: str, teams: list[str], since: int = 0, need_team: bool = True) -> tuple[bytes, dict] | None:
+    """(jpeg, crédito) del jugador con la camiseta de su club; o None."""
+    for c in player_candidates(name, teams, since)[:4]:
+        if need_team and not c["team_hit"]:
+            continue
         got = _download(c)
         if got:
             got[1]["player"] = name
             got[1]["team_hit"] = c["team_hit"]
+            return got
+    return None
+
+
+def team_photo(team: str) -> tuple[bytes, dict] | None:
+    """Foto reciente de un partido, el estadio o la hinchada del club (nunca entradas, afiches ni escudos)."""
+    from datetime import date
+    this_year = date.today().year
+    for c in candidates(team, limit=40, team=True):
+        t = f" {_plain(c['title'])} "
+        if _BAD_RE.search(t) or not c["year"] or c["year"] < this_year - 4 or "unknown author" in _plain(c["author"]):
+            continue
+        got = _download(c)
+        if got:
             return got
     return None
 

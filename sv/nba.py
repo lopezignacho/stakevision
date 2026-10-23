@@ -7,6 +7,7 @@ Fuentes:
 """
 from __future__ import annotations
 
+import html
 import re
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -413,6 +414,15 @@ def live_alerts(state: dict) -> list[str]:
 
 
 # ---------------------------------------------------------------- previa exclusiva VIP (20-30 min antes)
+INJURY_ES = {"knee": "rodilla", "ankle": "tobillo", "foot": "pie", "heel": "talón", "shoulder": "hombro",
+             "oblique": "oblicuo", "hamstring": "isquiotibial", "back": "espalda", "hip": "cadera", "calf": "pantorrilla",
+             "wrist": "muñeca", "hand": "mano", "illness": "enfermedad", "groin": "ingle", "achilles": "tendón de Aquiles",
+             "concussion": "conmoción", "rest": "descanso", "personal": "motivo personal", "thumb": "pulgar",
+             "finger": "dedo", "toe": "dedo del pie", "quadriceps": "cuádriceps", "elbow": "codo", "neck": "cuello",
+             "rib": "costilla", "lower leg": "pierna", "leg": "pierna", "abdomen": "abdomen", "face": "cara",
+             "nose": "nariz", "eye": "ojo", "head": "cabeza", "chest": "pecho", "shin": "tibia", "forearm": "antebrazo",
+             "pelvis": "pelvis", "glute": "glúteo", "adductor": "aductor", "plantar fascia": "fascia plantar",
+             "suspension": "suspensión", "not injury related": "sin lesión"}
 STATUS_ES = {"out": "Fuera", "doubtful": "Muy dudoso", "questionable": "Duda", "day-to-day": "Día a día",
              "probable": "Probable", "suspension": "Suspendido"}
 
@@ -434,9 +444,10 @@ def _news_for(ctx: dict, hours: int = 48) -> list[str]:
             continue
         if not head or head in seen or when < since:
             continue
-        text = _plain(head + " " + (a.get("description") or ""))
+        head = html.unescape(head)
+        text = _plain(head)
         if nick and not any(n in text for n in nick):
-            continue
+            continue   # solo titulares que nombran a uno de los dos equipos
         seen.add(head)
         out.append((when, head))
     out.sort(reverse=True)
@@ -466,7 +477,7 @@ def pregame(pick: dict, minutes: int, ctx: dict | None = None) -> str | None:
         rows.sort(key=lambda i: (not i.get("key"), list(STATUS_ES).index(i["status"].lower())))
         lines.append(f"• {esc(T['name'])}: " + "; ".join(
             f"{esc(i['name'])}{' ⭐' if i.get('key') else ''} — {STATUS_ES[i['status'].lower()]}"
-            + (f" ({esc(i['type'])})" if i.get("type") else "") for i in rows[:5]))
+            + (f" ({esc(INJURY_ES.get(i['type'].lower(), i['type']))})" if i.get("type") else "") for i in rows[:5]))
     lines += ["", "📊 <b>Cómo llegan</b>"]
     for T in (H, A):
         f = _form(T)

@@ -1429,7 +1429,7 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
             from . import matchphoto
             t = rep.get(who.get("side")) or {}
             photo = (matchphoto.for_scorer(who["full"], [x for x in (t.get("name"), t.get("short")) if x])
-                     or commons.photo(who["full"]))
+                     or commons.team_photo(t.get("name") or "") or commons.photo(who["full"]))
     data = recap.build(p, rep, photo, old.get("custom_title"))
     data["credit"] = photo[1]["text"] if photo and photo[1] else None
     from . import layouts

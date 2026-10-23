@@ -14,7 +14,7 @@ for team, sport in [("Los Angeles Lakers", "basketball"), ("LA Clippers", "baske
     try:
         qid = players.team_qid(team, sport)
         sq = players.squad(team, sport)
-        log.append(f"== {team} ({sport}) qid={qid} referentes={[p['name'] for p in sq[:6]]}")
+        log.append(f"== {team} ({sport}) qid={qid} referentes={[(p['name'], p.get('since')) for p in sq[:8]]}")
         got = matchphoto.referent([team], sport)
         if got:
             slug = team.lower().replace(" ", "-")
@@ -51,7 +51,6 @@ if ev:
     except Exception:
         log.append(traceback.format_exc())
     try:
-        config.ROOT = os.path.abspath("data/probe/root")
         from sv import main
         main._make_pick_photo(pick)
         with open(main._pick_photo_file(pick), "rb") as f, open(f"{OUT}/pick-37-nuevo.jpg", "wb") as g:

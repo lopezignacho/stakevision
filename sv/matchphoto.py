@@ -17,8 +17,9 @@ def _names(team: dict | None, fallback: str) -> list[str]:
     return [x for x in dict.fromkeys([t.get("name"), t.get("short"), fallback]) if x]
 
 
-def referent(team_names: list[str], sport: str = "soccer", tries: int = 4):
-    """(jpeg, crédito) de un referente del equipo, o None."""
+def referent(team_names: list[str], sport: str = "soccer", tries: int = 8):
+    """(jpeg, crédito) de un referente del equipo con la camiseta del club, o None.
+    Nunca usa una foto de otro club o de su selección: si no hay, devuelve None."""
     for name in team_names[:2]:
         try:
             sq = players.squad(name, sport)
@@ -27,15 +28,9 @@ def referent(team_names: list[str], sport: str = "soccer", tries: int = 4):
             sq = []
         if not sq:
             continue
-        for pl in sq[:tries]:   # primero con la camiseta del club
-            got = commons.player_photo(pl["name"], team_names)
-            if got and got[1].get("team_hit"):
-                return got
-        for pl in sq[:tries]:   # luego su foto principal o una reciente
-            got = (commons.file_photo(pl["image"]) if pl.get("image") else None) or \
-                commons.player_photo(pl["name"], team_names)
+        for pl in sq[:tries]:
+            got = commons.player_photo(pl["name"], team_names, since=pl.get("since") or 0)
             if got:
-                got[1]["player"] = pl["name"]
                 return got
         return None
     return None
@@ -51,14 +46,15 @@ def for_pick(leg: dict, teams: dict | None):
         got = referent(names, sport)
         if got:
             return got
-    for names in order:
-        got = commons.photo(names[0], team=True)
+    for names in order:   # sin referentes con su camiseta: partido, estadio o hinchada del club
+        got = commons.team_photo(names[0])
         if got:
             return got
     return None
 
 
 def for_scorer(full_name: str, team_names: list[str]):
+    """El goleador / la figura, con la camiseta de su club (foto de los últimos 2 años)."""
     return commons.player_photo(full_name, team_names) if full_name else None
 
 
@@ -70,6 +66,10 @@ def for_halftime(rep: dict):
             return got
     for side in ("home", "away"):
         got = referent(_names(rep.get(side), ""), "soccer")
+        if got:
+            return got
+    for side in ("home", "away"):
+        got = commons.team_photo((rep.get(side) or {}).get("name") or "")
         if got:
             return got
     return None
