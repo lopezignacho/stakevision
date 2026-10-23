@@ -228,9 +228,13 @@ def _auto_pool(state: dict, publish_at) -> list:
     return [[pid, opt] for _rk, _pr, _ed, pid, opt in pool]
 
 
+EVIDENCE_V = 2   # versión del contraste: si cambia la forma de calcularlo, se recalcula
+
+
 def _leg_evidence(l: dict) -> dict | None:
     """Contraste con datos (forma reciente + cara a cara), calculado una vez y guardado en la selección."""
-    if "evidence" not in l:
+    if "evidence" not in l or l.get("evidence_v") != EVIDENCE_V:
+        l["evidence_v"] = EVIDENCE_V
         try:
             from . import evidence
             l["evidence"] = evidence.check(l)
@@ -692,6 +696,8 @@ def _cancel_file(state: dict) -> None:
             telegram.send(state["owner_chat"], f"⚠️ No encontré el pick #{pid}.")
             return
         from . import evidence
+        for l in p["legs"]:
+            l.pop("evidence", None)   # siempre con datos frescos
         evs = [_leg_evidence(l) for l in p["legs"]]
         txt = "\n".join(evidence.line(e) for e in evs)
         if all(e and e["verdict"] == "ok" for e in evs):
