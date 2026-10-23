@@ -1,0 +1,24 @@
+name: H2H - explorar ESPN
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: mkdir -p data/probe && (python tools/h2h_probe.py 2>&1 | tee data/probe/h2h-run.txt) || true
+        env:
+          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
+      - if: always()
+        run: |
+          git config user.name "stakevision-bot"
+          git config user.email "bot@users.noreply.github.com"
+          rm -rf data/probe/root && git add data/probe
+          git commit -m "probe h2h" || echo "sin cambios"
+          git pull --rebase && git push
