@@ -78,6 +78,7 @@ ODDS_BATCHES = 4                 # máximo de grupos de 5 ligas por escaneo (20 
 # --- Horarios y zona -----------------------------------------------------
 TIMEZONE = "America/Santiago"
 AUTO_SCAN_FALLBACK = True
+DAILY_SCAN_AT = (0, 5)          # el escaneo del día sale a las 00:05 (hora Chile) y mira solo los partidos de ese día
 # --- Pick gratis automático ---------------------------------------------------
 AUTO_FREE = True                 # tras el escaneo diario, el bot elige solo el pick gratis y lo publica
 AUTO_FREE_DELAY_MIN = 30         # minutos para cancelarlo o cambiarlo antes de que salga
@@ -100,7 +101,7 @@ NBA_PREGAME = True           # previa exclusiva en el VIP antes de cada pick NBA
 NBA_PREGAME_MIN = 28         # cuántos minutos antes (sale entre 28 y 8 min antes del inicio)
 NBA_DAILY_GAMES = 3          # partidos de NBA que te llegan en el escaneo diario (cada uno con opción A y B)
 NBA_DIGEST_HOUR = 10         # resumen diario de la NBA (hora Chile), solo para ti
-NBA_LIVE_ALERTS = True       # alertas privadas de posibles remontadas durante los partidos   # si el disparo de las 09:07 no corre, la revisión lanza el escaneo del día
+NBA_LIVE_ALERTS = True       # alertas privadas de posibles remontadas durante los partidos
 REMINDER_BEFORE_MIN = 30      # aviso en los canales antes del partido
 RESULT_CHECK_AFTER_MIN = 135   # minutos tras el inicio para buscar el marcador final
 RESULT_RETRY_MIN = 20          # si el marcador aún no está, reintentar cada 20 min

@@ -136,6 +136,19 @@ def _local_today() -> str:
     return store.now_utc().astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat()
 
 
+def _end_of_today():
+    """23:59:59 de hoy en hora de Chile, en UTC."""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo(config.TIMEZONE)
+    local = store.now_utc().astimezone(tz)
+    return local.replace(hour=23, minute=59, second=59, microsecond=0).astimezone(store.now_utc().tzinfo)
+
+
+def _is_today(iso: str) -> bool:
+    from zoneinfo import ZoneInfo
+    return store.parse_ts(iso).astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat() == _local_today()
+
+
 def _iso(dt) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -197,7 +210,7 @@ def _auto_pool(state: dict, publish_at) -> list:
         if p["status"] != "candidate" or p.get("live") or p.get("kind") != "simple" or _vip_only(p):
             continue   # el gratis siempre es fútbol
         made = store.parse_ts(p["created_at"]).astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat()
-        if made != today or store.parse_ts(p["kickoff"]) < lead:
+        if made != today or store.parse_ts(p["kickoff"]) < lead or not _is_today(p["kickoff"]):   # gratis: partido de HOY
             continue
         for opt, d in (("A", p), ("B", p.get("alt"))):
             if not d or len(d.get("legs") or []) != 1:
@@ -213,6 +226,8 @@ def _free_given_today(state: dict) -> bool:
     from zoneinfo import ZoneInfo
     today = _local_today()
     for p in state["picks"].values():
+        if p.get("status") == "cancelled":
+            continue
         if "free" in (p.get("channel_msgs") or {}) and p.get("published_at"):
             if store.parse_ts(p["published_at"]).astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat() == today:
                 return True
@@ -445,7 +460,7 @@ def _free_preview(state: dict) -> None:
             telegram.send_photo(owner, image)
         telegram.send(owner, cap)
     telegram.send(owner, "🏆 <b>Ranking de opciones de hoy</b> (más probable primero):\n" + "\n".join(ranking)
-                  + "\n\nCon el automático encendido, a las 09:07 elegiría el n.º 1 entre los candidatos de ese "
+                  + "\n\nCon el automático encendido, a las 00:05 elegiría el n.º 1 entre los candidatos de ese "
                     "escaneo y te daría 30 min para cambiarlo o cancelarlo.")
     try:
         os.remove(_pick_photo_file(p))
@@ -462,6 +477,8 @@ def _force_free(state: dict, pid: str, opt: str = "A") -> str:
         return f"No encuentro el pick #{pid}."
     if _vip_only(p):
         return f"El pick #{pid} es de NBA: la NBA es exclusiva del VIP. El gratis del día tiene que ser fútbol."
+    if not _is_today(p["kickoff"]):
+        return f"El pick #{pid} no se juega hoy: el gratis tiene que ser de un partido del día."
     if "free" in (p.get("channel_msgs") or {}):
         return f"El pick #{pid} ya estaba en el canal Gratis."
     if p["status"] not in ("candidate", "selected", "published"):
@@ -553,8 +570,8 @@ def _repair_pick(state: dict, pid: str) -> str:
         p.pop("auto_free", None)
         af = state.get("auto_free") or {}
         if af.get("pid") == pid:
-            state["auto_free"] = {}   # el gratis de hoy vuelve a elegirse (fútbol) tras el escaneo de las 09:07
-            notes.append("el gratis de hoy se elegirá de nuevo, de fútbol, tras el escaneo de las 09:07")
+            state["auto_free"] = {}   # el gratis de hoy vuelve a elegirse (fútbol) tras el escaneo de las 00:05
+            notes.append("el gratis de hoy se elegirá de nuevo, de fútbol, tras el escaneo de las 00:05")
     owner = state.get("owner_chat")
     if owner and image:
         cr = p.get("pick_photo_credit") or {}
@@ -562,6 +579,67 @@ def _repair_pick(state: dict, pid: str) -> str:
         telegram.send_photo(owner, image, caption=f"🔧 <b>Pick #{pid} corregido</b>{formatting.escape(who)}\n"
                                                   + "\n".join(f"• {formatting.escape(n)}" for n in notes))
     return ""
+
+
+def _cancel_pick(state: dict, pid: str, refree: bool = False) -> str:
+    """Cancela un pick publicado: sale de la web y no tendrá aviso, entretiempo ni resultado.
+    Con refree, busca un gratis nuevo para hoy."""
+    p = state["picks"].get(pid)
+    if not p:
+        return f"No encontré el pick #{pid}."
+    was_free = "free" in (p.get("channel_msgs") or {})
+    p.update(status="cancelled", free=False, cancelled_at=_iso(store.now_utc()))
+    for k in ("ig_pre_status", "ig_story_status"):
+        if p.get(k) == "queued":
+            p[k] = "skipped"
+    try:
+        from . import instagram
+        for key in (f"pre-{pid}", f"story-{pid}"):
+            if os.path.exists(instagram.image_path(key)):
+                os.remove(instagram.image_path(key))
+    except Exception:  # noqa: BLE001
+        pass
+    owner = state.get("owner_chat")
+    if owner:
+        telegram.send(owner, f"🗑 Pick #{pid} cancelado: salió de la web y no tendrá aviso, entretiempo ni resultado."
+                             + (" Los mensajes en Telegram siguen ahí." if p.get("channel_msgs") else ""))
+    af = state.get("auto_free") or {}
+    if refree and (was_free or af.get("pid") == pid):
+        state["auto_free"] = {}
+        if not _auto_free_choose(state):
+            if owner:
+                telegram.send(owner, "🔎 Buscando partidos de hoy para el gratis nuevo…")
+            store.save(state)
+            try:
+                _scan_soccer(hours=max(2, int((_end_of_today() - store.now_utc()).total_seconds() // 3600) + 1),
+                             top=config.MANUAL_TOP, manual=True)
+            except Exception:
+                traceback.print_exc()
+            fresh = store.load()
+            state.clear()
+            state.update(fresh)
+            state["auto_free"] = {}
+            _auto_free_choose(state)
+    return ""
+
+
+def _cancel_file(state: dict) -> None:
+    """data/cancel.json ({"id": "...", "pid": "39", "refree": true}): cancelar un pick publicado, una sola vez."""
+    import json
+    path = os.path.join(config.ROOT, "data", "cancel.json")
+    if not os.path.exists(path) or not state.get("owner_chat"):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("cancel_done") or []):
+        return
+    state.setdefault("cancel_done", []).append(req["id"])
+    err = _cancel_pick(state, str(req.get("pid", "")).lstrip("#"), bool(req.get("refree")))
+    if err:
+        telegram.send(state["owner_chat"], "⚠️ " + formatting.escape(err))
 
 
 def _repair_file(state: dict) -> None:
@@ -600,7 +678,7 @@ def _free_command(state: dict, text: str) -> None:
         return
     if arg in ("encender", "on", "si", "sí"):
         state.pop("auto_free_off", None)
-        telegram.send(owner, "▶️ Pick gratis automático encendido: sale cada día tras el escaneo de las 09:07.")
+        telegram.send(owner, "▶️ Pick gratis automático encendido: sale cada día tras el escaneo de las 00:05.")
         return
     bits = arg.replace("#", " ").split()
     if bits and bits[0].lstrip("#").isdigit():   # /gratis 37 [b] · ese pick es el gratis de hoy y sale ya
@@ -630,6 +708,8 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
     else:
         title = f"🔎 Búsqueda manual ({hours} h)" if manual else "🔎 Escaneo de hoy"
         frm, to = now + timedelta(hours=config.WINDOW_START_H), now + timedelta(hours=hours)
+        if not manual:   # escaneo diario: solo los partidos de HOY (hora Chile)
+            to = min(to, _end_of_today())
 
     markets = oddspapi.markets()
     fixtures = (oddspapi.live_fixtures if live else oddspapi.upcoming_fixtures)(_iso(frm), _iso(to))
@@ -780,6 +860,8 @@ def scan_nba(top: int | None = None, manual: bool = False, live: bool = False) -
         frm, to = now - timedelta(hours=3), now
     else:
         frm, to = now + timedelta(minutes=30), now + timedelta(hours=30)
+        if not manual:
+            to = min(to, _end_of_today())
     markets = oddspapi.markets(sport_id=config.NBA_SPORT_ID)
     fixtures = (oddspapi.live_fixtures if live else oddspapi.upcoming_fixtures)(_iso(frm), _iso(to),
                                                                              sport_id=config.NBA_SPORT_ID)
@@ -2569,7 +2651,7 @@ HELP_TEXT = (
     "/enlace Juan · enlace personal al bot con acceso VIP (vence en 7 días; /enlace Juan 30 para 30 días)\n"
     "/anular Juan · anula su acceso VIP si aún no lo usa\n"
     "/mensaje Juan hola · le escribe a un contacto · /contactos · la lista\n\n"
-    "El escaneo sale a las 09:07 y el gratis automático ~30 min después. La NBA y los Bet Builder te llegan "
+    "El escaneo sale a las 00:05 (solo partidos de ese día) y el gratis automático ~30 min después. La NBA y los Bet Builder te llegan "
     "solos antes de cada partido."
 )
 
@@ -2718,7 +2800,7 @@ def _moved_hint(text: str) -> str:
         return "Usa /builder (por ejemplo /builder Thunder vs Nuggets)."
     if t.startswith("/vivo"):
         return "Usa /envivo."
-    return ("La NBA ya te llega sola (escaneo de las 09:07 y Bet Builder antes de cada partido). "
+    return ("La NBA ya te llega sola (escaneo de las 00:05 y Bet Builder antes de cada partido). "
             "Para un partido puntual usa /partido Lakers.")
 
 def _migrate_stakes(state: dict, now) -> None:
@@ -2855,6 +2937,7 @@ def poll() -> None:
         except Exception:
             traceback.print_exc()
     try:
+        _cancel_file(state)
         _repair_file(state)
         _force_free_file(state)
         _auto_free_tick(state, now)
@@ -2927,8 +3010,8 @@ def poll() -> None:
     from zoneinfo import ZoneInfo
     local = store.now_utc().astimezone(ZoneInfo(config.TIMEZONE))
     if (config.AUTO_SCAN_FALLBACK and state.get("owner_chat") and state.get("auto_scan_date") != _local_today()
-            and (local.hour, local.minute) >= (9, 7) and local.hour < 22):
-        scan()   # respaldo del escaneo diario por si el disparo de las 09:07 no corrió
+            and (local.hour, local.minute) >= config.DAILY_SCAN_AT):
+        scan()   # escaneo diario: sale apenas pasa la hora configurada (00:05)
 
 
 def setup() -> None:

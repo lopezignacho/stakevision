@@ -43,6 +43,10 @@ telegram._call = lambda *a, **k: True
 telegram.updates = lambda offset, wait=0: [u for u in updates_q if u["update_id"] >= offset]
 config.AUTO_SCAN_FALLBACK = False
 config.AUTO_FREE = False   # se prueba aparte, al final
+_real_end_of_today = main._end_of_today
+main._end_of_today = lambda: store.now_utc() + timedelta(hours=48)   # pruebas antiguas: partidos de cualquier hora
+_real_is_today = main._is_today
+main._is_today = lambda iso: True
 _scan = main.scan
 
 
@@ -1035,3 +1039,38 @@ assert "Gratis automático" in est and "Publicados en juego" in est
 hoy = next(t for c, t, *_ in sent[n:] if (t or "").startswith("📅"))
 assert "#" in hoy or "Todavía" in hoy
 print("OK estado + hoy")
+
+# 31) gratis solo del día + cancelar un pick publicado y buscar otro
+main._end_of_today, main._is_today = _real_end_of_today, _real_is_today
+st = store.load()
+tomorrow = [p_ for p_ in st["picks"].values() if p_["status"] == "candidate"]
+for p_ in st["picks"].values():
+    if p_["status"] in ("candidate", "selected", "published"):
+        p_["status"] = "settled"
+    (p_.get("channel_msgs") or {}).pop("free", None)
+c1 = dict(next(iter(st["picks"].values())))
+c1.update(id="901", status="candidate", kind="simple", live=False, created_at=main._iso(store.now_utc()),
+          kickoff=main._iso(main._end_of_today() + timedelta(hours=10)), price=1.80, prob=0.6, edge=0.0)
+c1["legs"] = [dict(c1["legs"][0], sport="soccer", kickoff=c1["kickoff"])]
+c1.pop("alt", None)
+st["picks"]["901"] = c1
+st.pop("auto_free", None)
+st.pop("auto_free_off", None)
+store.save(st)
+st = store.load()
+assert all(pid_ != "901" for pid_, _ in main._auto_pool(st, store.now_utc()))   # mañana: no sirve para el gratis
+assert "no se juega hoy" in main._force_free(st, "901")
+pub = dict(c1, id="902", status="published", channel_msgs={"free": 5, "vip": 6}, free=True,
+           published_at=main._iso(store.now_utc()))
+st["picks"]["902"] = pub
+st["auto_free"] = {"date": main._local_today(), "status": "published", "pid": "902"}
+store.save(st)
+st = store.load()
+assert main._free_given_today(st)
+main._cancel_pick(st, "902", refree=False)
+assert st["picks"]["902"]["status"] == "cancelled" and not main._free_given_today(st)
+store.save(st)
+store.export_public(st)
+import json as _j  # noqa: E402
+assert all(r["id"] != "902" for r in _j.load(open(config.PUBLIC_HISTORY))["picks"])
+print("OK gratis del día + cancelar")
