@@ -478,9 +478,10 @@ updates_q.append({"update_id": 511, "callback_query": {"id": "t9", "data": f"st:
                                                        "message": {"chat": {"id": OWNER}, "message_id": 95}}})
 main.poll()
 p7s = store.load()["picks"][p7["id"]]
-assert p7s["pick_style"] == "photo" and "listo para compartir" in photos[-1][1]
-assert main._pick_image(p7s) == open(main._pick_photo_file(p7s), "rb").read()
-print("OK adelanto + pick con foto")
+assert p7s["pick_style"] == "coupon" and "listo para compartir" in photos[-1][1]   # antes del partido: cupón
+flat_ = [d for row in main.SHARE_BUTTONS(p7s) for _, d in row]
+assert not any(d.startswith(("th:", "dl:")) for d in flat_) and f"yp:{p7['id']}" in flat_
+print("OK adelanto + pick en cupón")
 
 # 15) adjuntar tu imagen para el pick (antes del partido)
 for i, upd in enumerate([

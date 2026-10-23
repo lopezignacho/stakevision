@@ -24,6 +24,8 @@ def _photo_area(im, m, box, T, side="center", fade=("bottom",), focus=None):
     w, h = x1 - x0, y1 - y0
     if m.get("photo"):
         ph = P._enhance(P._cover(m["photo"], (w, h), focus=focus, side=side)).convert("RGBA")
+    elif (m.get("report") or {}).get("home"):
+        ph = _team_backdrop(m["report"], (w, h), T)
     else:
         ph = Image.new("RGBA", (w, h), T["bg"] + (255,))
     bg = Image.new("RGBA", (w, h), T["bg"] + (255,))
@@ -35,6 +37,29 @@ def _photo_area(im, m, box, T, side="center", fade=("bottom",), focus=None):
         elif f == "left":
             ph = Image.composite(bg, ph, P._alpha_ramp((w, h), [(0, 255), (0.25, 0), (1, 0)], True))
     im.alpha_composite(ph, (x0, y0))
+
+
+def _team_backdrop(rep: dict, size, T) -> Image.Image:
+    """Sin foto: fondo propio con los colores de los dos equipos (diagonal, franjas y brillo suave)."""
+    w, h = size
+    hc, _ = P.team_palette(rep["home"])
+    ac, _ = P.team_palette(rep["away"])
+    dark = lambda c, t: P._mix(tuple(c), T["bg"], t)  # noqa: E731
+    im = Image.new("RGBA", (w, h), T["bg"] + (255,))
+    d = ImageDraw.Draw(im)
+    d.polygon([(0, 0), (w * 0.62, 0), (w * 0.38, h), (0, h)], fill=dark(hc, 0.45) + (255,))
+    d.polygon([(w * 0.62, 0), (w, 0), (w, h), (w * 0.38, h)], fill=dark(ac, 0.45) + (255,))
+    stripes = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(stripes)
+    for x in range(-h, w, 70):
+        sd.polygon([(x, h), (x + 26, h), (x + 26 + h * 0.4, 0), (x + h * 0.4, 0)], fill=(255, 255, 255, 14))
+    im.alpha_composite(stripes)
+    d = ImageDraw.Draw(im)
+    d.line([(w * 0.62, 0), (w * 0.38, h)], fill=T["brand"] + (255,), width=8)
+    glow = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).ellipse((w * 0.25, h * 0.15, w * 0.75, h * 0.85), fill=T["brand"] + (30,))
+    im.alpha_composite(glow.filter(ImageFilter.GaussianBlur(80)))
+    return im
 
 
 def _outline_text(im, xy, text, font, color, stroke=3):

@@ -21,6 +21,13 @@ CANDIDATE_BUTTONS = lambda pid: [  # noqa: E731
 ]
 
 
+def _image_row(p: dict) -> list:
+    """Antes del partido el pick sale como cupón (solo la apuesta). Tu imagen es opcional y se puede deshacer."""
+    if p.get("pick_style") == "photo":
+        return [("🧾 Volver al cupón", f"st:{p['id']}"), ("🖼 Adjuntar otra imagen", f"yp:{p['id']}")]
+    return [("🖼 Adjuntar mi imagen", f"yp:{p['id']}")]
+
+
 def SHARE_BUTTONS(p: dict) -> list:
     """Destinos para un pick elegido. Cada uno se puede usar; lo ya hecho queda marcado."""
     pid, msgs = p["id"], p.get("channel_msgs") or {}
@@ -32,12 +39,7 @@ def SHARE_BUTTONS(p: dict) -> list:
             if not msgs:
                 rows.append([("❌ Descartar", f"r:{pid}")])
             return rows
-        photo = p.get("pick_style") == "photo"
-        rows.append([("🧾 Volver al cupón" if photo else "📰 Versión con foto", f"st:{pid}"),
-                     ("🖼 Adjuntar mi imagen", f"yp:{pid}")])
-        if photo:
-            rows.append([("🌙 Modo noche" if p.get("theme") == "light" else "☀️ Modo día", f"th:{pid}"),
-                         ("🔀 Otro diseño", f"dl:{pid}")])
+        rows.append(_image_row(p))
         if not msgs:
             rows.append([("❌ Descartar", f"r:{pid}")])
         return rows
@@ -53,15 +55,8 @@ def SHARE_BUTTONS(p: dict) -> list:
     st = p.get("ig_pre_status")
     rows.append([("✅ Instagram" if st == "posted" else "⏳ Instagram en cola" if st == "queued"
                   else "📸 Compartir en Instagram", "noop" if st in ("queued", "posted") else f"pi:{pid}")])
-    photo = p.get("pick_style") == "photo"
-    rows.append([("🧾 Volver al cupón" if photo else "📰 Versión con foto", f"st:{pid}"),
-                 ("🖼 Adjuntar mi imagen", f"yp:{pid}")])
-    if photo:
-        rows.append([("🌙 Modo noche" if p.get("theme") == "light" else "☀️ Modo día", f"th:{pid}"),
-                     ("🔀 Otro diseño", f"dl:{pid}")])
-        rows.append([("📲 Adelanto (historia)", f"ad:{pid}")])
-    else:
-        rows.append([("📲 Adelanto (historia)", f"ad:{pid}")])
+    rows.append(_image_row(p))
+    rows.append([("📲 Adelanto (historia)", f"ad:{pid}")])
     if not msgs and not st:
         rows.append([("❌ Descartar", f"r:{pid}")])
     return rows
@@ -282,13 +277,7 @@ def _auto_free_choose(state: dict, skip: list | None = None) -> bool:
     _use_option(p, opt)
     p["status"] = "selected"
     p["auto_free"] = True
-    try:
-        from . import layouts
-        p["pick_layout"] = p.get("pick_layout") or layouts.next_layout(state, "pick")
-        _make_pick_photo(p)
-        p["pick_style"] = "photo"
-    except Exception:
-        traceback.print_exc()
+    p["pick_style"] = "coupon"   # antes del partido: solo la apuesta (las fotos quedan para el final)
     if p.get("owner_msg"):
         telegram.edit_buttons_off(owner, p["owner_msg"], "🤖 Elegido como pick gratis automático (abajo)")
     state["auto_free"] = {"date": today, "status": "pending", "pid": pid, "opt": opt, "at": _iso(at),
@@ -433,13 +422,7 @@ def _free_preview(state: dict) -> None:
     p = copy.deepcopy(state["picks"][pid])
     _use_option(p, opt)
     p["id"] = f"{pid}-prueba"
-    try:
-        from . import layouts
-        p["pick_layout"] = layouts.next_layout({}, "pick")
-        _make_pick_photo(p)
-        p["pick_style"] = "photo"
-    except Exception:
-        traceback.print_exc()
+    p["pick_style"] = "coupon"
     l = p["legs"][0]
     esc = formatting.escape
     ranking = []
@@ -501,14 +484,8 @@ def _force_free(state: dict, pid: str, opt: str = "A") -> str:
         if p.get("owner_msg") and state.get("owner_chat"):
             telegram.edit_buttons_off(state["owner_chat"], p["owner_msg"], "🤖 Elegido como pick gratis de hoy")
     p["auto_free"] = True
-    if p.get("pick_style") != "photo":
-        try:
-            from . import layouts
-            p["pick_layout"] = p.get("pick_layout") or layouts.next_layout(state, "pick")
-            _make_pick_photo(p)
-            p["pick_style"] = "photo"
-        except Exception:
-            traceback.print_exc()
+    if p.get("pick_style") == "photo" and not p.get("pick_raw"):
+        p["pick_style"] = "coupon"
     state["auto_free"] = {"date": _local_today(), "status": "pending", "pid": pid, "opt": opt.upper(),
                           "at": _iso(now), "pool": [], "manual": True}
     _auto_free_publish(state, p)
@@ -544,8 +521,7 @@ def _repair_pick(state: dict, pid: str) -> str:
     for f in (_upload_file(p, "pickphoto"), _pick_photo_file(p)):
         if os.path.exists(f):
             os.remove(f)
-    _make_pick_photo(p)
-    p["pick_style"] = "photo"
+    p["pick_style"] = "coupon"
     image = _pick_image(p, "vip")
     msgs = p.setdefault("channel_msgs", {})
     if _vip_only(p) and "free" in msgs:
@@ -1757,7 +1733,7 @@ def _nba_board(state: dict, p: dict, rep: dict, kind: str, photo=None, half_rep=
     if kind == "half":   # en el descanso: el máximo anotador del partido
         allp = [(x, s) for s in ("home", "away") for x in rep[s]["leaders"][:1]]
         fig = max(allp, key=lambda t: t[0]["pts"]) if allp else None
-    if photo is None:   # la figura; si no hay foto suya con esa camiseta, otro líder; luego referentes del equipo
+    if photo is None and kind != "half":   # al final: la figura; si no hay foto suya, otro líder; luego referentes
         tries = ([(fig[0]["name"], fig[1])] if fig else []) + \
                 [(x["name"], s_) for s_ in ("home", "away") for x in rep[s_]["leaders"][:3]
                  if not fig or x["name"] != fig[0]["name"]]
@@ -1772,9 +1748,6 @@ def _nba_board(state: dict, p: dict, rep: dict, kind: str, photo=None, half_rep=
                 photo = matchphoto.referent([rep[s_]["name"], rep[s_]["short"]], "basketball")
         except Exception:
             traceback.print_exc()
-    if photo is None and os.path.exists(_upload_file(p, "pickphoto")):
-        with open(_upload_file(p, "pickphoto"), "rb") as f:
-            photo = (f.read(), p.get("pick_photo_credit"))
     other = "away" if fig and fig[1] == "home" else "home"
     ld = rep[other]["leaders"][:1]
     sel = formatting.outcome_label(l)
@@ -1912,22 +1885,7 @@ def _halftime_check(state: dict, p: dict, now) -> None:
         return
     p["ht_done"] = "sent"
     st = halftime.status(l, rep["home"]["score"], rep["away"]["score"], grade_leg)
-    photo = None
-    scorers = [g for g in rep["goals"] if g["kind"] != "own" and g["full"]]
-    if scorers:   # quien marcó, con la camiseta de su club
-        try:
-            photo = matchphoto.for_halftime(rep)
-        except Exception:
-            traceback.print_exc()
-    cache = _upload_file(p, "pickphoto")
-    if not photo and os.path.exists(cache):   # sin goles: el referente que ya salió con el pick
-        with open(cache, "rb") as f:
-            photo = (f.read(), p.get("pick_photo_credit"))
-    if not photo:
-        try:
-            photo = matchphoto.for_halftime(rep)
-        except Exception:
-            traceback.print_exc()
+    photo = None   # en el entretiempo, sin fotos: solo marcador y estadísticas (las fotos quedan para el final)
     league = (l.get("league") or "").split("·")[-1].strip()
     sel = formatting.outcome_label(l)
     data = {"report": rep, "eyebrow": league or "Pick en juego", "photo": photo[0] if photo else None,
@@ -2380,20 +2338,8 @@ def _handle_update(state: dict, u: dict) -> None:
             if p["status"] not in ("selected", "published"):
                 telegram.answer(cb["id"], "Este pick ya no está disponible")
                 return
-            if p.get("pick_style") == "photo":
-                p["pick_style"] = "coupon"
-            else:
-                telegram.answer(cb["id"], "Armando la versión con foto…")
-                try:
-                    if not p.get("pick_layout"):
-                        from . import layouts
-                        p["pick_layout"] = layouts.next_layout(state, "pick")
-                    _make_pick_photo(p)
-                    p["pick_style"] = "photo"
-                except Exception:
-                    traceback.print_exc()
-                    telegram.send(owner, "⚠️ No pude armar la versión con foto. Sigue la del cupón.")
-                    return
+            p["pick_style"] = "coupon"   # volver al cupón (antes del partido, solo la apuesta)
+            p.pop("pick_raw", None)
             if p.get("share_msg"):
                 telegram.edit_buttons_off(owner, p["share_msg"], "↪️ Reemplazada por la versión de abajo")
             _share_panel(state, p)
