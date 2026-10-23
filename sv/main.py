@@ -122,6 +122,7 @@ def _iso(dt) -> str:
 
 # ---------------------------------------------------------------- escaneo diario
 def scan(hours: int | None = None, top: int | None = None, manual: bool = False, live: bool = False) -> None:
+    """Escaneo de fútbol y, en el diario, también de la NBA."""
     state = store.load()
     if not state["owner_chat"]:
         print("Aún no está vinculado tu chat. Escribe al bot: /vincular <tu código>")
@@ -133,6 +134,18 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False,
             return
         state["auto_scan_date"] = today
         store.save(state)
+    try:
+        _scan_soccer(hours, top, manual, live)
+    finally:
+        if not manual and not live and config.NBA_ENABLED:
+            try:
+                scan_nba()
+            except Exception:
+                traceback.print_exc()
+
+
+def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool = False, live: bool = False) -> None:
+    state = store.load()
     now = store.now_utc()
     hours = min(hours or config.WINDOW_END_H, 47)
     if live:
@@ -227,12 +240,148 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False,
         store.save(state)  # guardar tras cada envío por si algo falla a mitad
 
 
+# ---------------------------------------------------------------- NBA
+def NBA_BUTTONS(pid: str, has_b: bool) -> list:
+    row = [("🅰️ Elegir opción A", f"s:{pid}")]
+    if has_b:
+        row.append(("🅱️ Elegir opción B", f"sb:{pid}"))
+    return [row, [("❌ Descartar", f"r:{pid}")]]
+
+
+def _nba_option_block(d: dict, role: str) -> str:
+    from . import nba
+    l = d["legs"][0]
+    sign = "+" if d["edge"] >= 0 else ""
+    return (f"<b>Opción {role}</b> · 🎯 <b>{formatting.escape(l['label'])}</b> @ {formatting.odds(d['price'])} "
+            f"· valor {sign}{formatting.pct(d['edge'])} · stake {d['stake']}/10\n"
+            f"<i>{formatting.escape(d.get('why', ''))}</i>\n{nba.arguments_text(l, l.get('nba_ctx'))}")
+
+
+def nba_candidate_text(d: dict) -> str:
+    l = d["legs"][0]
+    live = ""
+    if d.get("live"):
+        live = (f"🔴 <b>EN VIVO</b>" + (f" · {formatting.escape(d['live_info'])}" if d.get("live_info") else "")
+                + f"\n⏱ Vence en {config.LIVE_CANDIDATE_MIN} min: las cuotas en vivo cambian rápido.\n")
+    tag = "🟢 <b>Con valor</b>" if d.get("tier") == "valor" else "⚖️ <b>Cuota justa</b>"
+    parts = [f"🏀 <b>NBA · Candidato #{d['id']}</b>\n{live}{tag}",
+             f"<b>{formatting.escape(l['home'])} vs {formatting.escape(l['away'])}</b> · 🕒 {formatting.local_time(l['kickoff'])}",
+             "", _nba_option_block(d, "A")]
+    if d.get("alt"):
+        parts += ["", _nba_option_block(d["alt"], "B")]
+    parts += ["", "Verifica las cuotas en tu app. Elige la opción que te convenza y te llega la imagen para publicar."]
+    return "\n".join(parts)
+
+
+def scan_nba(top: int | None = None, manual: bool = False, live: bool = False) -> None:
+    """NBA: por cada partido, opción A (1.65-2.00, la de más valor) y opción B (alternativa), con argumentos."""
+    from . import nba
+    from .value import Pick
+    state = store.load()
+    owner = state.get("owner_chat")
+    if not owner:
+        return
+    now = store.now_utc()
+    title = "🏀🔴 NBA en vivo" if live else ("🏀 Búsqueda NBA" if manual else "🏀 NBA de hoy")
+    if live:
+        frm, to = now - timedelta(hours=3), now
+    else:
+        frm, to = now + timedelta(minutes=30), now + timedelta(hours=30)
+    markets = oddspapi.markets(sport_id=config.NBA_SPORT_ID)
+    fixtures = (oddspapi.live_fixtures if live else oddspapi.upcoming_fixtures)(_iso(frm), _iso(to),
+                                                                             sport_id=config.NBA_SPORT_ID)
+    fixtures = [f for f in fixtures if f.get("tournamentId") == config.NBA_TOURNAMENT
+                and frm <= store.parse_ts(f["startTime"]) <= to]
+    if not fixtures:
+        if manual or live:
+            telegram.send(owner, f"{title}: no hay partidos " + ("jugándose ahora." if live else "en las próximas 30 horas."))
+        return
+    by_id = {f["fixtureId"]: f for f in fixtures}
+    busy = {l.get("fixture_id") for p in state["picks"].values()
+            if p["status"] in ("candidate", "selected", "published") for l in p["legs"]}
+    games = []
+    for row in oddspapi.odds_by_tournaments([config.NBA_TOURNAMENT]):
+        fx = by_id.get(row.get("fixtureId"))
+        if not fx or fx["fixtureId"] in busy or len(row.get("bookmakerOdds") or {}) < 2:
+            continue
+        opt = nba.options_for_game(selections_for_fixture(fx, row, markets, "basketball"))
+        if opt:
+            games.append((fx, opt))
+    games.sort(key=lambda g: g[1][0].edge, reverse=True)
+    games = games[:top or config.NBA_DAILY_GAMES]
+    if not games:
+        telegram.send(owner, f"{title}: {len(fixtures)} partidos revisados, ninguno con una apuesta en "
+                             f"{config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f} cerca de la cuota justa.")
+        return
+    telegram.send(owner, f"{title}: {len(fixtures)} partidos revisados. Te mando {len(games)}, cada uno con "
+                         "opción A (nuestro rango) y opción B (alternativa), con sus argumentos.")
+    for fx, (a, b, tier) in games:
+        ctx = None
+        try:
+            ctx = nba.context(a.home, a.away, a.kickoff)
+        except Exception:
+            traceback.print_exc()
+
+        def build(sel, t, role):
+            d = Pick("simple", [sel], tier=t).to_dict()
+            leg = d["legs"][0]
+            leg["label"] = formatting.outcome_label(leg)
+            leg["nba_ctx"] = ctx
+            d["why"] = nba.why_line(sel, role)
+            d["analysis"] = formatting.analysis(d)
+            return d
+
+        d = build(a, tier, "A")
+        if b:
+            d["alt"] = build(b, "valor" if b.edge >= config.MIN_EDGE else "justa", "B")
+        state["seq"] += 1
+        pid = str(state["seq"])
+        d.update(id=pid, status="candidate", created_at=_iso(now), stake_v=2, sport="basketball")
+        if live:
+            d["live"] = True
+            found = nba.find_event(a.home, a.away, a.kickoff)
+            if found:
+                st = found[0].get("status") or {}
+                comp = found[0]["competitions"][0]["competitors"]
+                hs = next(x for x in comp if x["homeAway"] == "home").get("score")
+                as_ = next(x for x in comp if x["homeAway"] == "away").get("score")
+                sc = f"{as_}-{hs}" if found[1] else f"{hs}-{as_}"
+                d["live_info"] = f"{sc} · {st.get('period', '?')}º cuarto {st.get('displayClock', '')}"
+        msg = telegram.send(owner, nba_candidate_text(d), NBA_BUTTONS(pid, bool(d.get("alt"))))
+        d["owner_msg"] = msg["message_id"]
+        state["picks"][pid] = d
+        store.save(state)
+
+
+def _nba_daily(state: dict) -> None:
+    """Resumen diario (por privado) y alertas en vivo de posibles remontadas."""
+    if not config.NBA_ENABLED or not state.get("owner_chat"):
+        return
+    from zoneinfo import ZoneInfo
+    from . import nba
+    local = store.now_utc().astimezone(ZoneInfo(config.TIMEZONE))
+    if state.get("nba_digest_date") != _local_today() and config.NBA_DIGEST_HOUR <= local.hour < 22:
+        state["nba_digest_date"] = _local_today()
+        try:
+            telegram.send(state["owner_chat"], nba.digest())
+        except Exception:
+            traceback.print_exc()
+    if config.NBA_LIVE_ALERTS and (local.hour >= 12 or local.hour < 4):
+        try:
+            for a in nba.live_alerts(state):
+                telegram.send(state["owner_chat"], a)
+        except Exception:
+            traceback.print_exc()
+
+
 # ---------------------------------------------------------------- resultados
 def grade_leg(l: dict, h: int, a: int) -> str | None:
     """Compara la apuesta con el marcador de 90': 'W' verde, 'L' roja, 'V' nula, None si no sé leerla."""
     t, o, line = l.get("mtype", ""), str(l.get("outcome", "")).strip().lower(), l.get("handicap")
     if t == "1x2":
         won = {"1": h > a, "x": h == a, "2": h < a}.get(o)
+    elif t == "moneyline" and o in ("1", "2"):   # básquetbol: ganador incluida la prórroga
+        won = (h > a) if o == "1" else (a > h)
     elif t == "bothteamsscore":
         won = (h > 0 and a > 0) == o.startswith(("s", "y"))
     elif t in ("totals", "teamtotals-team1", "teamtotals-team2") and line is not None:
@@ -267,7 +416,11 @@ def _grade(pick: dict) -> tuple[str | None, list, bool]:
     una selección; nula si ambas se devuelven; verde en otro caso."""
     scores, results = [], []
     for l in pick["legs"]:
-        sc = apifootball.final_score(l["home"], l["away"], l["kickoff"])
+        if l.get("sport") == "basketball":
+            from . import nba
+            sc = nba.final_score(l["home"], l["away"], l["kickoff"])
+        else:
+            sc = apifootball.final_score(l["home"], l["away"], l["kickoff"])
         scores.append(sc)
         results.append(grade_leg(l, *sc) if sc else None)
     finished = all(scores)
@@ -1076,6 +1229,16 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.answer(cb["id"])
         return
 
+    if action == "sb":   # NBA: elegir la opción B (pasa a ser el pick)
+        if p["status"] != "candidate" or not p.get("alt"):
+            telegram.answer(cb["id"], "Ya estaba procesado")
+            return
+        alt = p.pop("alt")
+        p["alt_original"] = {k: p[k] for k in ("legs", "price", "prob", "edge", "stake", "tier", "kind", "analysis")}
+        p.update({k: alt[k] for k in ("legs", "price", "prob", "edge", "stake", "tier", "kind", "analysis")})
+        p["chosen_option"] = "B"
+        action = "s"
+
     if action == "s":   # elegir: generar la imagen y preguntar destinos
         if p["status"] != "candidate":
             telegram.answer(cb["id"], "Ya estaba procesado")
@@ -1401,6 +1564,7 @@ HELP_TEXT = (
     "👁 <b>Comandos de Stakevision</b>\n\n"
     "/buscar · analiza ahora los partidos de las próximas 30 h y te manda el top 3\n"
     "/buscar 40 · igual, pero mirando 40 horas hacia adelante (máximo 47)\n"
+    "/buscar nba · picks de NBA (opción A y B con argumentos) · /envivo nba · NBA en juego\n"
     "/envivo · busca valor en partidos que se están jugando ahora\n"
     "/compartir 8 · vuelve a mandarte la imagen del pick #8 (o su post partido, si ya terminó)\n"
     "/titular 8 MARACA-NAZO · cambia el titular de la imagen post partido del pick #8\n"
@@ -1421,7 +1585,10 @@ def _request_search(state: dict, text: str, live: bool = False) -> None:
     owner = state["owner_chat"]
     parts = text.split()
     hours = config.WINDOW_END_H
-    if len(parts) > 1 and parts[1].lower() in ("vivo", "envivo", "live"):
+    is_nba = any(x.lower() in ("nba", "basket", "basquet", "básquet", "baloncesto") for x in parts[1:])
+    if is_nba:
+        live = live or any(x.lower() in ("vivo", "envivo", "live") for x in parts[1:])
+    elif len(parts) > 1 and parts[1].lower() in ("vivo", "envivo", "live"):
         live = True
     elif len(parts) > 1 and not live:
         try:
@@ -1439,6 +1606,11 @@ def _request_search(state: dict, text: str, live: bool = False) -> None:
         return
     m["n"] += 1
     state["manual"] = m
+    if is_nba:
+        state["scan_request"] = "nba-live" if live else "nba"
+        telegram.send(owner, "🏀 Buscando en la NBA" + (" (partidos en juego)" if live else "")
+                      + f"… te llega en un par de minutos. (Búsqueda {m['n']} de {config.MANUAL_SEARCHES_PER_DAY} hoy)")
+        return
     if live:
         state["scan_request"] = "live"
         telegram.send(owner, f"🔴 Buscando valor en los partidos que se están jugando… te llega en un par de "
@@ -1514,7 +1686,9 @@ def _run_scan_request(state: dict) -> dict:
     if not request:
         return state
     store.save(state)
-    if request == "live":
+    if request in ("nba", "nba-live"):
+        scan_nba(top=config.MANUAL_TOP, manual=True, live=request == "nba-live")
+    elif request == "live":
         scan(top=config.MANUAL_TOP, manual=True, live=True)
     else:
         scan(hours=request, top=config.MANUAL_TOP, manual=True)
@@ -1580,6 +1754,7 @@ def poll() -> None:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)
     _refresh_recap_texts(state)
+    _nba_daily(state)
     for p in state["picks"].values():   # picks aprobados con el flujo antiguo: ofrecer la imagen para compartir
         if (owner and p["status"] == "published" and not p.get("share_msg") and not p.get("share_offered")
                 and store.parse_ts(p["kickoff"]) > now):

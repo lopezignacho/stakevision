@@ -67,15 +67,16 @@ def quota_text() -> str:
     return ", ".join(f"{k}={v}" for k, v in found.items()) or "sin datos de uso"
 
 
-def markets(force: bool = False) -> dict:
-    """Mapa marketId -> info del mercado. Se descarga una vez y queda en data/markets.json."""
-    if not force and os.path.exists(config.MARKETS_CACHE):
-        with open(config.MARKETS_CACHE, encoding="utf-8") as f:
+def markets(force: bool = False, sport_id: int = 10) -> dict:
+    """Mapa marketId -> info del mercado. Se descarga una vez y queda en caché (fútbol: data/markets.json)."""
+    cache = config.MARKETS_CACHE if sport_id == 10 else os.path.join(config.ROOT, "data", "markets_basketball.json")
+    if not force and os.path.exists(cache):
+        with open(cache, encoding="utf-8") as f:
             return json.load(f)
     raw = _get("/markets", language="es")
     out = {}
     for m in raw:
-        if m.get("sportId") != 10:
+        if m.get("sportId") != sport_id:
             continue
         out[str(m["marketId"])] = {
             "name": m.get("marketName"),
@@ -86,8 +87,8 @@ def markets(force: bool = False) -> dict:
             "length": m.get("marketLength"),
             "outcomes": {str(o["outcomeId"]): o.get("outcomeName") for o in m.get("outcomes", [])},
         }
-    os.makedirs(os.path.dirname(config.MARKETS_CACHE), exist_ok=True)
-    with open(config.MARKETS_CACHE, "w", encoding="utf-8") as f:
+    os.makedirs(os.path.dirname(cache), exist_ok=True)
+    with open(cache, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=1)
     return out
 
@@ -103,15 +104,15 @@ def tournaments() -> list[dict]:
     return out
 
 
-def upcoming_fixtures(frm: str, to: str) -> list[dict]:
-    """Partidos de fútbol con cuotas de Betano en la ventana (debe ser < 48 h)."""
-    return _get("/fixtures", sportId=10, **{"from": frm, "to": to},
+def upcoming_fixtures(frm: str, to: str, sport_id: int = 10) -> list[dict]:
+    """Partidos con cuotas de Betano en la ventana (debe ser < 48 h). Fútbol = 10, básquetbol = 11."""
+    return _get("/fixtures", sportId=sport_id, **{"from": frm, "to": to},
                 statusId=0, hasOdds="true", bookmakers=config.BOOK)
 
 
-def live_fixtures(frm: str, to: str) -> list[dict]:
-    """Partidos de fútbol que se están jugando (statusId=1) con cuotas de Betano."""
-    return _get("/fixtures", sportId=10, **{"from": frm, "to": to},
+def live_fixtures(frm: str, to: str, sport_id: int = 10) -> list[dict]:
+    """Partidos que se están jugando (statusId=1) con cuotas de Betano."""
+    return _get("/fixtures", sportId=sport_id, **{"from": frm, "to": to},
                 statusId=1, hasOdds="true", bookmakers=config.BOOK)
 
 

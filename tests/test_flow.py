@@ -630,3 +630,69 @@ updates_q.append({"update_id": 1100, "message": {"chat": {"id": OWNER, "type": "
 main.poll()
 assert photos[n:] and all(ch == OWNER for ch, _ in photos[n:]) and "Vista previa" in (photos[n][1] or sent[-1][1])
 print("OK vista previa entretiempo")
+
+# 23) NBA: escaneo con opción A y B, argumentos, elegir B, calificar y alertas en vivo
+from sv import formatting, nba  # noqa: E402
+NBA_MARKETS = {
+    "111": {"name": "Ganador", "type": "moneyline", "period": "result", "handicap": 0, "playerProp": False,
+            "length": 2, "outcomes": {"111": "1", "112": "2"}},
+    "11358": {"name": "Hándicap", "type": "spreads", "period": "result", "handicap": -4.5, "playerProp": False,
+              "length": 2, "outcomes": {"11358": "1", "11359": "2"}},
+    "11278": {"name": "Total", "type": "totals", "period": "result", "handicap": 228.5, "playerProp": False,
+              "length": 2, "outcomes": {"11278": "Más", "11279": "Menos"}},
+}
+fxn = te.fixture("n1", "Boston Celtics", "New York Knicks", hours=8)
+fxn["tournamentId"] = 132
+_orig_markets = oddspapi.markets
+oddspapi.markets = lambda force=False, sport_id=10: NBA_MARKETS if sport_id == 11 else te.MARKETS
+oddspapi.upcoming_fixtures = lambda frm, to, sport_id=10: [fxn] if sport_id == 11 else []
+oddspapi.odds_by_tournaments = lambda ids: [{"fixtureId": "n1", "bookmakerOdds": {
+    "pinnacle": te.book({"111": {"111": 1.55, "112": 2.55}, "11358": {"11358": 1.95, "11359": 1.91},
+                         "11278": {"11278": 1.92, "11279": 1.94}}),
+    "betano": te.book({"111": {"111": 1.62, "112": 2.40}, "11358": {"11358": 1.99, "11359": 1.80},
+                       "11278": {"11278": 1.88, "11279": 1.90}})}}]
+games = [{"date": f"2026-10-{20 - i:02d}T23:00Z", "pf": 118 - i, "pa": 108, "home": i % 2 == 0, "opp": "X", "season": 2027}
+         for i in range(8)]
+nba.context = lambda h, a, k: {"event": "e1", "inverted": False,
+                               "home": {"name": "Boston Celtics", "id": "2", "record": "3-0", "home_rec": "2-0",
+                                        "road_rec": "1-0", "games": games, "rest_days": 2.0,
+                                        "injuries": [], "espn_prob": 0.64},
+                               "away": {"name": "New York Knicks", "id": "18", "record": "1-2", "home_rec": "1-0",
+                                        "road_rec": "0-2", "games": [dict(g, pf=105, pa=110) for g in games],
+                                        "rest_days": 0.9,
+                                        "injuries": [{"name": "Jalen Brunson", "status": "Out", "key": True, "type": "Ankle"}],
+                                        "espn_prob": 0.36}}
+n = len(sent)
+main.scan_nba(manual=True)
+cand = [(t, b) for _, t, b, _ in sent[n:] if b and "NBA · Candidato" in t]
+assert cand, sent[n:]
+txt, btns = cand[0]
+assert "Opción A" in txt and "Opción B" in txt and "A favor" in txt and "Brunson" in txt, txt
+assert "hándicap de puntos" in txt or "puntos" in txt
+pidn = btns[0][0][1].split(":")[1]
+assert btns[0][1][1] == f"sb:{pidn}"
+updates_q.append({"update_id": 1200, "callback_query": {"id": "nb", "data": f"sb:{pidn}",
+                                                        "message": {"chat": {"id": OWNER}, "message_id": 140}}})
+main.poll()
+pn = store.load()["picks"][pidn]
+assert pn["status"] == "selected" and pn["chosen_option"] == "B" and pn["legs"][0]["sport"] == "basketball"
+assert "Betano" not in formatting.channel_post(pn)
+assert main.grade_leg({"mtype": "moneyline", "outcome": "2"}, 101, 108) == "W"
+nba.final_score = lambda h, a, k: (112, 104)
+assert main._grade(pn)[2]
+# alertas en vivo: favorito pierde por 12 en el 3er cuarto
+def _fake_get(path, **kw):
+    if path == "/scoreboard":
+        return {"events": [{"id": "77", "status": {"type": {"state": "in"}, "period": 3, "displayClock": "6:10"},
+                            "competitions": [{"competitors": [
+                                {"homeAway": "home", "score": "70", "team": {"displayName": "Boston Celtics"}},
+                                {"homeAway": "away", "score": "82", "team": {"displayName": "Miami Heat"}}]}]}]}
+    if path == "/summary":
+        return {"predictor": {"homeTeam": {"gameProjection": "68.0"}}, "winprobability": [{"homeWinPercentage": 0.22}]}
+    return {}
+nba._get = _fake_get
+st = store.load()
+al = nba.live_alerts(st)
+assert al and "Posible remontada" in al[0] and "4.55" in al[0], al
+assert not nba.live_alerts(st)   # una sola vez por cuarto
+print("OK NBA")

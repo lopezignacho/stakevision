@@ -38,6 +38,18 @@ def outcome_label(l: dict) -> str:
     team = {"1": l["home"], "2": l["away"]}
     push = h is not None and float(h) == int(float(h))   # línea entera: con ese número exacto se devuelve
     push_txt = f" (con {_line(h)} exactos se devuelve)" if push else ""
+    if l.get("sport") == "basketball":
+        unit = "puntos"
+        if t == "moneyline" and o in team:
+            return f"Gana {team[o]} (incluye prórroga)"
+        if t == "totals" and h is not None:
+            return f"{'Más' if o.lower().startswith(('más', 'mas', 'over')) else 'Menos'} de {_line(h)} {unit}{push_txt}"
+        if t in ("teamtotals-team1", "teamtotals-team2") and h is not None:
+            who = l["home"] if t.endswith("1") else l["away"]
+            return f"{who}: {'más' if o.lower().startswith(('más', 'mas', 'over')) else 'menos'} de {_line(h)} {unit}{push_txt}"
+        if t == "spreads" and h is not None and o in team:
+            hh = float(h) if o == "1" else -float(h)
+            return f"{team[o]} {'+' if hh > 0 else ''}{_line(hh)} (hándicap de puntos)"
     if t == "totals" and h is not None:
         return f"{'Más' if o.lower().startswith('más') else 'Menos'} de {_line(h)} goles{push_txt}"
     if t in ("teamtotals-team1", "teamtotals-team2") and h is not None:
@@ -134,31 +146,77 @@ def _market_line(l: dict, h: list[dict], a: list[dict]) -> str:
 
 def analysis(pick: dict) -> str:
     """Valor de la cuota + forma real de los equipos (si hay datos) + probabilidad. Breve."""
+    if any(l.get("sport") == "basketball" for l in pick["legs"]):
+        from . import nba
+        parts = [nba.arguments_text(l, l.get("nba_ctx")) for l in pick["legs"]]
+        parts.append(f"Probabilidad estimada: {pct(pick['prob'])}. "
+                     f"Para no perder a esta cuota se necesita {pct(1 / pick['price'])}.")
+        return "\n".join(x for x in parts if x)
     parts = []
     for l in pick["legs"]:
-        parts.append(f"{escape(outcome_label(l))} en {escape(l['home'])} vs {escape(l['away'])}: "
-                     f"cuota justa estimada {odds(l['fair_odds'])}, cuota disponible {odds(l['price'])}"
-                     + (f" (+{pct(l['edge'])} de valor)." if l['edge'] >= 0 else " (en línea con la cuota justa)."))
-        ctx = l.get("context") or {}
-        if ctx.get("v") == 2:
-            h, a = ctx.get("home") or [], ctx.get("away") or []
-            if len(h) >= 3:
-                parts.append("📊 " + _team_line(l["home"], h, "L"))
-            if len(a) >= 3:
-                parts.append("📊 " + _team_line(l["away"], a, "V"))
-            if len(h) >= 3 and len(a) >= 3:
-                m = _market_line(l, h, a)
-                if m:
-                    parts.append("🎯 " + m)
+        if len(pick["legs"]) > 1:
+            parts.append(f"<b>{escape(outcome_label(l))}</b> en {escape(l['home'])} vs {escape(l['away'])}")
+        pros, cons = soccer_arguments(l)
+        if pros:
+            parts.append("✅ <b>A favor:</b>\n" + "\n".join(f"• {p}" for p in pros))
+        if cons:
+            parts.append("⚠️ <b>En contra:</b>\n" + "\n".join(f"• {c}" for c in cons))
     parts.append(f"Probabilidad estimada: {pct(pick['prob'])}. "
                  f"Para no perder a esta cuota se necesita {pct(1 / pick['price'])}.")
     return "\n".join(parts)
 
 
+def _pts(ms: list[dict]) -> int:
+    return sum(3 if m["gf"] > m["ga"] else 1 if m["gf"] == m["ga"] else 0 for m in ms[:6])
+
+
+def soccer_arguments(l: dict) -> tuple[list[str], list[str]]:
+    """Argumentos a favor y en contra de una selección de fútbol, con datos reales (texto HTML escapado)."""
+    pros, cons = [], []
+    edge = l.get("edge", 0)
+    if edge >= config.MIN_EDGE:
+        pros.append(f"Valor: cuota justa {odds(l['fair_odds'])} y cuota disponible "
+                    f"{odds(l['price'])}: +{pct(edge)}.")
+    elif edge >= 0:
+        pros.append(f"Cuota en línea con la justa ({odds(l['fair_odds'])}): no hay regalo de la casa, "
+                    "la decisión se apoya en la forma de los equipos.")
+    else:
+        cons.append(f"Paga algo menos que la cuota justa ({odds(l['fair_odds'])}).")
+    ctx = l.get("context") or {}
+    if ctx.get("v") != 2:
+        return pros, cons
+    h, a = ctx.get("home") or [], ctx.get("away") or []
+    t, o = l.get("mtype", ""), str(l.get("outcome", "")).strip().lower()
+    side = {"1": "home", "2": "away"}.get(o) if t in ("1x2", "drawnobet", "spreads") else None
+    if side and len(h) >= 3 and len(a) >= 3:
+        me, op = (h, a) if side == "home" else (a, h)
+        mn, on = (l["home"], l["away"]) if side == "home" else (l["away"], l["home"])
+        mv, ov = ("L", "V") if side == "home" else ("V", "L")
+        (pros if _pts(me) >= _pts(op) else cons).append("📊 " + _team_line(mn, me, mv))
+        (pros if _pts(op) < _pts(me) else cons).append("📊 " + _team_line(on, op, ov))
+    elif t == "1x2" and o == "x" and len(h) >= 3 and len(a) >= 3:
+        draws = sum(m["gf"] == m["ga"] for m in h[:6]) + sum(m["gf"] == m["ga"] for m in a[:6])
+        n = len(h[:6]) + len(a[:6])
+        (pros if draws / n >= 0.3 else cons).append(f"Empates recientes: {draws} de {n} partidos entre los dos equipos.")
+    elif len(h) >= 3 and len(a) >= 3:
+        m_line = _market_line(l, h, a)
+        hits = [int(x) for x in __import__("re").findall(r"en (\d+) de (\d+)", m_line or "") for x in x[:1]]
+        tot = [int(x[1]) for x in __import__("re").findall(r"en (\d+) de (\d+)", m_line or "")]
+        if m_line:
+            ratio = sum(hits) / max(sum(tot), 1)
+            (pros if ratio >= 0.5 else cons).append("🎯 " + m_line)
+        pros.append("📊 " + _team_line(l["home"], h, "L"))
+        pros.append("📊 " + _team_line(l["away"], a, "V"))
+    if len(h) < 3 or len(a) < 3:
+        cons.append("Poco historial reciente de uno de los equipos: el análisis se apoya sobre todo en la cuota.")
+    return pros[:4], cons[:3]
+
+
 def _legs_block(pick: dict) -> str:
     rows = []
     for l in pick["legs"]:
-        rows.append(f"⚽ <b>{escape(l['home'])} vs {escape(l['away'])}</b>\n"
+        emoji = "🏀" if l.get("sport") == "basketball" else "⚽"
+        rows.append(f"{emoji} <b>{escape(l['home'])} vs {escape(l['away'])}</b>\n"
                     f"🏆 {escape(l['league'])} · 🕒 {local_time(l['kickoff'])}\n"
                     f"🎯 <b>{escape(outcome_label(l))}</b> @ {odds(l['price'])}")
     return "\n\n".join(rows)
@@ -309,7 +367,8 @@ def instagram_pick_caption(pick: dict) -> str:
         lines.append(f"🎯 {outcome_label(l)} @ {odds(l['price'])}")
     lines.append(f"📈 Cuota {odds(pick['price'])} · Stake {pick['stake']}/10")
     ana = _h.unescape(_re.sub(r"<[^>]+>", "", pick.get("analysis") or ""))
-    keep = [x for x in ana.split("\n") if x.startswith("📊") or x.startswith("🎯")]
+    keep = [x.lstrip("• ").strip() for x in ana.split("\n") if "📊" in x or "🎯" in x or x.startswith("• ")]
+    keep = [x for x in keep if not x.startswith("Valor:")]
     if keep:
         lines += [""] + keep[:3]
     lines += ["", "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio)."]

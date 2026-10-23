@@ -27,6 +27,7 @@ class Selection:
     price: float            # cuota Betano
     fair_prob: float        # probabilidad justa (Pinnacle sin margen)
     ref_price: float        # cuota Pinnacle original
+    sport: str = "soccer"
 
     @property
     def fair_odds(self) -> float:
@@ -109,9 +110,13 @@ def _price(book_odds: dict, market_id: str, outcome_id: str) -> float | None:
     return float(price) if price and price > 1 else None
 
 
-def _market_ok(meta: dict | None) -> bool:
+def _market_ok(meta: dict | None, sport: str = "soccer") -> bool:
     if not meta or meta.get("playerProp"):
         return False
+    if sport == "basketball":   # partido completo incluida la prórroga
+        if (meta.get("period") or "").lower() != "result" or meta.get("type") not in config.NBA_MARKET_TYPES:
+            return False
+        return True
     if config.ONLY_FULLTIME and (meta.get("period") or "").lower() != "fulltime":
         return False
     if config.ALLOWED_MARKET_TYPES and meta.get("type") not in config.ALLOWED_MARKET_TYPES:
@@ -122,7 +127,7 @@ def _market_ok(meta: dict | None) -> bool:
     return True
 
 
-def selections_for_fixture(fx: dict, odds: dict, markets: dict) -> list[Selection]:
+def selections_for_fixture(fx: dict, odds: dict, markets: dict, sport: str = "soccer") -> list[Selection]:
     """Todas las selecciones donde Betano y Pinnacle tienen el mercado completo."""
     books = odds.get("bookmakerOdds") or {}
     book, ref = books.get(config.BOOK), books.get(config.REFERENCE)
@@ -131,7 +136,7 @@ def selections_for_fixture(fx: dict, odds: dict, markets: dict) -> list[Selectio
     out = []
     for mid, rmkt in (ref.get("markets") or {}).items():
         meta = markets.get(str(mid))
-        if not _market_ok(meta):
+        if not _market_ok(meta, sport):
             continue
         if mid not in (book.get("markets") or {}):
             continue
@@ -162,7 +167,7 @@ def selections_for_fixture(fx: dict, odds: dict, markets: dict) -> list[Selectio
                 market_id=str(mid), market=meta.get("name") or str(mid), mtype=meta.get("type") or "",
                 outcome_id=str(oid), outcome=meta["outcomes"].get(str(oid), str(oid)),
                 handicap=meta.get("handicap"),
-                price=bp, fair_prob=imp / total, ref_price=rp,
+                price=bp, fair_prob=imp / total, ref_price=rp, sport=sport,
             ))
     return out
 
