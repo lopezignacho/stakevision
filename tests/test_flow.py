@@ -42,6 +42,7 @@ telegram.answer = lambda *a, **k: None
 telegram._call = lambda *a, **k: True
 telegram.updates = lambda offset, wait=0: [u for u in updates_q if u["update_id"] >= offset]
 config.AUTO_SCAN_FALLBACK = False
+config.AUTO_FREE = False   # se prueba aparte, al final
 _scan = main.scan
 
 
@@ -724,3 +725,66 @@ main.poll()
 got = [t for _, t, b, _ in sent[n:] if b and "Candidato" in t]
 assert got and "⚽" in got[0] and "Ambos marcan" in got[0], sent[n:]
 print("OK /partido")
+
+# 25) pick gratis automático: elige el más probable, avisa, permite cambiar y publica solo
+config.AUTO_FREE = True
+st = store.load()
+for p_ in st["picks"].values():   # dejar libre el día de pruebas
+    if p_["status"] in ("candidate", "selected", "published"):
+        p_["status"] = "settled"
+    p_.get("channel_msgs", {}).pop("free", None)
+st.pop("auto_free", None)
+store.save(st)
+commons.photo = lambda name, team=False: None
+oddspapi.live_fixtures = lambda frm, to, sport_id=10: []
+fxa = te.fixture("fa1", "Colo-Colo", "U. de Chile", hours=6)
+fxb = te.fixture("fb1", "Boca Juniors", "River Plate", hours=8)
+oddspapi.upcoming_fixtures = lambda frm, to, sport_id=10: [] if sport_id == 11 else [fxa, fxb]
+oddspapi.odds_by_tournaments = lambda ids: [
+    {"fixtureId": "fa1", "bookmakerOdds": {   # justa 1.85 -> prob ~0.54
+        "pinnacle": te.book({"104": {"104": 1.80, "105": 2.05}}),
+        "betano": te.book({"104": {"104": 1.95, "105": 1.85}})}},
+    {"fixtureId": "fb1", "bookmakerOdds": {   # más probable: justa ~1.70
+        "pinnacle": te.book({"104": {"104": 1.66, "105": 2.30}}),
+        "betano": te.book({"104": {"104": 1.78, "105": 2.10}})}}]
+n = len(sent)
+main.scan()
+st = store.load()
+af = st["auto_free"]
+assert af["status"] == "pending", af
+first = st["picks"][af["pid"]]
+assert first["status"] == "selected" and first["auto_free"]
+probs = sorted((st["picks"][pid].get("prob") for pid, _ in af["pool"]), reverse=True)
+assert first["prob"] == probs[0], (first["prob"], probs)
+note = [t for _, t, _, _ in sent[n:] if "Pick gratis automático de hoy" in (t or "")]
+assert note and "Se publica sola" in note[0] and "Betano" not in note[0], sent[n:]
+# cambiar por la siguiente opción
+assert len(af["pool"]) > 1, af["pool"]
+if True:
+    updates_q.append({"update_id": 1400, "callback_query": {"id": "fo", "data": f"fo:{af['pid']}",
+                                                            "message": {"chat": {"id": OWNER}, "message_id": 150}}})
+    main.poll()
+    st = store.load()
+    assert st["picks"][first["id"]]["status"] == "candidate"
+    assert st["auto_free"]["pid"] != first["id"] and st["auto_free"]["status"] == "pending"
+# vence el plazo: se publica solo en VIP + Gratis
+st["auto_free"]["at"] = main._iso(store.now_utc() - timedelta(minutes=1))
+store.save(st)
+n = len(sent)
+main.poll()
+st = store.load()
+pa = st["picks"][st["auto_free"]["pid"]]
+assert st["auto_free"]["status"] == "published", st["auto_free"]
+assert "free" in pa["channel_msgs"] and "vip" in pa["channel_msgs"]
+assert any(c == config.FREE_CHANNEL for c, *_ in sent[n:])
+# no se elige otro el mismo día
+assert not main._auto_free_choose(st)
+# /gratis muestra el estado
+n = len(sent)
+updates_q.append({"update_id": 1401, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/gratis"}})
+main.poll()
+assert any("publicado" in (t or "") for _, t, _, _ in sent[n:])
+updates_q.append({"update_id": 1402, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/gratis apagar"}})
+main.poll()
+assert store.load().get("auto_free_off")
+print("OK pick gratis automático")

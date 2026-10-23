@@ -142,6 +142,283 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False,
                 scan_nba()
             except Exception:
                 traceback.print_exc()
+        if not manual and not live and config.AUTO_FREE:
+            try:
+                state = store.load()
+                _auto_free_choose(state)
+                store.save(state)
+            except Exception:
+                traceback.print_exc()
+
+
+# ---------------------------------------------------------------- pick gratis automático
+AUTO_KEYS = ("legs", "price", "prob", "edge", "stake", "tier", "kind", "analysis")
+
+
+def AUTO_FREE_BUTTONS(pid: str) -> list:
+    return [[("🚀 Publicar ya", f"fa:{pid}"), ("🔁 Elegir otro", f"fo:{pid}")],
+            [("✋ No publicar hoy", f"fc:{pid}")]]
+
+
+def _auto_pool(state: dict, publish_at) -> list:
+    """Opciones del escaneo de hoy que sirven para el gratis, de la más probable a la menos."""
+    lead = publish_at + timedelta(minutes=config.AUTO_FREE_MIN_LEAD_MIN)
+    today = _local_today()
+    from zoneinfo import ZoneInfo
+    pool = []
+    for p in state["picks"].values():
+        if p["status"] != "candidate" or p.get("live") or p.get("kind") != "simple":
+            continue
+        made = store.parse_ts(p["created_at"]).astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat()
+        if made != today or store.parse_ts(p["kickoff"]) < lead:
+            continue
+        for opt, d in (("A", p), ("B", p.get("alt"))):
+            if not d or len(d.get("legs") or []) != 1:
+                continue
+            if not (config.ODDS_MIN <= d["price"] <= config.ODDS_MAX) or d["edge"] < config.AUTO_FREE_MIN_EDGE:
+                continue
+            pool.append((d["prob"], d["edge"], p["id"], opt))
+    pool.sort(key=lambda x: (round(x[0], 3), x[1]), reverse=True)   # más probable; a igualdad, más valor
+    return [[pid, opt] for _pr, _ed, pid, opt in pool]
+
+
+def _free_given_today(state: dict) -> bool:
+    from zoneinfo import ZoneInfo
+    today = _local_today()
+    for p in state["picks"].values():
+        if "free" in (p.get("channel_msgs") or {}) and p.get("published_at"):
+            if store.parse_ts(p["published_at"]).astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat() == today:
+                return True
+    return False
+
+
+def _use_option(p: dict, opt: str) -> None:
+    if opt == "B" and p.get("alt"):
+        alt = p.pop("alt")
+        p["alt_original"] = {k: p[k] for k in AUTO_KEYS}
+        p.update({k: alt[k] for k in AUTO_KEYS})
+        p["chosen_option"] = "B"
+
+
+def _undo_option(p: dict) -> None:
+    if p.get("chosen_option") == "B" and p.get("alt_original"):
+        p["alt"] = {k: p[k] for k in AUTO_KEYS}
+        p.update(p.pop("alt_original"))
+        p.pop("chosen_option", None)
+
+
+def _restore_candidate(state: dict, p: dict) -> None:
+    """Devuelve el pick a candidato (con sus botones de siempre) si se cambia o cancela el automático."""
+    _undo_option(p)
+    p["status"] = "candidate"
+    p.pop("auto_free", None)
+    p.pop("pick_style", None)
+    owner = state.get("owner_chat")
+    if owner and p.get("owner_msg"):
+        btns = NBA_BUTTONS(p["id"], bool(p.get("alt"))) if p.get("sport") == "basketball" else CANDIDATE_BUTTONS(p["id"])
+        try:
+            telegram.set_buttons(owner, p["owner_msg"], btns)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _auto_free_choose(state: dict, skip: list | None = None) -> bool:
+    """Elige el pick gratis del día (el de mayor probabilidad justa dentro de 1.65-2.00) y te avisa
+    con unos minutos para cancelarlo o cambiarlo antes de publicarlo."""
+    owner = state.get("owner_chat")
+    if not owner or state.get("auto_free_off"):
+        return False
+    today = _local_today()
+    af = state.get("auto_free") or {}
+    if af.get("date") == today and af.get("status") in ("pending", "published", "cancelled") and skip is None:
+        return False
+    if _free_given_today(state):
+        return False
+    now = store.now_utc()
+    at = now + timedelta(minutes=config.AUTO_FREE_DELAY_MIN)
+    pool = af.get("pool") if skip is not None and af.get("date") == today else _auto_pool(state, at)
+    gone = {x[0] for x in skip or []}
+    pool = [x for x in pool or [] if x[0] not in gone
+            and (state["picks"].get(x[0]) or {}).get("status") == "candidate"]
+    if not pool:
+        state["auto_free"] = {"date": today, "status": "none", "pool": []}
+        telegram.send(owner, "🤖 Pick gratis automático: hoy ninguna opción cumple (cuota 1.65–2.00, cerca de la "
+                             "cuota justa y con tiempo antes del partido). Si quieres, elige uno a mano con 🎁.")
+        return False
+    pid, opt = pool[0]
+    p = state["picks"][pid]
+    _use_option(p, opt)
+    p["status"] = "selected"
+    p["auto_free"] = True
+    try:
+        from . import layouts
+        p["pick_layout"] = p.get("pick_layout") or layouts.next_layout(state, "pick")
+        _make_pick_photo(p)
+        p["pick_style"] = "photo"
+    except Exception:
+        traceback.print_exc()
+    if p.get("owner_msg"):
+        telegram.edit_buttons_off(owner, p["owner_msg"], "🤖 Elegido como pick gratis automático (abajo)")
+    state["auto_free"] = {"date": today, "status": "pending", "pid": pid, "opt": opt, "at": _iso(at),
+                          "pool": pool, "tried": (af.get("tried") or []) + [[pid, opt]] if skip else [[pid, opt]]}
+    l = p["legs"][0]
+    from zoneinfo import ZoneInfo
+    hhmm = at.astimezone(ZoneInfo(config.TIMEZONE)).strftime("%H:%M")
+    where = "VIP + Gratis" if (config.AUTO_FREE_VIP_TOO and state.get("vip_chat")) else "Gratis"
+    from . import instagram
+    if config.AUTO_FREE_INSTAGRAM and instagram.enabled(state):
+        where += " + Instagram"
+    esc = formatting.escape
+    others = len(pool) - 1
+    cap = (f"🤖 <b>Pick gratis automático de hoy</b> · #{pid}" + (" (opción B)" if opt == "B" else "") + "\n"
+           f"{'🏀' if l.get('sport') == 'basketball' else '⚽'} {esc(l['home'])} vs {esc(l['away'])}\n"
+           f"🎯 <b>{esc(formatting.outcome_label(l))}</b> @ {formatting.odds(p['price'])}\n"
+           f"📈 Probabilidad justa {formatting.pct(p['prob'])} · valor {'+' if p['edge'] >= 0 else ''}"
+           f"{formatting.pct(p['edge'])}\n\n"
+           f"Es la opción más probable de las {len(pool)} que cumplen hoy. "
+           f"Se publica sola a las <b>{hhmm}</b> en {where}.\n"
+           "Revisa la cuota en tu app. Puedes publicarlo ya, cambiarlo por la siguiente opción"
+           + (f" (quedan {others})" if others else "") + " o no publicar gratis hoy.")
+    image = _pick_image(p)
+    msg = telegram.send_photo(owner, image, caption=cap) if image else telegram.send(owner, cap)
+    state["auto_free"]["msg"] = msg["message_id"]
+    telegram.set_buttons(owner, msg["message_id"], AUTO_FREE_BUTTONS(pid))
+    return True
+
+
+def _auto_free_publish(state: dict, p: dict) -> None:
+    owner = state.get("owner_chat")
+    af = state["auto_free"]
+    vip_too = config.AUTO_FREE_VIP_TOO and bool(state.get("vip_chat"))
+    _publish(state, p, free=True, vip_too=vip_too)
+    p["auto_free"] = True
+    note = "✅ Publicado en " + ("VIP + Gratis" if vip_too else "Gratis")
+    from . import instagram
+    if config.AUTO_FREE_INSTAGRAM and instagram.enabled(state) and not p.get("ig_pre_status"):
+        image = _pick_image(p)
+        if image:
+            from . import postimage
+            instagram.save_image(f"pre-{p['id']}", postimage.fit_instagram(image))
+            p["ig_pre_status"] = "queued"
+            p["ig_pre_caption"] = formatting.instagram_pick_caption(p)
+            note += " · Instagram en cola"
+    af["status"] = "published"
+    if owner and af.get("msg"):
+        telegram.edit_buttons_off(owner, af["msg"], note)
+    if owner:
+        _share_panel(state, p)   # por si quieres el adelanto para historias u otro diseño
+
+
+def _auto_free_tick(state: dict, now) -> None:
+    af = state.get("auto_free") or {}
+    if af.get("status") != "pending" or now < store.parse_ts(af["at"]):
+        return
+    p = state["picks"].get(af.get("pid") or "")
+    owner = state.get("owner_chat")
+    if not p or p["status"] not in ("selected", "published") or "free" in (p.get("channel_msgs") or {}):
+        af["status"] = "published" if p and "free" in (p.get("channel_msgs") or {}) else "cancelled"
+        return
+    if _free_given_today(state):
+        af["status"] = "cancelled"
+        if owner and af.get("msg"):
+            telegram.edit_buttons_off(owner, af["msg"], "Ya publicaste un gratis hoy: no salió el automático")
+        _restore_candidate(state, p)
+        return
+    if store.parse_ts(p["kickoff"]) - now < timedelta(minutes=15):
+        af["status"] = "cancelled"
+        if owner and af.get("msg"):
+            telegram.edit_buttons_off(owner, af["msg"], "⌛ El partido está por empezar: no se publicó")
+        return
+    _auto_free_publish(state, p)
+
+
+def _auto_recap_tick(state: dict, p: dict, now) -> None:
+    """Post partido del pick gratis automático: se comparte solo en sus canales (e Instagram si fue verde)."""
+    r = p.get("recap") or {}
+    if (not r.get("auto_at") or r.get("auto_done") or r.get("auto_off") or now < store.parse_ts(r["auto_at"])
+            or not os.path.exists(_recap_file(p))):
+        return
+    r["auto_done"] = True
+    done = []
+    for where in (p.get("channel_msgs") or {}):
+        if where in r["msgs"] or (where == "vip" and not state.get("vip_chat")):
+            continue
+        try:
+            _recap_share(state, p, where)
+            done.append("VIP" if where == "vip" else "Gratis")
+        except Exception:
+            traceback.print_exc()
+    from . import instagram
+    if (p.get("result") == "W" and config.AUTO_FREE_INSTAGRAM and instagram.enabled(state)
+            and p.get("ig_res_status") not in ("queued", "posted")):
+        p["ig_res_status"] = "queued"
+        p["ig_res_caption"] = r["ig"]
+        done.append("Instagram (en cola)")
+    owner = state.get("owner_chat")
+    if owner:
+        if r.get("panel"):
+            telegram.set_buttons(owner, r["panel"], RECAP_BUTTONS(p))
+        if done:
+            telegram.send(owner, f"🤖 Compartí el post partido del pick #{p['id']} en " + ", ".join(done) + ".")
+
+
+def _auto_free_callback(state: dict, cb: dict, action: str, p: dict) -> None:
+    owner = state["owner_chat"]
+    af = state.get("auto_free") or {}
+    mid = cb["message"]["message_id"]
+    if af.get("pid") != p["id"] or af.get("status") != "pending":
+        telegram.answer(cb["id"], "Ya no está pendiente")
+        telegram.edit_buttons_off(owner, mid, "Ya procesado")
+        return
+    if action == "fa":
+        telegram.answer(cb["id"], "Publicando…")
+        _auto_free_publish(state, p)
+        return
+    _restore_candidate(state, p)
+    if action == "fc":
+        af["status"] = "cancelled"
+        telegram.edit_buttons_off(owner, mid, "✋ Hoy no sale el gratis automático (el pick volvió a candidatos)")
+        telegram.answer(cb["id"], "Cancelado por hoy")
+        return
+    telegram.edit_buttons_off(owner, mid, "🔁 Cambiado por la siguiente opción (abajo)")
+    telegram.answer(cb["id"], "Buscando la siguiente…")
+    if not _auto_free_choose(state, skip=(af.get("tried") or []) + [[p["id"], af.get("opt")]]):
+        state["auto_free"]["status"] = "none"
+
+
+def _free_command(state: dict, text: str) -> None:
+    """/gratis · estado del pick gratis automático · /gratis apagar · /gratis encender · /gratis ahora"""
+    owner = state["owner_chat"]
+    arg = (text.split(maxsplit=1)[1] if len(text.split()) > 1 else "").strip().lower()
+    if arg in ("apagar", "off", "no"):
+        state["auto_free_off"] = True
+        telegram.send(owner, "⏸️ Pick gratis automático apagado. Vuelve con /gratis encender.")
+        return
+    if arg in ("encender", "on", "si", "sí"):
+        state.pop("auto_free_off", None)
+        telegram.send(owner, "▶️ Pick gratis automático encendido: sale cada día tras el escaneo de las 09:07.")
+        return
+    if arg in ("ahora", "elegir", "ya"):
+        af = state.get("auto_free") or {}
+        if af.get("date") == _local_today() and af.get("status") == "pending":
+            telegram.send(owner, "Ya hay un pick gratis automático pendiente para hoy (mira el mensaje de arriba).")
+            return
+        if state.get("auto_free_off"):
+            telegram.send(owner, "Está apagado. Usa /gratis encender primero.")
+            return
+        if _free_given_today(state):
+            telegram.send(owner, "Hoy ya salió un pick en el canal Gratis.")
+            return
+        state["auto_free"] = {}
+        _auto_free_choose(state)
+        return
+    af = state.get("auto_free") or {}
+    on = "apagado ⏸️" if state.get("auto_free_off") else "encendido ▶️"
+    st = {"pending": "pendiente de publicar", "published": "publicado", "cancelled": "cancelado",
+          "none": "sin opción que cumpla"}.get(af.get("status"), "aún no se elige")
+    telegram.send(owner, f"🤖 Pick gratis automático: {on}\nHoy: {st}"
+                  + (f" (pick #{af['pid']})" if af.get("pid") and af.get("date") == _local_today() else "")
+                  + "\n\n/gratis ahora · elegirlo ya con los candidatos de hoy\n/gratis apagar · /gratis encender")
 
 
 def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool = False, live: bool = False) -> None:
@@ -209,7 +486,9 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
                   f"{title}: {len(tournaments)} ligas, {analyzed} partidos, {len(selections)} cuotas comparadas.\n"
                   f"{'Tu top ' + str(len(picks)) if manual else 'Te envío ' + str(len(picks)) + ' candidatos'}: "
                   f"{n_val} 🟢 con valor y {len(picks) - n_val} ⚖️ de cuota justa.\n"
-                  f"Sugerencia: 1 para el canal gratis (✅ VIP + Gratis) y de 2 a 4 para el VIP. "
+                  + ("En unos segundos te llega el pick gratis que elegí (el más probable); tú elige de 2 a 4 "
+                     "para el VIP. " if config.AUTO_FREE and not manual and not live and not state.get("auto_free_off")
+                     else "Sugerencia: 1 para el canal gratis (✅ VIP + Gratis) y de 2 a 4 para el VIP. ") +
                   f"Revisa cada cuota en tu app antes de aprobar.")
     try:
         from . import history
@@ -743,7 +1022,13 @@ def _instagram_kit(state: dict, p: dict) -> None:
         caption = formatting.instagram_caption(p, streak)
         p["ig_caption"] = caption
         p["ig_kit_mode"] = "api" if instagram.enabled(state) else "manual"
-        if instagram.enabled(state):
+        if instagram.enabled(state) and p.get("auto_free") and config.AUTO_FREE_INSTAGRAM:
+            instagram.save_image(p["id"], image)
+            p["ig_status"] = "queued"
+            telegram.send_photo(owner, image, caption=(
+                f"🤖 <b>Celebración en Instagram</b> · pick gratis automático #{p['id']} ✅\n"
+                "Se publica sola en unos minutos."))
+        elif instagram.enabled(state):
             instagram.save_image(p["id"], image)   # la web la sirve para que Instagram la descargue
             telegram.send_photo(owner, image, caption=(
                 f"📸 <b>Celebración para Instagram</b> · pick #{p['id']} ✅\n"
@@ -830,7 +1115,8 @@ def RECAP_BUTTONS(p: dict) -> list:
         [("🖼 Adjuntar mi imagen", f"xp:{pid}"), ("✏️ Cambiar titular", f"xt:{pid}")],
         [("🌙 Modo noche" if (p.get("recap") or {}).get("theme") == "light" else "☀️ Modo día", f"xh:{pid}"),
          ("🔀 Otro diseño", f"xl:{pid}")],
-    ]
+    ] + ([[("✋ No compartir sola", f"xn:{pid}")]] if (p.get("recap") or {}).get("auto_at")
+         and not p["recap"].get("auto_done") and not p["recap"].get("auto_off") else [])
 
 
 def _recap_supported(p: dict) -> bool:
@@ -855,6 +1141,11 @@ def _recap_panel(state: dict, p: dict) -> None:
            "Elige dónde compartirlo (puedes usar varios botones).")
     if r.get("credit"):
         cap += f"\n📸 {formatting.escape(r['credit']['text'])}"
+    if r.get("auto_at") and not r.get("auto_done") and not r.get("auto_off"):
+        from zoneinfo import ZoneInfo
+        hhmm = store.parse_ts(r["auto_at"]).astimezone(ZoneInfo(config.TIMEZONE)).strftime("%H:%M")
+        cap += (f"\n🤖 Pick gratis automático: se comparte sola a las {hhmm} en los canales del pick"
+                + (" y en Instagram" if p.get("result") == "W" else "") + ".")
     with open(_recap_file(p), "rb") as f:
         msg = telegram.send_photo(owner, f.read(), caption=cap)
     r["panel"] = msg["message_id"]
@@ -904,6 +1195,11 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
                   "theme": old.get("theme"), "layout": layout,
                   "tg": recap.telegram_caption(p, rep, data["headline"]),
                   "ig": recap.instagram_caption(p, rep, data["headline"], credit)}
+    for k in ("auto_at", "auto_done", "auto_off"):
+        if k in old:
+            p["recap"][k] = old[k]
+    if p.get("auto_free") and not p["recap"].get("auto_at"):
+        p["recap"]["auto_at"] = _iso(store.now_utc() + timedelta(minutes=config.AUTO_FREE_RECAP_DELAY_MIN))
     p.pop("recap_pending", None)
     p["ig_kit_sent"] = True   # el post partido reemplaza a la imagen de celebración
     _recap_panel(state, p)
@@ -1300,6 +1596,8 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith("/gratis"):
+            _free_command(state, text)
         elif chat == owner and text.lower().startswith("/partido"):
             _request_search(state, text)
         elif chat == owner and text.lower().startswith("/entretiempo"):
@@ -1352,6 +1650,9 @@ def _handle_update(state: dict, u: dict) -> None:
     p = state["picks"].get(pid)
     if not p:
         telegram.answer(cb["id"])
+        return
+    if action in ("fa", "fo", "fc"):
+        _auto_free_callback(state, cb, action, p)
         return
 
     if action == "sb":   # NBA: elegir la opción B (pasa a ser el pick)
@@ -1615,6 +1916,12 @@ def _handle_update(state: dict, u: dict) -> None:
             telegram.send(owner, "Ojo: en Instagram ya quedó la versión anterior.")
         return
 
+    elif action == "xn":   # no compartir sola la imagen post partido del gratis automático
+        r = p.get("recap") or {}
+        r["auto_off"] = True
+        telegram.set_buttons(owner, cb["message"]["message_id"], RECAP_BUTTONS(p))
+        telegram.answer(cb["id"], "Listo: la compartes tú cuando quieras")
+
     elif action in ("xv", "xf", "xi", "xt"):   # compartir la imagen post partido
         if not p.get("recap") or not os.path.exists(_recap_file(p)):
             telegram.answer(cb["id"], "La imagen post partido ya no está disponible")
@@ -1700,9 +2007,11 @@ HELP_TEXT = (
     "/anular Juan · anula ese enlace\n"
     "/enlace Juan · enlace personal al bot: al tocar Iniciar recibe su acceso VIP y te aviso\n"
     "/mensaje Juan hola · le escribe a un contacto que ya inició el bot · /contactos · la lista\n"
+    "/gratis · pick gratis automático (estado) · /gratis ahora · /gratis apagar · /gratis encender\n"
     "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
     "/ayuda · esta lista\n\n"
-    "El escaneo automático sigue saliendo todos los días a las 09:07."
+    "El escaneo automático sigue saliendo todos los días a las 09:07. Después, el bot elige solo el pick "
+    "gratis (el más probable) y lo publica 30 min más tarde, salvo que lo cambies o lo canceles."
 )
 
 
@@ -1879,7 +2188,7 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
-    if owner and state.get("cmds_v") != 9:
+    if owner and state.get("cmds_v") != 10:
         try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
             telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
                 {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
@@ -1893,14 +2202,19 @@ def poll() -> None:
                 {"command": "mensaje", "description": "Escribirle a un contacto (ej. /mensaje Juan hola)"},
                 {"command": "contactos", "description": "Quiénes iniciaron el bot"},
                 {"command": "partido", "description": "Analizar un partido específico (ej. /partido Celtics vs Knicks)"},
+                {"command": "gratis", "description": "Pick gratis automático: estado, ahora, apagar o encender"},
                 {"command": "estado", "description": "Pendientes, picks en juego e historial"},
                 {"command": "ayuda", "description": "Lista de comandos"}])
-            state["cmds_v"] = 9
+            state["cmds_v"] = 10
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)
     _refresh_recap_texts(state)
     _nba_daily(state)
+    try:
+        _auto_free_tick(state, now)
+    except Exception:
+        traceback.print_exc()
     for p in state["picks"].values():   # picks aprobados con el flujo antiguo: ofrecer la imagen para compartir
         if (owner and p["status"] == "published" and not p.get("share_msg") and not p.get("share_offered")
                 and store.parse_ts(p["kickoff"]) > now):
@@ -1919,6 +2233,10 @@ def poll() -> None:
                 telegram.edit_buttons_off(owner, p["share_msg"], "⌛ Ya no está vigente")
         _remind(state, p, now)
         _recap_retry(state, p, now)
+        try:
+            _auto_recap_tick(state, p, now)
+        except Exception:
+            traceback.print_exc()
         try:
             _halftime_check(state, p, now)
         except Exception:
