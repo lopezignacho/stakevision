@@ -110,6 +110,15 @@ def _nba_logs(team_id: str, before: datetime, n: int = 10) -> list[dict]:
     return games
 
 
+def current_roster(team_id: str) -> set[str]:
+    """Ids de los jugadores que HOY están en el plantel (ESPN). Vacío si no se pudo leer."""
+    r = nba._get(f"/teams/{team_id}/roster")
+    ath = r.get("athletes") or []
+    if ath and isinstance(ath[0], dict) and "items" in ath[0]:
+        ath = [x for g in ath for x in g.get("items") or []]
+    return {str(a.get("id")) for a in ath if a.get("id")}
+
+
 def nba_legs(home: str, away: str, kickoff_iso: str) -> tuple[list[dict], dict]:
     found = nba.find_event(home, away, kickoff_iso)
     if not found:
@@ -131,8 +140,11 @@ def nba_legs(home: str, away: str, kickoff_iso: str) -> tuple[list[dict], dict]:
         games = _nba_logs(str(team["id"]), ko)
         if len(games) < 6:
             continue
+        roster = current_roster(str(team["id"]))
         pids = {pid for g in games for pid in g}
         for pid in pids:
+            if roster and pid not in roster:
+                continue   # ya no está en el equipo (traspaso, corte o agente libre): fuera
             if pid in out_players:
                 continue
             played = [g[pid] for g in games if pid in g and g[pid]["min"] > 0]
@@ -177,7 +189,8 @@ def soccer_legs(home: str, away: str, kickoff_iso: str) -> tuple[list[dict], dic
         per_player: dict[str, list] = {}
         names: dict[str, str] = {}
         corners = []
-        for ev in evs[:5]:
+        evs = sorted(evs, key=lambda x: x.get("gameDate") or "", reverse=True)
+        for gi, ev in enumerate(evs[:5]):
             s2 = _get(f"{ESPN}/soccer/all/summary", event=ev["id"])
             for ro in s2.get("rosters") or []:
                 if str((ro.get("team") or {}).get("id")) != tid:
@@ -188,8 +201,9 @@ def soccer_legs(home: str, away: str, kickoff_iso: str) -> tuple[list[dict], dic
                     ath = pl.get("athlete") or {}
                     pid = str(ath.get("id"))
                     names[pid] = ath.get("displayName") or ""
-                    per_player.setdefault(pid, []).append(
-                        {x.get("name"): _n(x.get("displayValue")) for x in pl.get("stats") or []})
+                    row = {x.get("name"): _n(x.get("displayValue")) for x in pl.get("stats") or []}
+                    row["_game"] = gi
+                    per_player.setdefault(pid, []).append(row)
             for tb in (s2.get("boxscore") or {}).get("teams") or []:
                 if str((tb.get("team") or {}).get("id")) == tid:
                     st = {x.get("name"): x.get("displayValue") for x in tb.get("statistics") or []}
@@ -199,6 +213,8 @@ def soccer_legs(home: str, away: str, kickoff_iso: str) -> tuple[list[dict], dic
         for pid, rows in per_player.items():
             if n_games < 4 or len(rows) < 4:
                 continue   # titular habitual: al menos 4 de los últimos 5
+            if not any(r["_game"] <= 1 for r in rows):
+                continue   # no fue titular en ninguno de los 2 últimos: puede haberse ido o estar lesionado
             for stat, (lines, word) in SOCCER_LINES.items():
                 vals = [r.get(stat, 0) for r in rows]
                 best = _best_line(vals, lines, min_rate=0.8, recent=len(vals))

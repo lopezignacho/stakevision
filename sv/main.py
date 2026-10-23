@@ -228,7 +228,7 @@ def _auto_pool(state: dict, publish_at) -> list:
     return [[pid, opt] for _rk, _pr, _ed, pid, opt in pool]
 
 
-EVIDENCE_V = 2   # versión del contraste: si cambia la forma de calcularlo, se recalcula
+EVIDENCE_V = 3   # versión del contraste: si cambia la forma de calcularlo, se recalcula
 
 
 def _evidence_note(l: dict) -> str:
@@ -1893,6 +1893,56 @@ def _live_builders(state: dict) -> None:
         telegram.send(owner, text)
 
 
+def _lineup_check(state: dict, p: dict, now) -> None:
+    """Fútbol: con las alineaciones confirmadas (75-15 min antes), ¿juegan los goleadores? Si no, te aviso."""
+    if (p["status"] != "published" or p.get("lineup_checked") or len(p["legs"]) != 1
+            or (p["legs"][0].get("sport") or "soccer") != "soccer" or p.get("kind") == "builder"):
+        return
+    kick = store.parse_ts(p["kickoff"])
+    if now > kick - timedelta(minutes=10):
+        p["lineup_checked"] = "missed"
+        return
+    if now < kick - timedelta(minutes=75):
+        return
+    import requests as _rq
+    from . import espn
+    l = p["legs"][0]
+    found = espn._find(l["home"], l["away"], l["kickoff"])
+    if not found:
+        return
+    try:
+        sm = _rq.get("https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary",
+                     params={"event": found[0]["id"]}, timeout=25).json()
+    except Exception:
+        return
+    starters = {str(((pl.get("athlete") or {}).get("id"))) for ro in sm.get("rosters") or []
+                for pl in ro.get("roster") or [] if pl.get("starter")}
+    if len(starters) < 18:
+        return   # aún no están las alineaciones: se reintenta en la próxima revisión
+    p["lineup_checked"] = "done"
+    missing = []
+    for t in sm.get("leaders") or []:
+        team = (t.get("team") or {}).get("displayName") or ""
+        for cat in t.get("leaders") or []:
+            if cat.get("name") != "goalsLeaders":
+                continue
+            for ld in (cat.get("leaders") or [])[:1]:
+                ath = ld.get("athlete") or {}
+                goals = re.search(r"Goals: (\d+)", ld.get("displayValue") or "")
+                if goals and int(goals.group(1)) >= 2 and str(ath.get("id")) not in starters:
+                    missing.append(f"{ath.get('displayName')} ({team}, {goals.group(1)} goles)")
+    owner = state.get("owner_chat")
+    if not owner:
+        return
+    esc = formatting.escape
+    head = f"📋 <b>Alineaciones confirmadas</b> · pick #{p['id']} · {esc(l['home'])} vs {esc(l['away'])}\n"
+    if missing:
+        telegram.send(owner, head + "⚠️ No es titular: " + esc("; ".join(missing))
+                      + "\nRevisa si cambia algo para el pick (" + esc(formatting.outcome_label(l)) + ").")
+    else:
+        telegram.send(owner, head + "✅ Los goleadores de los dos equipos son titulares.")
+
+
 def _nba_board(state: dict, p: dict, rep: dict, kind: str, photo=None, half_rep=None, title=None) -> tuple[bytes, dict]:
     """Imagen NBA (entretiempo o final) y datos usados."""
     from . import layouts, matchphoto, nbagame
@@ -3053,6 +3103,10 @@ def poll() -> None:
             if owner and p.get("share_msg"):
                 telegram.edit_buttons_off(owner, p["share_msg"], "⌛ Ya no está vigente")
         _remind(state, p, now)
+        try:
+            _lineup_check(state, p, now)
+        except Exception:
+            traceback.print_exc()
         _recap_retry(state, p, now)
         try:
             _auto_recap_tick(state, p, now)

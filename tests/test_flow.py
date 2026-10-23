@@ -1093,3 +1093,35 @@ ev_t = evidence.check(leg_t)
 assert ev_t["h2h"] == [6, 6] and ev_t["verdict"] == "ok", ev_t
 assert evidence.blend(0.55, ev_t) > 0.55 and "cara a cara 6/6" in evidence.line(ev_t)
 print("OK contraste con datos")
+
+# 33) plantel actual en Bet Builder NBA y aviso de alineaciones
+from sv import builder as _bld  # noqa: E402
+_games = [{"1": {"name": "Jayson Tatum", "min": 36, "pts": 28, "reb": 8, "ast": 5, "tpm": 3},
+           "7": {"name": "Jaylen Brown", "min": 35, "pts": 25, "reb": 6, "ast": 4, "tpm": 2}} for _ in range(10)]
+_bld._nba_logs = lambda tid, before, n=10: _games
+_bld.current_roster = lambda tid: {"1"}
+nba.find_event = lambda h, a, k: ({"id": "g1", "competitions": [{"competitors": [
+    {"homeAway": "home", "team": {"id": "2", "displayName": "Boston Celtics"}},
+    {"homeAway": "away", "team": {"id": "18", "displayName": "New York Knicks"}}]}]}, False)
+nba._get = lambda path, **kw: {}
+legs_, _m = _bld.nba_legs("Boston Celtics", "New York Knicks", "2026-10-24T00:00:00Z")
+assert legs_ and all(x["player"] == "Jayson Tatum" for x in legs_), {x["player"] for x in legs_}
+# alineaciones: el goleador no es titular -> aviso
+import requests as _rq_mod  # noqa: E402
+espn._find = lambda h, a, k, sport="soccer": ({"id": "e9"}, None, None, None)
+class _R:
+    def json(self):
+        return {"rosters": [{"roster": [{"starter": True, "athlete": {"id": str(i)}} for i in range(22)]}],
+                "leaders": [{"team": {"displayName": "Arsenal"}, "leaders": [{"name": "goalsLeaders", "leaders": [
+                    {"displayValue": "Matches: 8, Goals: 6", "athlete": {"id": "999", "displayName": "Bukayo Saka"}}]}]}]}
+_orig_get = _rq_mod.get
+_rq_mod.get = lambda *a, **k: _R()
+pl_ = {"id": "L1", "status": "published", "kickoff": main._iso(store.now_utc() + timedelta(minutes=40)), "kind": "simple",
+       "legs": [{"home": "Arsenal", "away": "Chelsea", "kickoff": main._iso(store.now_utc() + timedelta(minutes=40)),
+                 "sport": "soccer", "mtype": "1x2", "outcome": "1", "label": "Gana Arsenal"}]}
+st = store.load()
+n = len(sent)
+main._lineup_check(st, pl_, store.now_utc())
+_rq_mod.get = _orig_get
+assert pl_["lineup_checked"] == "done" and any("Saka" in (t or "") for _, t, *_ in sent[n:]), sent[n:]
+print("OK plantel actual + alineaciones")

@@ -16,7 +16,8 @@ from . import espn
 
 ESPN_SUMMARY = "https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary"
 CONTRA, WEAK = 0.35, 0.50
-W_FORM, W_H2H = 0.55, 0.45
+W_FORM, W_VENUE, W_H2H = 0.4, 0.2, 0.4
+_LAST_TABLE: dict = {}
 
 
 def _hit(l: dict, a: int, b: int) -> bool | None:
@@ -55,8 +56,8 @@ def _score(c: dict) -> int | None:
         return None
 
 
-def _team_last(team_id: str, before: str, n: int = 10) -> list[tuple[int, int]]:
-    """Últimos n partidos terminados del equipo (todas las competiciones), como (goles propios, del rival)."""
+def _team_last(team_id: str, before: str, n: int = 10) -> list[tuple[int, int, bool]]:
+    """Últimos n partidos terminados del equipo (todas las competiciones): (goles propios, del rival, ¿de local?)."""
     url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/teams/{team_id}/schedule"
     rows = set()
     for params in ({}, {"season": int(before[:4]) - 1}):
@@ -75,10 +76,10 @@ def _team_last(team_id: str, before: str, n: int = 10) -> list[tuple[int, int]]:
             op = next((x for x in comp if str((x.get("team") or {}).get("id")) != str(team_id)), None)
             if not me or not op or _score(me) is None or _score(op) is None:
                 continue
-            rows.add((ev["date"], _score(me), _score(op)))
+            rows.add((ev["date"], _score(me), _score(op), me.get("homeAway") == "home"))
         if len(rows) >= n:
             break
-    return [(x, y) for _d, x, y in sorted(rows, reverse=True)[:n]]
+    return [(x, y, h) for _d, x, y, h in sorted(rows, reverse=True)[:n]]
 
 
 def _espn(home: str, away: str, kickoff: str) -> tuple[list, list, list]:
@@ -104,6 +105,16 @@ def _espn(home: str, away: str, kickoff: str) -> tuple[list, list, list]:
             other = next((x for x in comp if str((x.get("team") or {}).get("id")) == aid), None)
             if mine and other and _score(mine) is not None and _score(other) is not None:
                 h2h.append((_score(mine), _score(other)))
+    table = {}
+    for grp in ((sm.get("standings") or {}).get("groups") or []):
+        entries = ((grp.get("standings") or {}).get("entries") or [])
+        for i, en in enumerate(entries):
+            stv = {x.get("name"): x.get("value") for x in en.get("stats") or []}
+            rank = stv.get("rank") or (i + 1)
+            table[str(en.get("id"))] = {"rank": int(rank), "pts": int(stv.get("points") or 0),
+                                        "gp": int(stv.get("gamesPlayed") or 0), "n": len(entries)}
+    _LAST_TABLE.clear()
+    _LAST_TABLE.update({"home": table.get(hid), "away": table.get(aid)})
     fh, fa = _team_last(hid, kickoff), _team_last(aid, kickoff)
     if len(fh) < 4 or len(fa) < 4:   # respaldo: los últimos 5 del resumen del partido
         lf_map = {}
@@ -115,7 +126,8 @@ def _espn(home: str, away: str, kickoff: str) -> tuple[list, list, list]:
                     hs, as_ = int(ev.get("homeTeamScore")), int(ev.get("awayTeamScore"))
                 except (TypeError, ValueError):
                     continue
-                rows.append((hs, as_) if str(ev.get("homeTeamId")) == tid else (as_, hs))
+                home_ = str(ev.get("homeTeamId")) == tid
+                rows.append((hs, as_, True) if home_ else (as_, hs, False))
             lf_map[tid] = rows
         fh = fh if len(fh) >= 4 else lf_map.get(hid, [])
         fa = fa if len(fa) >= 4 else lf_map.get(aid, [])
@@ -130,14 +142,20 @@ def check(l: dict) -> dict | None:
         fh, fa, h2h = _espn(l["home"], l["away"], l["kickoff"])
     except Exception:  # noqa: BLE001
         fh, fa, h2h = [], [], []
+    table = dict(_LAST_TABLE)
     ctx = l.get("context") or {}
     if len(fh) < 4 and ctx.get("v") == 2 and isinstance(ctx.get("home"), list):
-        fh = [(m["gf"], m["ga"]) for m in ctx["home"]][:10]
+        fh = [(m["gf"], m["ga"], m.get("venue") == "L") for m in ctx["home"]][:10]
     if len(fa) < 4 and ctx.get("v") == 2 and isinstance(ctx.get("away"), list):
-        fa = [(m["gf"], m["ga"]) for m in ctx["away"]][:10]
+        fa = [(m["gf"], m["ga"], m.get("venue") == "L") for m in ctx["away"]][:10]
+    fh = [tuple(x) + (None,) * (3 - len(x)) for x in fh]
+    fa = [tuple(x) + (None,) * (3 - len(x)) for x in fa]
     # En los partidos del visitante, él hace de «2»: (rival, visitante)
-    form_games = list(fh) + [(y, x) for x, y in fa]
+    form_games = [(x, y) for x, y, _h in fh] + [(y, x) for x, y, _h in fa]
+    # Localía: el local en sus partidos de local y el visitante en los suyos de visita
+    venue_games = [(x, y) for x, y, h_ in fh if h_ is True] + [(y, x) for x, y, h_ in fa if h_ is False]
     fhits, fn = _rate(l, form_games)
+    vhits, vn = _rate(l, venue_games)
     hhits, hn = _rate(l, h2h)
     if fn + hn < 4:
         return None
@@ -145,6 +163,9 @@ def check(l: dict) -> dict | None:
     if fn:
         parts.append(fhits / fn)
         weights.append(W_FORM)
+    if vn >= 4:
+        parts.append(vhits / vn)
+        weights.append(W_VENUE)
     if hn >= 3:
         parts.append(hhits / hn)
         weights.append(W_H2H)
@@ -154,8 +175,17 @@ def check(l: dict) -> dict | None:
     # El cara a cara pesa por sí solo: si casi nunca se dio entre ellos, no puede ser «ok»
     if hn >= 4 and hhits / hn < 0.25 and verdict == "ok":
         verdict = "debil"
-    return {"form": [fhits, fn], "h2h": [hhits, hn], "rate": round(rate, 3), "verdict": verdict,
-            "h2h_goals": goals_h2h, "h2h_n": len(h2h)}
+    # Tabla: apostar por un equipo muy por debajo del rival (8+ puestos, con 5+ fechas) no puede ser «ok»
+    t_h, t_a = table.get("home"), table.get("away")
+    o, t = str(l.get("outcome", "")).lower(), l.get("mtype", "")
+    side = {"1": ("home", "away"), "2": ("away", "home")}.get(o) if t in ("1x2", "drawnobet", "spreads") else None
+    if side and t_h and t_a and min(t_h["gp"], t_a["gp"]) >= 5:
+        me, op = (t_h, t_a) if side[0] == "home" else (t_a, t_h)
+        if me["rank"] - op["rank"] >= 8 and verdict == "ok":
+            verdict = "debil"
+    return {"form": [fhits, fn], "venue": [vhits, vn], "h2h": [hhits, hn], "rate": round(rate, 3),
+            "verdict": verdict, "h2h_goals": goals_h2h, "h2h_n": len(h2h),
+            "table": {"home": t_h, "away": t_a} if t_h and t_a else None}
 
 
 def blend(market_p: float, ev: dict | None) -> float:
@@ -174,10 +204,15 @@ def line(ev: dict | None) -> str:
     bits = []
     if ev["form"][1]:
         bits.append(f"forma reciente {ev['form'][0]}/{ev['form'][1]}")
+    if (ev.get("venue") or [0, 0])[1] >= 4:
+        bits.append(f"local/visita {ev['venue'][0]}/{ev['venue'][1]}")
     if ev["h2h"][1]:
         bits.append(f"cara a cara {ev['h2h'][0]}/{ev['h2h'][1]}"
                     + (f" ({str(ev['h2h_goals']).replace('.', ',')} goles por partido)"
                        if ev.get("h2h_goals") is not None else ""))
+    tb = ev.get("table")
+    if tb:
+        bits.append(f"tabla {tb['home']['rank']}º vs {tb['away']['rank']}º")
     tag = {"ok": "✅ los datos acompañan", "debil": "🟡 los datos acompañan a medias",
            "contra": "⚠️ los datos lo contradicen"}[ev["verdict"]]
     return f"📚 Datos: {' · '.join(bits)} → {tag}"
