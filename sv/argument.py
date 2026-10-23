@@ -36,7 +36,8 @@ def _avg(ms, key) -> float:
 def _soccer(l: dict) -> tuple[str, list[str]]:
     """(resumen, datos) para una selección de fútbol."""
     ctx = l.get("context") or {}
-    H, A = (ctx.get("home") or [])[:6], (ctx.get("away") or [])[:6]
+    v2 = ctx.get("v") == 2 and isinstance(ctx.get("home"), list) and isinstance(ctx.get("away"), list)
+    H, A = ((ctx.get("home") or [])[:6], (ctx.get("away") or [])[:6]) if v2 else ([], [])
     hn, an = escape(l["home"]), escape(l["away"])
     t, o, line = l.get("mtype", ""), str(l.get("outcome", "")).strip().lower(), l.get("handicap")
     facts: list[str] = []
