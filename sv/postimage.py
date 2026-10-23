@@ -1351,3 +1351,4 @@ def render_pick_photo(m: dict, theme: str = "dark") -> bytes:
         ImageDraw.Draw(tmp).text((0, 2), m["credit"], font=fc, fill=T["credit"])
         im.alpha_composite(tmp.rotate(-90, expand=True), (1040, 180))
     return _jpeg(im)
+

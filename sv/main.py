@@ -78,7 +78,7 @@ def _share_panel(state: dict, p: dict) -> None:
             "\n🎨 En VIP sale en dorado con «PICK VIP»; en Gratis e Instagram, en verde con «PICK GRATIS».")
     head = (f"🖼 <b>Pick #{p['id']} listo para compartir</b>{look}\n"
             "Elige dónde publicarlo (puedes usar varios botones). Este es el texto que sale con la imagen:")
-    text = formatting.channel_post(p)
+    text = formatting.channel_post(p, tier)
     full = f"{head}\n\n{text}"
     together = bool(image) and formatting.caption_fits(full)
     caption = full if together else head
@@ -544,7 +544,7 @@ def _repair_pick(state: dict, pid: str) -> str:
         else:
             notes.append("⚠️ no pude borrarlo del canal Gratis (Telegram no lo permitió): bórralo a mano")
     if "vip" in msgs and state.get("vip_chat") and image:
-        text = formatting.channel_post(p)
+        text = formatting.channel_post(p, "vip")
         if telegram.edit_photo(state["vip_chat"], msgs["vip"], image, text if formatting.caption_fits(text) else None):
             notes.append("cambié la imagen en el VIP (mismo mensaje)")
         else:
@@ -1141,16 +1141,15 @@ def _pick_image(p: dict, tier: str | None = None) -> bytes | None:
 
 def _publish(state: dict, p: dict, free: bool, vip_too: bool = True) -> None:
     """Publica en VIP (si vip_too) y en Gratis (si free). Si ya estaba en un canal, no lo repite."""
-    text = formatting.channel_post(p)
     msgs = p.setdefault("channel_msgs", {})
     vip = state.get("vip_chat")
     image = None
     if vip_too and vip and "vip" not in msgs:
         image = _pick_image(p, "vip")   # dorado «PICK VIP»
-        msgs["vip"] = _post(vip, text, image)
+        msgs["vip"] = _post(vip, formatting.channel_post(p, "vip"), image)
     if free and "free" not in msgs and not _vip_only(p):
         image = _pick_image(p, "free")   # verde «PICK GRATIS»
-        msgs["free"] = _post(config.FREE_CHANNEL, text, image)
+        msgs["free"] = _post(config.FREE_CHANNEL, formatting.channel_post(p, "free"), image)
     if p["status"] != "published":
         p.update(status="published", published_at=_iso(store.now_utc()), has_photo=bool(image))
     p["free"] = "free" in msgs
@@ -2550,11 +2549,10 @@ def _migrate_stakes(state: dict, now) -> None:
         if p["status"] in ("candidate", "published") and store.parse_ts(p["kickoff"]) > now:
             p["stake"] = stake_for(p.get("tier", "valor"), p["kind"], p["price"], p["edge"])
             if p["status"] == "published":
-                text = formatting.channel_post(p)
                 for where, mid in (p.get("channel_msgs") or {}).items():
                     chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
                     try:
-                        telegram.edit_text(chat, mid, text)
+                        telegram.edit_text(chat, mid, formatting.channel_post(p, where))
                     except telegram.TelegramError as e:
                         print(f"No se pudo editar el pick {p['id']} en {where}: {e}")
         p["stake_v"] = 2

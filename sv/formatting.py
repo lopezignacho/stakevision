@@ -226,14 +226,24 @@ def _bank(stake: int) -> str:
     return f"{stake * 0.5:g}%".replace(".", ",")
 
 
-def channel_post(pick: dict) -> str:
-    title = "COMBINADA DOBLE" if pick["kind"] == "doble" else "PICK DEL DÍA"
+def channel_post(pick: dict, tier: str | None = None) -> str:
+    """Texto del pick en los canales: partido, cuota y stake + argumento (resumen, 3 datos y probabilidad).
+    tier «free» / «vip» cambia el título y el cierre."""
+    from . import argument
+    if any(l.get("sport") == "basketball" for l in pick["legs"]):
+        tier = "vip"
+    if pick["kind"] == "doble":
+        title = "COMBINADA DOBLE" + (" · VIP" if tier == "vip" else " · GRATIS" if tier == "free" else "")
+    else:
+        title = {"vip": "PICK VIP 👑", "free": "PICK GRATIS 🎁"}.get(tier, "PICK DEL DÍA")
+    close = ("👑 Exclusivo VIP · 🔞 +18 · Apuesta con responsabilidad" if tier == "vip" else
+             "Más pronósticos en nuestro VIP 👑\n🔞 +18 · Apuesta con responsabilidad" if tier == "free" else
+             "🔞 +18 · Apuesta con responsabilidad")
     return (f"👁 <b>STAKEVISION · {title}</b>\n\n"
             f"{_legs_block(pick)}\n\n"
-            f"📈 Cuota total: <b>{odds(pick['price'])}</b>\n"
-            f"💰 Stake: <b>{pick['stake']}/10</b> ({_bank(pick['stake'])} del bankroll)\n\n"
-            f"🧠 <i>{pick['analysis']}</i>\n\n"
-            f"🔞 +18 · Apuesta con responsabilidad")
+            + (f"📈 Cuota total: <b>{odds(pick['price'])}</b> · " if len(pick["legs"]) > 1 else "")
+            + f"💰 Stake: <b>{pick['stake']}/10</b> ({_bank(pick['stake'])} del bankroll)\n\n"
+            + f"{argument.body(pick)}\n\n{close}")
 
 
 def owner_candidate(pick: dict) -> str:
