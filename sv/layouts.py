@@ -449,3 +449,110 @@ def halftime(m: dict, theme: str = "dark") -> bytes:
     _legal(d, T, 1318)
     _credit(im, T, m.get("credit"), x=1046, y=150)
     return P._jpeg(im)
+
+
+# ---------------------------------------------------------------- NBA: entretiempo y final
+def nba_board(m: dict, theme: str = "dark") -> bytes:
+    """Entretiempo (al terminar el 2º cuarto) o final de un partido NBA.
+    m = {"kind": "half"|"final", "report", "eyebrow", "headline", "photo", "credit", "figure": (nombre, línea),
+         "stats": [(label, local, visita, unidad)], "pick_label", "odds", "status": (W|L|V|?, texto) | None}"""
+    T = P._mag(theme)
+    rep = m["report"]
+    home, away = rep["home"], rep["away"]
+    hacc, aacc = P._accents(home, away, theme)
+    ink_brand = (11, 26, 6) if theme == "dark" else (255, 255, 255)
+    im = Image.new("RGBA", (W, H), T["bg"] + (255,))
+    _photo_area(im, m, (0, 0, W, 610), T, side="center", fade=("bottom", "top"))
+    d = ImageDraw.Draw(im)
+    P._put_logo(im, 165, theme, 56, 40)
+    if m.get("eyebrow"):
+        f = P._oswald(22)
+        tw = P._spaced_len(d, m["eyebrow"].upper(), f, 3) + 44
+        _pill(d, (W - 40 - tw, 56), m["eyebrow"].upper(), f, T["brand"], ink_brand)
+    # título + titular
+    ft = P._bebas(76)
+    title = "ENTRETIEMPO" if m.get("kind") == "half" else "FINAL"
+    tw = d.textlength(title, font=ft) + 56
+    d.rounded_rectangle((40, 330, 40 + tw, 330 + 88), 14, fill=T["brand"])
+    d.text((68, 330 + 72), title, font=ft, fill=ink_brand, anchor="ls")
+    if m.get("headline"):
+        fh, _ = _fit_bebas(d, [m["headline"]], 116, 1000, 70)
+        d.text((42, 538), m["headline"], font=fh, fill=T["fg"], anchor="ls", stroke_width=2,
+               stroke_fill=T["bg"])
+    # marcador
+    P._mag_card(im, (40, 560, 1040, 740), T, r=28)
+    d = ImageDraw.Draw(im)
+    im.alpha_composite(P.shield(home, 100), (72, 584))
+    im.alpha_composite(P.shield(away, 100), (W - 72 - 100, 584))
+    fs = P._bebas(170)
+    hs, as_ = str(home["score"]), str(away["score"])
+    gap = 100
+    total = d.textlength(hs, font=fs) + gap + d.textlength(as_, font=fs)
+    x = (W - total) / 2
+    lead = "home" if home["score"] > away["score"] else "away" if away["score"] > home["score"] else ""
+    d.text((x, 716), hs, font=fs, fill=hacc if lead == "home" else T["fg"], anchor="ls")
+    d.rectangle((x + d.textlength(hs, font=fs) + 28, 646, x + d.textlength(hs, font=fs) + gap - 28, 656), fill=T["brand"])
+    d.text((x + d.textlength(hs, font=fs) + gap, 716), as_, font=fs, fill=aacc if lead == "away" else T["fg"], anchor="ls")
+    fn = P._oswald(22)
+    d.text((76, 772), _team_name(home).upper(), font=fn, fill=T["sub"], anchor="ls")
+    an = _team_name(away).upper()
+    d.text((W - 76 - d.textlength(an, font=fn), 772), an, font=fn, fill=T["sub"], anchor="ls")
+    # tabla por cuarto
+    n = max(len(home.get("lines") or []), len(away.get("lines") or []), 2 if m.get("kind") == "half" else 4)
+    cols = [f"{i + 1}C" if i < 4 else ("PR" if n == 5 else f"PR{i - 3}") for i in range(n)]
+    fh_, fv = P._oswald(19), P._bebas(34)
+    cw = min(110, int(640 / (n + 1)))
+    abbr_w = 130
+    cx0 = (W - (abbr_w + (n + 1) * cw)) // 2 + abbr_w
+    y0 = 800
+    for i, c in enumerate(cols + ["T"]):
+        d.text((cx0 + i * cw + cw // 2, y0 + 8), c, font=fh_, fill=T["muted"], anchor="ms")
+    for r, (t, acc) in enumerate(((home, hacc), (away, aacc))):
+        yy = y0 + 40 + r * 40
+        d.text((cx0 - abbr_w, yy), (t.get("abbr") or _team_name(t)[:3]).upper(), font=fv, fill=acc, anchor="ls")
+        lines = (t.get("lines") or [])[:n]
+        for i in range(n):
+            v = str(lines[i]) if i < len(lines) else "–"
+            d.text((cx0 + i * cw + cw // 2, yy), v, font=fv, fill=T["fg"], anchor="ms")
+        d.text((cx0 + n * cw + cw // 2, yy), str(t["score"]), font=fv, fill=T["brand"], anchor="ms")
+    # figura / líderes
+    y = 912
+    if m.get("figure"):
+        name, line = m["figure"]
+        lab = ("⭐ FIGURA: " if m.get("kind") != "half" else "🔥 LÍDER: ") + f"{name.upper()} · {line}"
+        lab, fl = P._wrap_fit(d, lab.replace("⭐ ", "").replace("🔥 ", ""), "Bold", 26, 1000)
+        P._ctext(d, y, lab, fl, T["fg"])
+    if m.get("leaders_line"):
+        t2, f2 = P._wrap_fit(d, m["leaders_line"], "Medium", 20, 1000)
+        P._ctext(d, y + 34, t2, f2, T["sub"])
+    # estadísticas
+    y = 1042
+    fl, fvv = P._oswald(18), P._bebas(32)
+    for label, hv, av, unit in (m.get("stats") or [])[:3]:
+        tot = (hv + av) or 1
+        P._ctext(d, y - 26, label.upper(), fl, T["muted"])
+        hvs, avs = (f"{hv:.0f}{unit}", f"{av:.0f}{unit}")
+        d.text((70, y + 18), hvs, font=fvv, fill=T["fg"], anchor="ls")
+        d.text((W - 70 - d.textlength(avs, font=fvv), y + 18), avs, font=fvv, fill=T["fg"], anchor="ls")
+        bx0, bx1, by = 170, W - 170, y + 4
+        split = bx0 + (bx1 - bx0) * hv / tot
+        d.rounded_rectangle((bx0, by, max(bx0 + 6, split - 3), by + 11), 6, fill=hacc)
+        d.rounded_rectangle((min(bx1 - 6, split + 3), by, bx1, by + 11), 6, fill=aacc)
+        y += 56
+    # cómo va / cómo terminó el pick
+    if m.get("status"):
+        res, txt = m["status"]
+        col = {"W": P.BRAND, "L": (227, 38, 46), "V": (110, 116, 124)}.get(res, (230, 170, 30))
+        ink = (11, 26, 6) if res == "W" else (255, 255, 255)
+        by0 = 1188
+        d.rounded_rectangle((40, by0, 1040, by0 + 108), 22, fill=col)
+        head = f"NUESTRO PICK: {m['pick_label'].upper()} @ {m['odds']}"
+        head, fhh = P._wrap_fit(d, head, "Bold", 24, 920)
+        d.text((70, by0 + 42), head, font=fhh, fill=ink, anchor="ls")
+        import re as _re
+        txt = _re.sub(r"[←-⯿\U0001F000-\U0001FAFF️]", "", txt).strip()
+        t2, f2 = P._wrap_fit(d, txt, "Medium", 22, 920)
+        d.text((70, by0 + 84), t2, font=f2, fill=ink, anchor="ls")
+    _legal(d, T, 1326)
+    _credit(im, T, m.get("credit"), x=1046, y=150)
+    return P._jpeg(im)

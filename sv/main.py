@@ -1360,6 +1360,14 @@ def _correct(state: dict, p: dict, result: str) -> None:
 def RECAP_BUTTONS(p: dict) -> list:
     pid, msgs = p["id"], (p.get("recap") or {}).get("msgs") or {}
     st = p.get("ig_res_status")
+    if _vip_only(p):   # NBA: el final va al VIP y a Instagram (nunca a Gratis)
+        return [
+            [("✅ En VIP", "noop") if "vip" in msgs else ("👑 Compartir en VIP", f"xv:{pid}"),
+             ("✅ Instagram" if st == "posted" else "⏳ Instagram en cola" if st == "queued" else "📸 Instagram",
+              "noop" if st in ("queued", "posted") else f"xi:{pid}")],
+            [("🖼 Adjuntar mi imagen", f"xp:{pid}"), ("✏️ Cambiar titular", f"xt:{pid}")],
+            [("🌙 Modo noche" if (p.get("recap") or {}).get("theme") == "light" else "☀️ Modo día", f"xh:{pid}")],
+        ]
     return [
         [("✅ En VIP", "noop") if "vip" in msgs else ("👑 Compartir en VIP", f"xv:{pid}"),
          ("✅ En Gratis", "noop") if "free" in msgs else ("🎁 Compartir en Gratis", f"xf:{pid}")],
@@ -1373,7 +1381,7 @@ def RECAP_BUTTONS(p: dict) -> list:
 
 
 def _recap_supported(p: dict) -> bool:
-    return len(p["legs"]) == 1 and (p["legs"][0].get("sport") or "soccer") == "soccer"
+    return len(p["legs"]) == 1 and (p["legs"][0].get("sport") or "soccer") in ("soccer", "basketball")
 
 
 def _recap_file(p: dict) -> str:
@@ -1415,6 +1423,8 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
     reuse=True vuelve a dibujarla con los datos ya guardados (titular nuevo o tu foto)."""
     if not state.get("owner_chat") or not _recap_supported(p):
         return False
+    if (p["legs"][0].get("sport") or "soccer") == "basketball":
+        return _recap_nba(state, p, reuse)
     from . import commons, espn, postimage, recap
     l = p["legs"][0]
     old = p.get("recap") or {}
@@ -1515,8 +1525,145 @@ def _refresh_recap_texts(state: dict) -> None:
             p["ig_res_caption"] = r["ig"]
 
 
+def _nba_board(state: dict, p: dict, rep: dict, kind: str, photo=None, half_rep=None, title=None) -> tuple[bytes, dict]:
+    """Imagen NBA (entretiempo o final) y datos usados."""
+    from . import layouts, matchphoto, nbagame
+    l = p["legs"][0]
+    if kind == "half":
+        st = nbagame.pick_status(l, rep, False, grade_leg)
+    else:
+        res = p.get("result") or grade_leg(l, rep["home"]["score"], rep["away"]["score"]) or "?"
+        tot = rep["home"]["score"] + rep["away"]["score"]
+        st = (res, {"W": "VERDE", "L": "ROJA", "V": "NULA"}.get(res, "Resultado")
+              + f" · terminó {rep['home']['score']}-{rep['away']['score']} ({tot} puntos en total).")
+    fig = nbagame.hero(rep)
+    if kind == "half":   # en el descanso: el máximo anotador del partido
+        allp = [(x, s) for s in ("home", "away") for x in rep[s]["leaders"][:1]]
+        fig = max(allp, key=lambda t: t[0]["pts"]) if allp else None
+    if photo is None and fig:
+        t = rep[fig[1]]
+        try:
+            photo = matchphoto.for_scorer(fig[0]["name"], [t["name"], t["short"]])
+        except Exception:
+            traceback.print_exc()
+    if photo is None and os.path.exists(_upload_file(p, "pickphoto")):
+        with open(_upload_file(p, "pickphoto"), "rb") as f:
+            photo = (f.read(), p.get("pick_photo_credit"))
+    other = "away" if fig and fig[1] == "home" else "home"
+    ld = rep[other]["leaders"][:1]
+    sel = formatting.outcome_label(l)
+    data = {"kind": kind, "report": rep, "eyebrow": "NBA · VIP" if kind == "half" else "NBA",
+            "headline": title or nbagame.headline(rep, kind, half_rep),
+            "photo": photo[0] if photo else None, "credit": photo[1]["text"] if photo and photo[1] else None,
+            "figure": (fig[0]["name"], nbagame.line_of(fig[0])) if fig else None,
+            "leaders_line": f"{rep[other]['short']}: {ld[0]['name']} {nbagame.line_of(ld[0])}" if ld else "",
+            "stats": nbagame.stat_rows(rep)[:3], "pick_label": sel[:sel.index(" (")] if " (" in sel else sel,
+            "odds": formatting.odds(p["price"]), "status": st,
+            "photo_credit": photo[1] if photo else None}
+    theme = (p.get("recap") or {}).get("theme") if kind == "final" else p.get("theme")
+    return layouts.nba_board(data, theme or "dark"), data
+
+
+def _halftime_nba(state: dict, p: dict, now) -> None:
+    """NBA: al terminar el 2º cuarto, publica en el VIP marcador por cuarto, líderes, tiro y cómo va el pick."""
+    if p["status"] != "published" or p.get("ht_done") or "vip" not in (p.get("channel_msgs") or {}):
+        return
+    kick = store.parse_ts(p["kickoff"])
+    if now < kick + timedelta(minutes=50):
+        return
+    if now > kick + timedelta(minutes=170):
+        p["ht_done"] = "missed"
+        return
+    from . import nbagame
+    l = p["legs"][0]
+    live = nbagame.report(l["home"], l["away"], l["kickoff"])
+    if not live:
+        return
+    if live["completed"] or live["period"] > 3:
+        p["ht_done"] = "missed"
+        return
+    clock = live.get("clock") or ""
+    mins = int(clock.split(":")[0]) if ":" in clock and clock.split(":")[0].isdigit() else 0
+    if not (live["status_name"] == "STATUS_HALFTIME" or (live["period"] == 3 and mins >= 8)):
+        return
+    rep = nbagame.report(l["home"], l["away"], l["kickoff"], half=True)
+    p["ht_done"] = "sent"
+    p["nba_half"] = {"home": rep["home"]["score"], "away": rep["away"]["score"]}
+    try:
+        image, data = _nba_board(state, p, rep, "half")
+    except Exception:
+        traceback.print_exc()
+        image, data = None, None
+    st = data["status"] if data else nbagame.pick_status(l, rep, False, grade_leg)
+    text = nbagame.half_caption(p, rep, st)
+    mid = p["channel_msgs"]["vip"]
+    try:
+        if image and formatting.caption_fits(text):
+            telegram.send_photo(state["vip_chat"], image, caption=text, reply_to=mid)
+        else:
+            if image:
+                telegram.send_photo(state["vip_chat"], image, reply_to=mid)
+            telegram.send(state["vip_chat"], text, reply_to=mid)
+    except telegram.TelegramError as e:
+        print(f"No se pudo publicar el entretiempo NBA: {e}")
+    if state.get("owner_chat"):
+        telegram.send(state["owner_chat"], f"⏸️ Publiqué en el VIP el entretiempo NBA del pick #{p['id']} "
+                                           f"({rep['home']['score']}-{rep['away']['score']}).")
+
+
+def _recap_nba(state: dict, p: dict, reuse: bool = False) -> bool:
+    """Final NBA: imagen con marcador por cuarto, figura y resultado del pick; para el VIP e Instagram."""
+    from . import nbagame
+    l = p["legs"][0]
+    old = p.get("recap") or {}
+    rep = old.get("report") if reuse else None
+    if not rep:
+        rep = nbagame.report(l["home"], l["away"], l["kickoff"])
+        if not rep or not rep["completed"]:
+            return False
+    photo = None
+    if old.get("photo_src") == "user" and os.path.exists(_upload_file(p)):
+        with open(_upload_file(p), "rb") as f:
+            photo = (f.read(), None)
+    elif reuse and old.get("photo_cache") and os.path.exists(old["photo_cache"]):
+        with open(old["photo_cache"], "rb") as f:
+            photo = (f.read(), old.get("credit"))
+    half = p.get("nba_half")
+    half_rep = {"home": {"score": half["home"]}, "away": {"score": half["away"]}} if half else None
+    if old.get("mode") == "raw" and os.path.exists(_upload_file(p)):
+        from . import postimage
+        with open(_upload_file(p), "rb") as f:
+            image = postimage.fit_instagram(f.read())
+        data = {"headline": old.get("custom_title") or nbagame.headline(rep, "final", half_rep), "photo_credit": None}
+    else:
+        image, data = _nba_board(state, p, rep, "final", photo=photo, half_rep=half_rep, title=old.get("custom_title"))
+    path = _recap_file(p)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(image)
+    cache = old.get("photo_cache") or _upload_file(p, "recapphoto")
+    credit = data.get("photo_credit")
+    if data.get("photo") and old.get("photo_src") != "user":   # guardar la foto para cambiar modo o titular
+        os.makedirs(os.path.dirname(cache), exist_ok=True)
+        with open(cache, "wb") as f:
+            f.write(data["photo"])
+    p["recap"] = {"title": data["headline"], "custom_title": old.get("custom_title"), "credit": credit,
+                  "msgs": old.get("msgs") or {}, "panel": old.get("panel"), "hero": None, "report": rep,
+                  "photo_src": old.get("photo_src"), "mode": old.get("mode"), "v": RECAP_TEXT_V,
+                  "theme": old.get("theme"), "layout": "nba", "photo_cache": cache,
+                  "tg": nbagame.final_caption(p, rep, data["headline"], credit),
+                  "ig": nbagame.final_caption(p, rep, data["headline"], credit, ig=True)}
+    p.pop("recap_pending", None)
+    p["ig_kit_sent"] = True
+    _recap_panel(state, p)
+    return True
+
+
 def _halftime_check(state: dict, p: dict, now) -> None:
     """Entretiempo: publica en los canales del pick el marcador al descanso, goles, estadísticas y cómo va."""
+    if _vip_only(p) and len(p["legs"]) == 1:
+        _halftime_nba(state, p, now)
+        return
     if (p["status"] != "published" or p.get("ht_done") or len(p["legs"]) != 1
             or (p["legs"][0].get("sport") or "soccer") != "soccer" or not p.get("channel_msgs")):
         return
@@ -2206,6 +2353,9 @@ def _handle_update(state: dict, u: dict) -> None:
             return
         if action in ("xv", "xf"):
             where = "vip" if action == "xv" else "free"
+            if where == "free" and _vip_only(p):
+                telegram.answer(cb["id"], "La NBA es exclusiva del VIP")
+                return
             if where in p["recap"]["msgs"]:
                 telegram.answer(cb["id"], "Ya estaba compartida ahí")
                 return

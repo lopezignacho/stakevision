@@ -862,3 +862,77 @@ st = store.load()
 assert deleted == [(config.FREE_CHANNEL, 999)] and edited and "free" not in st["picks"][pidn]["channel_msgs"]
 assert st["auto_free"] == {}
 print("OK NBA solo VIP + previa + corrección")
+
+# 27) NBA: entretiempo (solo VIP) y final (VIP + Instagram, sin Gratis)
+from sv import matchphoto, nbagame  # noqa: E402
+matchphoto.for_scorer = lambda name, teams: None
+
+
+def _play(per, team, who, typ, text, shoot=False, made=False, val=0, ast=None):
+    parts = [{"athlete": {"id": who}}] + ([{"athlete": {"id": ast}}] if ast else [])
+    return {"period": {"number": per}, "team": {"id": team}, "participants": parts, "type": {"text": typ},
+            "text": text, "shootingPlay": shoot, "scoringPlay": made, "scoreValue": val}
+
+
+plays = []
+for per in (1, 2, 3, 4):
+    plays += [_play(per, "7", "j", "Jump Shot", "Jokic makes jumper (Murray assists)", True, True, 2, "m"),
+              _play(per, "7", "m", "Jump Shot", "Murray makes three point jumper", True, True, 3),
+              _play(per, "25", "s", "Driving Layup", "SGA makes layup", True, True, 2),
+              _play(per, "25", "s", "Jump Shot", "SGA misses jumper", True, False, 0),
+              _play(per, "7", "j", "Defensive Rebound", "Jokic defensive rebound")]
+summ = {"plays": plays, "boxscore": {"players": [
+    {"team": {"id": "7"}, "statistics": [{"keys": ["points", "rebounds", "assists"], "athletes": [
+        {"athlete": {"id": "j", "displayName": "Nikola Jokić", "shortName": "N. Jokić"}, "stats": ["28", "13", "9"]},
+        {"athlete": {"id": "m", "displayName": "Jamal Murray", "shortName": "J. Murray"}, "stats": ["21", "4", "6"]}]}]},
+    {"team": {"id": "25"}, "statistics": [{"keys": ["points", "rebounds", "assists"], "athletes": [
+        {"athlete": {"id": "s", "displayName": "Shai Gilgeous-Alexander", "shortName": "S. Gilgeous-Alexander"},
+         "stats": ["34", "5", "7"]}]}]}], "teams": []}}
+status_now = {"v": {"period": 2, "displayClock": "0.0", "type": {"name": "STATUS_HALFTIME", "state": "in", "completed": False}}}
+
+
+def _comp(lines_h, lines_a):
+    return [{"homeAway": "home", "team": {"id": "7", "displayName": "Denver Nuggets", "shortDisplayName": "Nuggets",
+                                          "abbreviation": "DEN", "color": "0e2240", "alternateColor": "fec524"},
+             "score": str(sum(lines_h)), "linescores": [{"displayValue": str(x)} for x in lines_h]},
+            {"homeAway": "away", "team": {"id": "25", "displayName": "Oklahoma City Thunder", "shortDisplayName": "Thunder",
+                                          "abbreviation": "OKC", "color": "007ac1", "alternateColor": "ef3b24"},
+             "score": str(sum(lines_a)), "linescores": [{"displayValue": str(x)} for x in lines_a]}]
+
+
+game = {"lines": ([30, 28], [27, 34])}
+nba.find_event = lambda h, a, k: ({"id": "g1", "competitions": [{"competitors": _comp(*game["lines"])}]}, False)
+nba._get = lambda path, **kw: (dict(summ, header={"competitions": [{"competitors": _comp(*game["lines"]),
+                                                                       "status": status_now["v"]}]})
+                               if path == "/summary" else {})
+rep = nbagame.report("Denver Nuggets", "Oklahoma City Thunder", "2026-10-24T01:00:00Z", half=True)
+assert rep["home"]["score"] == 58 and rep["away"]["score"] == 61 and rep["home"]["box"]["tpm"] == 2
+assert rep["home"]["leaders"][0]["name"] == "Jamal Murray" and rep["away"]["box"]["fga"] == 4
+st = store.load()
+pn = st["picks"][pidn]
+pn.update(status="published", kickoff=main._iso(store.now_utc() - timedelta(minutes=70)), price=1.87)
+pn["legs"][0].update(home="Denver Nuggets", away="Oklahoma City Thunder", mtype="totals", outcome="Más de",
+                      handicap=228.5, kickoff=pn["kickoff"])
+pn.pop("ht_done", None)
+store.save(st)
+n = len(sent)
+main.poll()
+ht = [(c, t) for c, t, _, _ in sent[n:] if "ENTRETIEMPO NBA" in (t or "")]
+assert ht and all(c == VIP for c, _ in ht), sent[n:]
+assert "58-61" in ht[0][1] and "Murray" in ht[0][1]
+assert store.load()["picks"][pidn]["nba_half"] == {"home": 58, "away": 61}
+# final
+game["lines"] = ([30, 28, 25, 29], [27, 34, 30, 27])
+status_now["v"] = {"period": 4, "displayClock": "0.0", "type": {"name": "STATUS_FINAL", "state": "post", "completed": True}}
+st = store.load()
+pn = st["picks"][pidn]
+assert main._recap(st, pn)
+assert pn["recap"]["title"] == "THUNDER SE LO LLEVA", pn["recap"]["title"]
+flat = [d for row in main.RECAP_BUTTONS(pn) for _, d in row]
+assert f"xv:{pidn}" in flat and f"xi:{pidn}" in flat and not any(d.startswith("xf:") for d in flat)
+assert "Shai Gilgeous-Alexander" in pn["recap"]["ig"] and "#NBA" in pn["recap"]["ig"]
+assert "Betano" not in pn["recap"]["ig"] + pn["recap"]["tg"]
+pn["recap"]["theme"] = "light"
+assert main._recap(st, pn, reuse=True)
+store.save(st)
+print("OK NBA entretiempo y final")
