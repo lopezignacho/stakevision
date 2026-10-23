@@ -1,0 +1,65 @@
+== Philadelphia 76ers vs Cleveland Cavaliers | ctx: True
+  home: Philadelphia 76ers rec 2-0 casa 1-0 fuera 1-0 juegos 10 descanso 0.0 prob None bajas ['Dean Wade', 'Tacko Fall', 'Dominick Barlow', 'Ariel Hukporti']
+  away: Cleveland Cavaliers rec 0-1 casa 0-0 fuera 0-1 juegos 10 descanso 0.0 prob None bajas []
+✅ <b>A favor:</b>
+• Valor: la cuota justa es 1.75 y la disponible 1.80 (+3,0%).
+• Philadelphia 76ers de local esta temporada: 1-0.
+• Cleveland Cavaliers juega en back-to-back (jugó ayer): suele pesar en piernas y rotación.
+⚠️ <b>En contra:</b>
+• Philadelphia 76ers: 6-4 en sus últimos 10 (incluye la temporada pasada), diferencia media +2.2 pts (4 victorias seguidas).
+• Cleveland Cavaliers: diferencia media +3.7 pts en sus últimos 10 (incluye la temporada pasada).
+• Philadelphia 76ers juega en back-to-back (jugó ayer): suele pesar en piernas y rotación.
+✅ <b>A favor:</b>
+• Cuota en línea con la justa (1.90): el mercado no la regala, la elección se apoya en los datos de abajo.
+• Promedios recientes: Philadelphia 76ers anota 112.5 y recibe 110.3; Cleveland Cavaliers anota 122.1 y recibe 118.4 → proyección 231.6 pts (línea 228.5).
+⚠️ <b>En contra:</b>
+• Philadelphia 76ers juega en back-to-back (jugó ayer): suele pesar en piernas y rotación.
+• Cleveland Cavaliers juega en back-to-back (jugó ayer): suele pesar en piernas y rotación.
+== Oklahoma City Thunder vs Denver Nuggets | ctx: True
+  home: Oklahoma City Thunder rec 1-0 casa 0-0 fuera 1-0 juegos 10 descanso 1.9861111111111112 prob None bajas ['Nikola Topic', 'Thomas Sorber', 'Otega Oweh']
+  away: Denver Nuggets rec 0-0 casa 0-0 fuera 0-0 juegos 10 descanso 193.04166666666666 prob None bajas ['Cameron Johnson', 'Spencer Jones', 'Julian Strawther']
+✅ <b>A favor:</b>
+• Valor: la cuota justa es 1.75 y la disponible 1.80 (+3,0%).
+• Oklahoma City Thunder: 8-2 en sus últimos 10 (incluye la temporada pasada), diferencia media +12.5 pts.
+• Denver Nuggets: diferencia media +10.5 pts en sus últimos 10.
+• Bajas de Denver Nuggets: Spencer Jones, Julian Strawther.
+⚠️ <b>En contra:</b>
+• Bajas de Oklahoma City Thunder: Nikola Topic, Thomas Sorber, Otega Oweh.
+✅ <b>A favor:</b>
+• Cuota en línea con la justa (1.90): el mercado no la regala, la elección se apoya en los datos de abajo.
+• Promedios recientes: Oklahoma City Thunder anota 121.8 y recibe 109.3; Denver Nuggets anota 131.2 y recibe 120.7 → proyección 241.5 pts (línea 228.5).
+🏀 <b>NBA · resumen del día</b> (23/10)
+
+📅 <b>Partidos de hoy</b> (hora Chile): 2
+• 20:00 Cavaliers (0-1) @ 76ers (2-0)
+• 22:30 Nuggets (0-0) @ Thunder (1-0)
+
+🚑 <b>Lesiones actualizadas (24 h)</b>: 44
+• Tyler Bilodeau (Brooklyn Nets): Day-To-Day · Shoulder
+• Grant Williams (Charlotte Hornets): Out · Hamstring
+• Coby White (Charlotte Hornets): Out · Calf
+• Kon Knueppel (Charlotte Hornets): Out · Hamstring
+• Dailyn Swain (Chicago Bulls): Day-To-Day · Illness
+• Jordan Hawkins (Chicago Bulls): Day-To-Day · Illness
+• Zach Collins (Chicago Bulls): Day-To-Day · Quadriceps
+• Tobe Awaka (Chicago Bulls): Day-To-Day · Knee
+• Josh Giddey (Chicago Bulls): Day-To-Day · Wrist
+• Jett Howard (Dallas Mavericks): Day-To-Day · Calf
+• Caleb Martin (Dallas Mavericks): Out · Thumb
+• Santi Aldama (Dallas Mavericks): Out · Knee
+• Tarik Biberovic (Dallas Mavericks): Out · Heel
+• Dereck Lively II (Dallas Mavericks): Out · Foot
+• Cameron Johnson (Denver Nuggets): Day-To-Day · Ankle
+
+🔁 <b>Movimientos (fichajes, traspasos, cortes)</b>: 0
+• Sin movimientos.
+
+📰 <b>Noticias</b> (titulares de ESPN, en inglés)
+• 76ers mount stunning 29-point comeback to beat Cavs in home opener
+• James, Embiid, Maxey spark 76ers&#x27; rally from 29 points down in home opener to stun Cavs 114-106
+• Cavs coach Atkinson &#x27;depressed&#x27; when LeBron deal fell through
+• Jason Kidd on Luka-Yaxel drama: &#x27;I love it&#x27;
+• &#x27;Inside the NBA&#x27; crew breaks down why Cavs are being overlooked
+• Co-defendant denies Billups gave him info, pleads guilty in NBA gambling case
+
+Para ver picks de hoy: /buscar nba · en vivo: /envivo nba
