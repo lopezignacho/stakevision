@@ -983,3 +983,40 @@ builder.final_box = lambda b: {b["legs"][0]["pid"]: {b["legs"][0]["stat"]: 0}}
 assert main._grade(pb)[0] == "L"
 assert "✅" in formatting.result_post(dict(pb, result="W")) or "VERDE" in formatting.result_post(dict(pb, result="W"))
 print("OK Bet Builder")
+
+# 29) Fútbol en vivo (señales al descanso) y Bet Builder NBA antes del partido
+from sv import livebb  # noqa: E402
+m_ht = {"home": {"name": "Arsenal", "goals": 0, "corners": 4, "yellow": 2, "red": 0, "fouls": 8, "sot": 4, "shots": 9,
+                 "players": [{"name": "Bukayo Saka", "shots": 3, "sot": 0}]},
+        "away": {"name": "Chelsea", "goals": 0, "corners": 2, "yellow": 1, "red": 0, "fouls": 7, "sot": 3, "shots": 5,
+                 "players": []}}
+sig = livebb.signals(m_ht)
+labels = [s_["label"] for s_ in sig]
+assert "Arsenal: más de 5.5 córners" in labels and "Más de 8.5 córners en el partido" in labels, labels
+assert "Más de 4.5 tarjetas en el partido" in labels and "Más de 0.5 goles" in labels and any("Saka" in x for x in labels)
+mk = {"m1": {"type": "teamtotals-corners-team1", "period": "fulltime", "handicap": 5.5,
+             "outcomes": {"o1": "Más", "o2": "Menos"}}}
+row = {"bookmakerOdds": {"betano": {"markets": {"m1": {"outcomes": {"o1": {"players": {"0": {"price": 1.95}}},
+                                                                  "o2": {"players": {"0": {"price": 1.80}}}}}}},
+                         "pinnacle": {"markets": {"m1": {"outcomes": {"o1": {"players": {"0": {"price": 1.90}}},
+                                                                     "o2": {"players": {"0": {"price": 1.95}}}}}}}}}
+got = livebb._find_market(row, mk, sig[[s_["label"] for s_ in sig].index("Arsenal: más de 5.5 córners")])
+assert got and got[0] == 1.95 and 1.9 < got[1] < 2.0, got
+# NBA: el builder sale solo entre 40 y 25 min antes
+calls_bb = []
+_orig_send = main._builder_send
+main._builder_send = lambda st_, h, a, ko, lg, sp, quiet=False: calls_bb.append((h, a, sp)) or True
+ko_soon = store.now_utc() + timedelta(minutes=30)
+ko_late = store.now_utc() + timedelta(hours=3)
+nba._get = lambda path, **kw: ({"events": [
+    {"id": "e1", "date": main._iso(ko_soon), "competitions": [{"competitors": [
+        {"homeAway": "home", "team": {"displayName": "Boston Celtics"}}, {"homeAway": "away", "team": {"displayName": "New York Knicks"}}]}]},
+    {"id": "e2", "date": main._iso(ko_late), "competitions": [{"competitors": [
+        {"homeAway": "home", "team": {"displayName": "Miami Heat"}}, {"homeAway": "away", "team": {"displayName": "Orlando Magic"}}]}]}]}
+    if path == "/scoreboard" else {})
+st = store.load()
+main._nba_builders_pregame(st, store.now_utc())
+main._nba_builders_pregame(st, store.now_utc())
+assert calls_bb == [("Boston Celtics", "New York Knicks", "basketball")], calls_bb
+main._builder_send = _orig_send
+print("OK en vivo + builder NBA previo")

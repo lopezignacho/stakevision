@@ -1699,7 +1699,7 @@ def _daily_builders(state: dict) -> None:
         return
     state["bb_date"] = today
     seen = set()
-    for sport in ("basketball", "soccer"):
+    for sport in ("soccer",):   # la NBA sale aparte, ~30 min antes de cada partido
         cands = [p for p in state["picks"].values() if p["status"] == "candidate" and p.get("kind") != "builder"
                  and (p["legs"][0].get("sport") or "soccer") == sport and not p.get("live")
                  and store.parse_ts(p["kickoff"]) > store.now_utc() + timedelta(hours=2)]
@@ -1712,6 +1712,42 @@ def _daily_builders(state: dict) -> None:
             seen.add(key)
             if _builder_send(state, l["home"], l["away"], l["kickoff"], l.get("league") or "", sport, quiet=True):
                 break
+
+
+def _nba_builders_pregame(state: dict, now) -> None:
+    """Bet Builder NBA de cada partido, entre 40 y 25 min antes (con las lesiones ya confirmadas)."""
+    if not state.get("owner_chat") or not config.NBA_ENABLED:
+        return
+    from . import nba
+    from zoneinfo import ZoneInfo
+    lo, hi = config.NBA_BUILDER_BEFORE_MIN
+    done = state.setdefault("bb_nba_done", [])
+    day = now.astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+    for e in nba._get("/scoreboard", dates=day).get("events") or []:
+        if e.get("id") in done:
+            continue
+        ko = store.parse_ts(e["date"].replace("Z", ":00Z") if len(e["date"]) == 17 else e["date"])
+        if not (ko - timedelta(minutes=hi) <= now <= ko - timedelta(minutes=lo)):
+            continue
+        done.append(e.get("id"))
+        c = e["competitions"][0]["competitors"]
+        h = next(x for x in c if x["homeAway"] == "home")["team"]["displayName"]
+        a = next(x for x in c if x["homeAway"] == "away")["team"]["displayName"]
+        try:
+            _builder_send(state, h, a, _iso(ko), "USA · NBA", "basketball", quiet=True)
+        except Exception:
+            traceback.print_exc()
+    del done[:-200]
+
+
+def _live_builders(state: dict) -> None:
+    """Fútbol en vivo: avisos de líneas que se están cumpliendo al descanso (córners, tarjetas, goles, remates)."""
+    owner = state.get("owner_chat")
+    if not owner:
+        return
+    from . import livebb
+    for text in livebb.scan(state):
+        telegram.send(owner, text)
 
 
 def _nba_board(state: dict, p: dict, rep: dict, kind: str, photo=None, half_rep=None, title=None) -> tuple[bytes, dict]:
@@ -2850,6 +2886,11 @@ def poll() -> None:
     _migrate_stakes(state, now)
     _refresh_recap_texts(state)
     _nba_daily(state)
+    for fn in (_nba_builders_pregame, lambda st, _now: _live_builders(st)):
+        try:
+            fn(state, now)
+        except Exception:
+            traceback.print_exc()
     try:
         _repair_file(state)
         _force_free_file(state)

@@ -86,7 +86,11 @@ AUTO_FREE_MIN_EDGE = -0.02       # cuota disponible como mucho un 2 % por debajo
 AUTO_FREE_VIP_TOO = True         # también sale en VIP (cuenta dentro de los 2-4 del día)
 AUTO_FREE_INSTAGRAM = True       # y en el feed de Instagram, si está conectado
 AUTO_FREE_RECAP_DELAY_MIN = 20
-DAILY_BUILDERS = True           # tras el escaneo diario: 1 Bet Builder de NBA y 1 de fútbol para revisar   # el post partido se comparte solo 20 min después del resultado
+DAILY_BUILDERS = True           # tras el escaneo diario: 1 Bet Builder de fútbol para revisar
+NBA_BUILDER_BEFORE_MIN = (25, 40)  # Bet Builder NBA: entre 40 y 25 minutos antes de cada partido
+LIVE_BB = True                  # fútbol en vivo: líneas que se están cumpliendo al descanso
+LIVE_BB_CHECKS_PER_DAY = 4      # consultas de cuotas en vivo por día (cada una ~3 llamadas a OddsPapi)
+LIVE_BB_MIN_ODDS = 1.60         # solo avisar si la línea paga al menos esto   # el post partido se comparte solo 20 min después del resultado
 # --- NBA ------------------------------------------------------------------
 NBA_ENABLED = True
 NBA_SPORT_ID = 11
