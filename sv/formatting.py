@@ -429,7 +429,7 @@ def builder_post(pick: dict, tier: str | None = "vip") -> str:
             f"({_bank(pick['stake'])} del bankroll)\n\n"
             f"{summary}\n\n" + "\n\n".join(facts) + "\n\n"
             f"📈 <b>Probabilidad estimada: {pct(pick['prob'])}</b> · a cuota {odds(pick['price'])} alcanza con {pct(need)}"
-            + (f" (valor +{pct(pick['edge'])})" if pick.get("edge", 0) > 0 else "") + "\n\n" + close)
+            + "\n\n" + close)
 
 
 def builder_owner(pick: dict) -> str:
@@ -444,5 +444,6 @@ def builder_owner(pick: dict) -> str:
             f"📈 Probabilidad estimada (combinada): <b>{pct(b['prob'])}</b> → cuota mínima <b>{odds(b['fair'])}</b>\n"
             f"🎯 Objetivo ~{odds(b['target'])}. Ármalo en tu app: si la cuota es mayor que {odds(b['fair'])}, "
             "según estos números conviene.\n\n"
-            "Cuando lo tengas, toca «Cargar cuota» y escríbeme la cuota real (ej. 3.10). "
-            "Las patas están pensadas para estar relacionadas lo menos posible, pero la casa igual puede ajustar el precio.")
+            "Cuando lo tengas, toca «Cargar cuota» y escríbeme la cuota real (ej. 3.10).\n"
+            "⚠️ Ojo: con pocos partidos (inicio de temporada) el % es optimista, y la casa ajusta el precio "
+            "cuando las patas están relacionadas.")

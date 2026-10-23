@@ -63,7 +63,12 @@ def _best_line(vals: list[int], lines: list[int], min_rate: float = 0.8, recent:
 
 
 def _p(hits: int, n: int) -> float:
-    return (hits + 1) / (n + 2)
+    """Probabilidad prudente: el historial se mezcla con un 60 % de base (como si hubiera 4 partidos más).
+    Así un 6 de 6 queda en ~84 % y no en 100 %, y las muestras cortas pesan menos."""
+    return (hits + 2.4) / (n + 4)
+
+
+MIN_LINE = {"pts": 10, "reb": 4, "ast": 3, "tpm": 1}   # NBA: por debajo de esto la línea no suma nada
 
 
 # ---------------------------------------------------------------- NBA
@@ -133,15 +138,16 @@ def nba_legs(home: str, away: str, kickoff_iso: str) -> tuple[list[dict], dict]:
             played = [g[pid] for g in games if pid in g and g[pid]["min"] > 0]
             if len(played) < 6 or sum(x["min"] for x in played) / len(played) < 24:
                 continue
+            mins = sum(x["min"] for x in played) / len(played)
             for stat, (lines, word) in NBA_LINES.items():
-                best = _best_line([x[stat] for x in played], lines)
+                best = _best_line([x[stat] for x in played], [x for x in lines if x >= MIN_LINE[stat]])
                 if not best:
                     continue
                 ln, hits, n = best
                 avg = sum(x[stat] for x in played) / n
                 legs.append({"player": played[0]["name"], "pid": pid, "team": team.get("displayName"),
                              "side": side, "stat": stat, "line": ln, "word": word, "hits": hits, "n": n,
-                             "avg": round(avg, 1), "p": _p(hits, n),
+                             "avg": round(avg, 1), "p": _p(hits, n), "min": round(mins, 1),
                              "label": f"{played[0]['name']}: {ln}+ {word}"})
     return legs, {"home": teams.get("home", {}).get("displayName"), "away": teams.get("away", {}).get("displayName"),
                   "event": e.get("id")}
@@ -220,8 +226,9 @@ def choose(legs: list[dict], k: int = 3, target: float = 3.0) -> dict | None:
     # Una línea que el jugador «regala» (muy por debajo de su promedio) no suma cuota: se prefieren
     # líneas cercanas a lo que hace siempre pero que igual cumple casi siempre.
     def score(l):
-        tight = min(1.0, l["line"] / max(l["avg"], 0.1))
-        return l["p"] * (0.75 + 0.25 * tight)
+        tight = min(1.0, l["line"] / max(l["avg"], 0.1))       # línea cerca de lo que hace = paga más
+        star = min(1.0, l.get("min", 34) / 34)                   # NBA: figuras con muchos minutos primero
+        return l["p"] * (0.75 + 0.25 * tight) * (0.6 + 0.4 * star)
     pool = sorted(legs, key=score, reverse=True)
     pick, used, per_team, per_stat = [], set(), {}, {}
     for l in pool:
@@ -299,3 +306,9 @@ def parse_odds(text: str) -> float | None:
         return None
     v = float(m.group(1).replace(",", "."))
     return v if 1.2 <= v <= 50 else None
+
+
+def league_name(slug: str) -> str:
+    """«2026-27-english-premier-league» → «English Premier League»."""
+    s = re.sub(r"^\d{4}(-\d{2,4})?-", "", slug or "")
+    return s.replace("-", " ").title() if s else "Fútbol"

@@ -1653,7 +1653,8 @@ def _builder_command(state: dict, text: str) -> None:
                 hn, an = h["team"].get("displayName", ""), a["team"].get("displayName", "")
                 if all(_name_hit(part, hn) or _name_hit(part, an) for part in re.split(r"\s+(?:vs\.?|v|-|contra)\s+", q, flags=re.I)):
                     ko = e["date"].replace("Z", ":00Z") if len(e["date"]) == 17 else e["date"]
-                    league = lg or ((e.get("season") or {}).get("slug") or "").replace("-", " ").title() or "Fútbol"
+                    from . import builder as _b
+                    league = lg or _b.league_name((e.get("season") or {}).get("slug") or "")
                     found = (hn, an, ko, league, sp)
                     break
             if found:

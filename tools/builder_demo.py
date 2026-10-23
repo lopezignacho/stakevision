@@ -44,7 +44,7 @@ for sport in ("basketball", "soccer"):
                    + (f" · candidatas {b['n_candidates']}" if b else ""))
         if not b:
             continue
-        league = "USA · NBA" if sport == "basketball" else ((e.get("season") or {}).get("slug") or "Fútbol")
+        league = "USA · NBA" if sport == "basketball" else builder.league_name((e.get("season") or {}).get("slug") or "")
         legs = [{"home": h, "away": a, "kickoff": ko, "league": league, "sport": sport, "label": x["label"],
                  "price": None} for x in b["legs"]]
         p = {"id": "demo", "kind": "builder", "legs": legs, "bb": b, "price": 3.10, "prob": b["prob"],
