@@ -796,4 +796,20 @@ assert any("publicado" in (t or "") for _, t, _, _ in sent[n:])
 updates_q.append({"update_id": 1452, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/gratis apagar"}})
 main.poll()
 assert store.load().get("auto_free_off")
+# /gratis 37: un pick elegido por ti sale ya como gratis (al día siguiente, para no chocar con el de hoy)
+st = store.load()
+st.pop("auto_free_off", None)
+for p_ in st["picks"].values():
+    p_.get("channel_msgs", {}).pop("free", None)
+    if p_["status"] in ("selected", "published"):
+        p_["status"] = "settled"
+cid = next(k for k, v in st["picks"].items() if v["status"] == "candidate")
+store.save(st)
+n = len(sent)
+updates_q.append({"update_id": 1453, "message": {"chat": {"id": OWNER, "type": "private"}, "text": f"/gratis {cid}"}})
+main.poll()
+st = store.load()
+pc = st["picks"][cid]
+assert "free" in pc.get("channel_msgs", {}) and "vip" in pc["channel_msgs"] and pc["auto_free"], pc.get("status")
+assert st["auto_free"]["pid"] == cid and st["auto_free"]["status"] == "published"
 print("OK pick gratis automático")
