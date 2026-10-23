@@ -77,5 +77,25 @@ if evs:
             break
     sm2 = get(f"{S}/soccer/all/summary", event=e["id"])
     log.append("soccer/all/summary: " + json.dumps(list(sm2.keys())[:12]))
+    lf = sm2.get("lastFiveGames") or []
+    log.append("lastFiveGames: " + json.dumps(keys(lf, 0, 4))[:1200])
+    ro = sm2.get("rosters") or []
+    log.append("rosters keys: " + json.dumps(keys(ro, 0, 3))[:800])
+    if ro and ro[0].get("roster"):
+        for pl in ro[0]["roster"][:2]:
+            log.append("jugador: " + json.dumps((pl.get("athlete") or {}).get("displayName")) + " starter=" + str(pl.get("starter"))
+                       + " stats=" + json.dumps([(x.get("name"), x.get("displayValue")) for x in pl.get("stats") or []]))
+    bx = (sm2.get("boxscore") or {}).get("teams") or []
+    if bx:
+        log.append("team stats: " + json.dumps([(x.get("name"), x.get("displayValue")) for x in bx[0].get("statistics") or []]))
+    # partido próximo: ¿trae lastFiveGames y rosters antes de jugarse?
+    day2 = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y%m%d")
+    up = next((x for x in get(f"{S}/soccer/all/scoreboard", dates=day2).get("events") or []), None)
+    if up:
+        sm3 = get(f"{S}/soccer/all/summary", event=up["id"])
+        lf3 = sm3.get("lastFiveGames") or []
+        log.append(f"Próximo {up['name']}: lastFiveGames equipos={len(lf3)} eventos={[len(t.get('events') or []) for t in lf3]}")
+        if lf3 and lf3[0].get("events"):
+            log.append("evento lastFive ej: " + json.dumps(keys(lf3[0]["events"][0], 0, 2))[:600])
 open(f"{OUT}/probe.txt", "w").write("\n".join(log))
 print("\n".join(log))
