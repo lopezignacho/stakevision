@@ -635,27 +635,13 @@ def _free_command(state: dict, text: str) -> None:
     if arg in ("prueba", "test", "probar"):
         _free_preview(state)
         return
-    if arg in ("ahora", "elegir", "ya"):
-        af = state.get("auto_free") or {}
-        if af.get("date") == _local_today() and af.get("status") == "pending":
-            telegram.send(owner, "Ya hay un pick gratis automático pendiente para hoy (mira el mensaje de arriba).")
-            return
-        if state.get("auto_free_off"):
-            telegram.send(owner, "Está apagado. Usa /gratis encender primero.")
-            return
-        if _free_given_today(state):
-            telegram.send(owner, "Hoy ya salió un pick en el canal Gratis.")
-            return
-        state["auto_free"] = {}
-        _auto_free_choose(state)
-        return
     af = state.get("auto_free") or {}
     on = "apagado ⏸️" if state.get("auto_free_off") else "encendido ▶️"
     st = {"pending": "pendiente de publicar", "published": "publicado", "cancelled": "cancelado",
           "none": "sin opción que cumpla"}.get(af.get("status"), "aún no se elige")
     telegram.send(owner, f"🤖 Pick gratis automático: {on}\nHoy: {st}"
                   + (f" (pick #{af['pid']})" if af.get("pid") and af.get("date") == _local_today() else "")
-                  + "\n\n/gratis 37 · usar ese pick como gratis de hoy (sale ya)\n/gratis prueba · ver qué elegiría (solo tú, no publica)\n/gratis ahora · elegirlo ya con los candidatos de hoy\n/gratis apagar · /gratis encender")
+                  + "\n\n/gratis 37 · usar ese pick como gratis de hoy (sale ya)\n/gratis prueba · ver qué elegiría (solo tú, no publica)\n/gratis apagar · /gratis encender")
 
 
 def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool = False, live: bool = False) -> None:
@@ -932,7 +918,13 @@ def scan_match(query: str, sport: str | None = None) -> None:
             live = is_live
             break
     if not found:
-        telegram.send(owner, f"🔎 No encontré «{formatting.escape(query)}» con cuotas, ni en juego ni en las próximas 47 horas.")
+        st_ = store.load()   # no encontró el partido: la búsqueda no cuenta
+        m_ = st_.get("manual") or {}
+        if m_.get("n", 0) > 0 and m_.get("date") == _local_today():
+            m_["n"] -= 1
+            store.save(st_)
+        telegram.send(owner, f"🔎 No encontré «{formatting.escape(query)}» con cuotas, ni en juego ni en las próximas 47 horas. "
+                             "Esta búsqueda no se descontó: revisa el nombre e intenta de nuevo.")
         return
     markets = oddspapi.markets(sport_id=sid)
     rows = oddspapi.odds_by_tournaments([found["tournamentId"]])
@@ -1724,7 +1716,7 @@ def _nba_builders_pregame(state: dict, now) -> None:
     done = state.setdefault("bb_nba_done", [])
     day = now.astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d")
     for e in nba._get("/scoreboard", dates=day).get("events") or []:
-        if e.get("id") in done:
+        if e.get("id") in done or not e.get("date"):
             continue
         ko = store.parse_ts(e["date"].replace("Z", ":00Z") if len(e["date"]) == 17 else e["date"])
         if not (ko - timedelta(minutes=hi) <= now <= ko - timedelta(minutes=lo)):
@@ -1964,44 +1956,6 @@ def _halftime_check(state: dict, p: dict, now) -> None:
                                            f"({rep['home']['score']}-{rep['away']['score']}).")
 
 
-def _halftime_preview(state: dict, text: str) -> None:
-    """/entretiempo Local vs Visita — vista previa SOLO para ti, con el marcador actual (no publica en canales)."""
-    import re as _re
-    from . import commons, espn, halftime, layouts
-    owner = state["owner_chat"]
-    body = text.split(maxsplit=1)[1] if len(text.split(maxsplit=1)) > 1 else ""
-    teams = _re.split(r"\s+(?:vs\.?|v|-|contra)\s+", body.strip(), maxsplit=1, flags=_re.I)
-    if len(teams) != 2:
-        telegram.send(owner, "Usa: /entretiempo Vasco vs Boca (un partido en juego o de los últimos 3 días). "
-                             "Es solo una vista previa para ti.")
-        return
-    found = espn.find_recent(teams[0].strip(), teams[1].strip(), finished_only=False)
-    if not found:
-        telegram.send(owner, "No encontré ese partido en ESPN (en juego o de los últimos 3 días).")
-        return
-    rep, _ko = found
-    l = {"home": rep["home"]["name"], "away": rep["away"]["name"], "mtype": "totals", "outcome": "Más de",
-         "handicap": 2.5}
-    st = halftime.status(l, rep["home"]["score"], rep["away"]["score"], grade_leg)
-    scorers = [g["full"] for g in reversed(rep["goals"]) if g["kind"] != "own" and g["full"]]
-    photo = None
-    for name, team in [(n, False) for n in scorers[:2]] + [(rep["home"]["name"], True), (rep["away"]["name"], True)]:
-        photo = commons.photo(name, team=team)
-        if photo:
-            break
-    data = {"report": rep, "eyebrow": "Vista previa", "photo": photo[0] if photo else None,
-            "credit": photo[1]["text"] if photo and photo[1] else None, "stats": halftime.stats(rep),
-            "pick_label": "Más de 2.5 goles (ejemplo)", "odds": "1.85", "status": st}
-    image = layouts.halftime(data, "dark")
-    p = {"price": 1.85, "legs": [dict(l, label="Más de 2.5 goles (pick de ejemplo)")]}
-    cap = "🧪 <b>Vista previa (solo tú la ves)</b>\n\n" + halftime.caption(p, rep, st)
-    if formatting.caption_fits(cap):
-        telegram.send_photo(owner, image, caption=cap)
-    else:
-        telegram.send_photo(owner, image)
-        telegram.send(owner, cap)
-
-
 def _recap_share(state: dict, p: dict, where: str) -> None:
     chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
     r = p["recap"]
@@ -2016,38 +1970,17 @@ def _recap_share(state: dict, p: dict, where: str) -> None:
         telegram.send(chat, text)
 
 
-def _invite_command(state: dict, text: str) -> None:
-    """/invitar Nombre [días] — enlace de un solo uso al canal VIP (para invitar sin cobrar)."""
-    import re as _re
-    owner = state["owner_chat"]
-    if not state.get("vip_chat"):
-        telegram.send(owner, "Primero vincula el canal VIP con /vincular_vip.")
-        return
-    body = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
-    days = 7
-    m = _re.search(r"\s(\d{1,3})\s*(d|días|dias)?$", " " + body)
-    if m:
-        days = max(1, min(365, int(m.group(1))))
-        body = body[:m.start()].strip() if m.start() > 0 else ""
-    name = (body or "Invitado")[:32]
-    expire = int((store.now_utc() + timedelta(days=days)).timestamp())
-    try:
-        link = telegram._call("createChatInviteLink", chat_id=state["vip_chat"], name=name,
-                              member_limit=1, expire_date=expire)
-    except telegram.TelegramError as e:
-        telegram.send(owner, "⚠️ No pude crear el enlace. Revisa que el bot sea administrador del canal VIP con el "
-                             "permiso «Invitar usuarios mediante enlace».\n" + formatting.escape(str(e)))
-        return
-    state.setdefault("invites", []).append({"name": name, "link": link["invite_link"], "created": _iso(store.now_utc()),
-                                            "days": days})
-    telegram.send(owner, f"🎟 Enlace VIP para <b>{formatting.escape(name)}</b> (1 sola persona, vence en {days} días):\n"
-                         f"{link['invite_link']}\n\nCópialo y envíaselo. Para anularlo: /anular {formatting.escape(name)}")
-
-
 def _revoke_command(state: dict, text: str) -> None:
     owner = state["owner_chat"]
     name = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
     inv = [i for i in state.get("invites") or [] if i["name"].lower() == name.lower() and not i.get("revoked")]
+    codes = [c for c in (state.get("guest_codes") or {}).values()
+             if c["name"].lower() == name.lower() and not c.get("used_by") and not c.get("revoked")]
+    for c in codes:   # enlace personal aún sin usar: deja de servir
+        c["revoked"] = True
+    if codes and not inv:
+        telegram.send(owner, f"🚫 Enlace personal de {formatting.escape(name)} anulado (todavía no lo usaba).")
+        return
     if not inv:
         lista = ", ".join(i["name"] for i in state.get("invites") or [] if not i.get("revoked")) or "ninguno"
         telegram.send(owner, f"No encontré un enlace activo para «{formatting.escape(name)}». Activos: {formatting.escape(lista)}")
@@ -2247,14 +2180,18 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
-        elif chat == owner and text.lower().startswith(("/builder", "/combinada")):
+        elif chat == owner and text.lower().startswith("/builder"):
             _builder_command(state, text)
+        elif chat == owner and text.lower().startswith("/hoy"):
+            telegram.send(chat, _today_text(state))
+        elif chat == owner and (text.lower().startswith(("/invitar", "/entretiempo", "/combinada", "/vivo"))
+                                or (text.lower().startswith(("/buscar", "/envivo"))
+                                    and "nba" in text.lower().split()[1:])):
+            telegram.send(chat, _moved_hint(text))
         elif chat == owner and text.lower().startswith("/gratis"):
             _free_command(state, text)
         elif chat == owner and text.lower().startswith("/partido"):
             _request_search(state, text)
-        elif chat == owner and text.lower().startswith("/entretiempo"):
-            _halftime_preview(state, text)
         elif chat == owner and text.lower().startswith("/enlace"):
             from . import guests
             guests.link_command(state, text)
@@ -2264,8 +2201,6 @@ def _handle_update(state: dict, u: dict) -> None:
         elif chat == owner and text.lower().startswith("/contactos"):
             from . import guests
             guests.contacts_command(state)
-        elif chat == owner and text.lower().startswith("/invitar"):
-            _invite_command(state, text)
         elif chat == owner and text.lower().startswith("/anular"):
             _revoke_command(state, text)
         elif chat == owner and text.lower().startswith("/adelanto"):
@@ -2276,7 +2211,7 @@ def _handle_update(state: dict, u: dict) -> None:
             _title_command(state, text)
         elif chat == owner and text.lower().startswith("/compartir"):
             _share_command(state, text)
-        elif chat == owner and text.lower().startswith(("/envivo", "/vivo")):
+        elif chat == owner and text.lower().startswith("/envivo"):
             _request_search(state, text, live=True)
         elif chat == owner and text.lower().startswith("/buscar"):
             _request_search(state, text)
@@ -2668,26 +2603,28 @@ def _handle_update(state: dict, u: dict) -> None:
 
 HELP_TEXT = (
     "👁 <b>Comandos de Stakevision</b>\n\n"
-    "/buscar · analiza ahora los partidos de las próximas 30 h y te manda el top 3\n"
-    "/buscar 40 · igual, pero mirando 40 horas hacia adelante (máximo 47)\n"
-    "/buscar nba · picks de NBA (opción A y B con argumentos) · /envivo nba · NBA en juego\n"
-    "/partido Celtics vs Knicks · analiza un partido específico, en vivo o próximo (fútbol o NBA)\n"
-    "/envivo · busca valor en partidos que se están jugando ahora\n"
-    "/compartir 8 · vuelve a mandarte la imagen del pick #8 (o su post partido, si ya terminó)\n"
-    "/titular 8 MARACA-NAZO · cambia el titular de la imagen post partido del pick #8\n"
-    "/postpartido Vasco vs Boca | Sudamericana · imagen post partido de cualquier partido terminado\n"
-    "/entretiempo Vasco vs Boca · vista previa del entretiempo de un partido (solo para ti)\n"
-    "/adelanto 8 10:00 · adelanto del pick #8 para historias (pistas + pick tapado hasta las 10:00)\n"
-    "/invitar Juan · enlace VIP de un solo uso que vence en 7 días (/invitar Juan 30 para 30 días)\n"
-    "/anular Juan · anula ese enlace\n"
-    "/enlace Juan · enlace personal al bot: al tocar Iniciar recibe su acceso VIP y te aviso\n"
-    "/mensaje Juan hola · le escribe a un contacto que ya inició el bot · /contactos · la lista\n"
-    "/builder Thunder vs Nuggets · Bet Builder: 3 líneas que los jugadores cumplen casi siempre (NBA o fútbol)\n"
-    "/gratis · pick gratis automático (estado) · /gratis 37 (ese pick es el gratis y sale ya) · /gratis prueba (solo tú) · /gratis ahora · /gratis apagar · /gratis encender\n"
-    "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
-    "/ayuda · esta lista\n\n"
-    "El escaneo automático sigue saliendo todos los días a las 09:07. Después, el bot elige solo el pick "
-    "gratis (el más probable) y lo publica 30 min más tarde, salvo que lo cambies o lo canceles."
+    "<b>Día a día</b>\n"
+    "/hoy · resumen del día: picks publicados, en juego, resultados y unidades\n"
+    "/estado · pendientes, números de cada pick, búsquedas que te quedan y estado del gratis\n"
+    "/compartir 8 · vuelve a mandarte la imagen del pick #8 (o su post partido)\n"
+    "/titular 8 MARACA-NAZO · cambia el titular del post partido del pick #8\n\n"
+    "<b>Buscar picks</b> (comparten 4 usos al día; si /partido no encuentra el partido, no se descuenta)\n"
+    "/partido Celtics vs Knicks · un partido específico, en vivo o próximo (fútbol o NBA), con opción A y B\n"
+    "/buscar · el top 3 de fútbol de las próximas 30 h · /buscar 40 · mirando 40 h (máx. 47)\n"
+    "/envivo · lo que tenga valor en los partidos de fútbol que se juegan ahora\n"
+    "/builder Thunder vs Nuggets · Bet Builder de 3 líneas que los jugadores cumplen casi siempre (sin límite)\n\n"
+    "<b>Pick gratis</b>\n"
+    "/gratis · estado del gratis automático · /gratis 37 · ese pick es el gratis y sale ya\n"
+    "/gratis prueba · qué elegiría (solo tú) · /gratis apagar · /gratis encender\n\n"
+    "<b>Redes</b>\n"
+    "/postpartido Vasco vs Boca · imagen post partido de cualquier partido terminado\n"
+    "/adelanto 8 10:00 · historia de adelanto del pick #8 (no aplica a NBA)\n\n"
+    "<b>Contactos y VIP</b>\n"
+    "/enlace Juan · enlace personal al bot con acceso VIP (vence en 7 días; /enlace Juan 30 para 30 días)\n"
+    "/anular Juan · anula su acceso VIP si aún no lo usa\n"
+    "/mensaje Juan hola · le escribe a un contacto · /contactos · la lista\n\n"
+    "El escaneo sale a las 09:07 y el gratis automático ~30 min después. La NBA y los Bet Builder te llegan "
+    "solos antes de cada partido."
 )
 
 
@@ -2749,16 +2686,94 @@ def _request_search(state: dict, text: str, live: bool = False) -> None:
                          f"te llegan en un par de minutos. (Búsqueda {m['n']} de {config.MANUAL_SEARCHES_PER_DAY} hoy)")
 
 
-def _status_text(state: dict) -> str:
-    ps = list(state["picks"].values())
-    pend = sum(1 for p in ps if p["status"] == "candidate")
-    live = sum(1 for p in ps if p["status"] == "published")
-    w = sum(1 for p in ps if p.get("result") == "W")
-    l = sum(1 for p in ps if p.get("result") == "L")
-    quota = "\nOddsPapi: " + oddspapi.quota_text()
-    return (f"📊 Candidatos por aprobar: {pend}\nPublicados en juego: {live}\n"
-            f"Historial: {w} verdes, {l} rojas.{quota}")
+def _pick_line(p: dict) -> str:
+    l = p["legs"][0]
+    sp = "🏀" if (l.get("sport") or "soccer") == "basketball" else "⚽"
+    what = "🧩 Bet Builder" if p.get("kind") == "builder" else formatting.escape(formatting.outcome_label(l))
+    if p.get("kind") == "doble":
+        what = "Doble: " + " + ".join(formatting.escape(formatting.outcome_label(x)) for x in p["legs"])
+    price = f" @ {formatting.odds(p['price'])}" if p.get("price") and p.get("status") != "bb" else ""
+    return (f"#{p['id']} {sp} {formatting.escape(l['home'])} vs {formatting.escape(l['away'])} · {what}{price}"
+            f" · {formatting.local_time(l['kickoff'])}")
 
+
+def _status_text(state: dict) -> str:
+    """/estado: lo que espera una decisión tuya, con el número de cada pick."""
+    from zoneinfo import ZoneInfo
+    now = store.now_utc()
+    ps = sorted(state["picks"].values(), key=lambda x: x["kickoff"])
+    cand = [p for p in ps if p["status"] == "candidate" and _expires(p) > now]
+    sel = [p for p in ps if p["status"] == "selected"]
+    bb = [p for p in ps if p["status"] == "bb" and _expires(p) > now]
+    pub = [p for p in ps if p["status"] == "published"]
+    m = state.get("manual") or {}
+    used = m.get("n", 0) if m.get("date") == _local_today() else 0
+    af = state.get("auto_free") or {}
+    free = ("apagado ⏸️" if state.get("auto_free_off") else
+            {"pending": f"pendiente (pick #{af.get('pid')})", "published": f"publicado (pick #{af.get('pid')})",
+             "cancelled": "cancelado hoy", "none": "hoy no hubo opción"}.get(af.get("status"), "aún no se elige")
+            if af.get("date") == _local_today() else ("apagado ⏸️" if state.get("auto_free_off") else "aún no se elige"))
+    out = ["📊 <b>Estado</b>", f"🔎 Búsquedas hoy: {used} de {config.MANUAL_SEARCHES_PER_DAY} "
+                              f"(te quedan {max(0, config.MANUAL_SEARCHES_PER_DAY - used)})",
+           f"🎁 Gratis automático: {free}"]
+    for title, rows in (("🆕 Candidatos por elegir", cand), ("🖼 Elegidos sin publicar", sel),
+                        ("🧩 Bet Builder sin cuota cargada", bb), ("⏳ Publicados en juego", pub)):
+        out += ["", f"<b>{title}</b> ({len(rows)})"] + ([_pick_line(p) for p in rows[:10]] or ["—"])
+    w = sum(1 for p in ps if p.get("result") == "W")
+    l_ = sum(1 for p in ps if p.get("result") == "L")
+    out += ["", f"📈 Historial: {w} verdes, {l_} rojas · /hoy para el resumen del día"]
+    try:
+        out.append("OddsPapi: " + oddspapi.quota_text())
+    except Exception:  # noqa: BLE001
+        pass
+    return "\n".join(out)
+
+
+def _today_text(state: dict) -> str:
+    """/hoy: los picks de hoy (hora Chile) con su estado y el balance en unidades."""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo(config.TIMEZONE)
+    today = _local_today()
+    rows = [p for p in state["picks"].values()
+            if p.get("published_at") and p.get("channel_msgs")
+            and (store.parse_ts(p["kickoff"]).astimezone(tz).date().isoformat() == today
+                 or store.parse_ts(p["published_at"]).astimezone(tz).date().isoformat() == today)]
+    rows.sort(key=lambda p: p["kickoff"])
+    now = store.now_utc()
+    out = [f"📅 <b>Hoy · {store.now_utc().astimezone(tz):%d/%m}</b>", ""]
+    units = 0.0
+    if not rows:
+        out.append("Todavía no se publica ningún pick hoy.")
+    for p in rows:
+        where = " + ".join({"vip": "VIP", "free": "Gratis"}[k] for k in p["channel_msgs"])
+        if p.get("result"):
+            mark = {"W": "✅ verde", "L": "❌ roja", "V": "↩️ nula"}[p["result"]]
+            units += (p["stake"] * (p["price"] - 1) if p["result"] == "W" else -p["stake"] if p["result"] == "L" else 0)
+        elif store.parse_ts(p["kickoff"]) <= now:
+            mark = "🔴 en juego"
+        else:
+            mark = "🕒 por jugarse"
+        out.append(f"{_pick_line(p)}\n   {mark} · {where} · stake {p['stake']}/10")
+    done = [p for p in rows if p.get("result") in ("W", "L")]
+    if done:
+        out += ["", f"💰 Balance del día: {'+' if units >= 0 else ''}{units:.2f} unidades "
+                    f"({sum(p['result'] == 'W' for p in done)} verdes, {sum(p['result'] == 'L' for p in done)} rojas)"]
+    return "\n".join(out)
+
+
+def _moved_hint(text: str) -> str:
+    """Comandos retirados: a cuál usar ahora."""
+    t = text.lower()
+    if t.startswith("/invitar"):
+        return "Ese comando se reemplazó por /enlace Juan (acceso VIP personal; /enlace Juan 30 para 30 días)."
+    if t.startswith("/entretiempo"):
+        return "Ese comando se retiró: el entretiempo de tus picks sale solo en sus canales."
+    if t.startswith("/combinada"):
+        return "Usa /builder (por ejemplo /builder Thunder vs Nuggets)."
+    if t.startswith("/vivo"):
+        return "Usa /envivo."
+    return ("La NBA ya te llega sola (escaneo de las 09:07 y Bet Builder antes de cada partido). "
+            "Para un partido puntual usa /partido Lakers.")
 
 def _migrate_stakes(state: dict, now) -> None:
     """Escala de stake v2: recalcula picks que aún no empiezan y corrige sus mensajes."""
@@ -2863,25 +2878,26 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
-    if owner and state.get("cmds_v") != 11:
+    if owner and state.get("cmds_v") != 12:
         try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
             telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
-                {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
-                {"command": "envivo", "description": "Buscar valor en partidos que se están jugando"},
-                {"command": "compartir", "description": "Imagen de un pick para VIP, Gratis o Instagram"},
-                {"command": "titular", "description": "Cambiar el titular de la imagen post partido"},
-                {"command": "postpartido", "description": "Imagen post partido de cualquier partido (ej. Vasco vs Boca)"},
-                {"command": "adelanto", "description": "Adelanto del pick para historias (ej. /adelanto 8 10:00)"},
-                {"command": "invitar", "description": "Enlace VIP de un solo uso (ej. /invitar Juan)"},
-                {"command": "enlace", "description": "Enlace personal al bot para un contacto (ej. /enlace Juan)"},
+                {"command": "hoy", "description": "Resumen del día: picks, resultados y unidades"},
+                {"command": "estado", "description": "Pendientes, números de pick y búsquedas que quedan"},
+                {"command": "partido", "description": "Analizar un partido (ej. /partido Celtics vs Knicks)"},
+                {"command": "buscar", "description": "Top 3 de fútbol de las próximas 30 h"},
+                {"command": "envivo", "description": "Valor en partidos de fútbol en juego"},
+                {"command": "builder", "description": "Bet Builder de un partido (ej. /builder Thunder)"},
+                {"command": "gratis", "description": "Pick gratis automático: estado, prueba, apagar"},
+                {"command": "compartir", "description": "Imagen de un pick o su post partido (ej. /compartir 8)"},
+                {"command": "titular", "description": "Cambiar el titular del post partido"},
+                {"command": "postpartido", "description": "Post partido de cualquier partido (ej. Vasco vs Boca)"},
+                {"command": "adelanto", "description": "Historia de adelanto (ej. /adelanto 8 10:00)"},
+                {"command": "enlace", "description": "Acceso VIP personal para un contacto (ej. /enlace Juan)"},
+                {"command": "anular", "description": "Anular el acceso VIP de un contacto"},
                 {"command": "mensaje", "description": "Escribirle a un contacto (ej. /mensaje Juan hola)"},
                 {"command": "contactos", "description": "Quiénes iniciaron el bot"},
-                {"command": "partido", "description": "Analizar un partido específico (ej. /partido Celtics vs Knicks)"},
-                {"command": "builder", "description": "Bet Builder: 3 líneas fáciles de un partido (ej. /builder Thunder)"},
-                {"command": "gratis", "description": "Pick gratis automático: estado, ahora, apagar o encender"},
-                {"command": "estado", "description": "Pendientes, picks en juego e historial"},
                 {"command": "ayuda", "description": "Lista de comandos"}])
-            state["cmds_v"] = 11
+            state["cmds_v"] = 12
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)

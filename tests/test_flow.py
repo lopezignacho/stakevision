@@ -561,18 +561,19 @@ assert set(p8s["channel_msgs"]) == {"free"} and p8s["status"] == "published" and
 assert buttons_set[-1][0][0][1] == f"pv:{p8['id']}" and buttons_set[-1][0][1][1] == "noop"
 print("OK solo Gratis")
 
-# 19) /invitar y /anular
+# 19) /invitar retirado (redirige a /enlace) y /anular de un enlace personal sin usar
 tg_calls = []
-telegram._call = lambda method, **kw: tg_calls.append((method, kw)) or {"invite_link": "https://t.me/+abc"}
+telegram._call = lambda method, **kw: tg_calls.append((method, kw)) or {"invite_link": "https://t.me/+abc", "username": "StakevisionBot"}
 updates_q.append({"update_id": 950, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/invitar Juan Pérez 30"}})
-updates_q.append({"update_id": 951, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/anular Juan Pérez"}})
+updates_q.append({"update_id": 951, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/enlace Pedro 30"}})
+updates_q.append({"update_id": 952, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/anular Pedro"}})
 main.poll()
-mk = [kw for m_, kw in tg_calls if m_ == "createChatInviteLink"][0]
-assert mk["member_limit"] == 1 and mk["name"] == "Juan Pérez" and mk["chat_id"] == VIP
-assert any(m_ == "revokeChatInviteLink" for m_, _ in tg_calls)
-assert any("https://t.me/+abc" in t for _, t, *_ in sent) and "anulado" in sent[-1][1]
+assert any("/enlace" in t for _, t, *_ in sent[-4:]) and "anulado" in sent[-1][1]
+assert not any(m_ == "createChatInviteLink" for m_, _ in tg_calls)
+st = store.load()
+assert any(c["name"] == "Pedro" and c.get("revoked") and c.get("days") == 30 for c in st["guest_codes"].values())
 telegram._call = lambda *a, **k: True
-print("OK invitar")
+print("OK enlace + anular")
 
 # 20) contactos: /enlace, /start con código, /mensaje
 tg_calls = []
@@ -624,13 +625,14 @@ main.poll()
 assert not any(c and "ENTRETIEMPO" in c for ch, c in photos[n + len(new):])
 print("OK entretiempo")
 
-# 22) /entretiempo (vista previa solo para el dueño)
-espn.find_recent = lambda a, b, days=3, finished_only=True: (rep_ht, "2026-10-21T00:30:00Z")
-n = len(photos)
-updates_q.append({"update_id": 1100, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/entretiempo Vasco vs Boca"}})
+# 22) comandos retirados: avisan cuál usar
+n = len(sent)
+for i_, cmd in enumerate(["/entretiempo Vasco vs Boca", "/buscar nba", "/combinada Thunder"]):
+    updates_q.append({"update_id": 1100 + i_, "message": {"chat": {"id": OWNER, "type": "private"}, "text": cmd}})
 main.poll()
-assert photos[n:] and all(ch == OWNER for ch, _ in photos[n:]) and "Vista previa" in (photos[n][1] or sent[-1][1])
-print("OK vista previa entretiempo")
+assert len([1 for c, *_ in sent[n:] if c == OWNER]) >= 3 and not photos[len(photos):]
+assert (store.load().get("manual") or {}).get("n", 0) <= 4
+print("OK comandos retirados")
 
 # 23) NBA: escaneo con opción A y B, argumentos, elegir B, calificar y alertas en vivo
 from sv import formatting, nba  # noqa: E402
@@ -1020,3 +1022,15 @@ main._nba_builders_pregame(st, store.now_utc())
 assert calls_bb == [("Boston Celtics", "New York Knicks", "basketball")], calls_bb
 main._builder_send = _orig_send
 print("OK en vivo + builder NBA previo")
+
+
+# 30) /estado y /hoy
+n = len(sent)
+updates_q.append({"update_id": 1800, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/estado"}})
+updates_q.append({"update_id": 1801, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/hoy"}})
+main.poll()
+est = next(t for c, t, *_ in sent[n:] if "Búsquedas hoy" in (t or ""))
+assert "Gratis automático" in est and "Publicados en juego" in est
+hoy = next(t for c, t, *_ in sent[n:] if (t or "").startswith("📅"))
+assert "#" in hoy or "Todavía" in hoy
+print("OK estado + hoy")

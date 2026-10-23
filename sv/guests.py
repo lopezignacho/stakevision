@@ -7,6 +7,7 @@ escriba primero a nadie: la persona siempre tiene que tocar Iniciar).
 """
 from __future__ import annotations
 
+import re
 import secrets
 from datetime import timedelta
 
@@ -45,6 +46,11 @@ def link_command(state: dict, text: str) -> None:
     owner = state["owner_chat"]
     parts = text.split(maxsplit=1)
     body = parts[1].strip() if len(parts) > 1 else ""
+    days = 7
+    m = re.search(r"\s(\d{1,3})\s*(d|días|dias)?$", " " + body)
+    if m:
+        days = max(1, min(365, int(m.group(1))))
+        body = body[:m.start()].strip() if m.start() > 0 else ""
     free_only = body.lower().endswith(" gratis") or body.lower() == "gratis"
     name = body[:-7].strip() if body.lower().endswith(" gratis") else ("" if body.lower() == "gratis" else body)
     if not name:
@@ -52,10 +58,11 @@ def link_command(state: dict, text: str) -> None:
                              "(agrega «gratis» al final si solo quieres invitarlo al canal gratis).")
         return
     code = secrets.token_urlsafe(6).replace("-", "x").replace("_", "y")
-    state.setdefault("guest_codes", {})[code] = {"name": name[:40], "created": _now_iso(), "vip": not free_only}
+    state.setdefault("guest_codes", {})[code] = {"name": name[:40], "created": _now_iso(), "vip": not free_only,
+                                                 "days": days}
     user = bot_username(state)
     telegram.send(owner, f"🔗 Enlace personal para <b>{formatting.escape(name)}</b>"
-                         f"{' (canal gratis)' if free_only else ' (con acceso VIP)'}:\n"
+                         f"{' (canal gratis)' if free_only else f' (con acceso VIP por {days} días de plazo para entrar)'}:\n"
                          f"https://t.me/{user}?start={code}\n\n"
                          "Mándaselo. Cuando lo abra y toque <b>Iniciar</b>, te aviso y ya le podré escribir "
                          f"con /mensaje {formatting.escape(name)} …")
@@ -70,8 +77,8 @@ def handle_start(state: dict, msg: dict) -> None:
     contacts = state.setdefault("contacts", {})
     info = (state.get("guest_codes") or {}).get(code)
     owner = state.get("owner_chat")
-    if info and info.get("used_by") not in (None, chat):
-        info = None   # cada enlace personal sirve para una sola persona
+    if info and (info.get("used_by") not in (None, chat) or info.get("revoked")):
+        info = None   # cada enlace personal sirve para una sola persona (y no si lo anulaste)
     c = contacts.setdefault(str(chat), {"joined": _now_iso()})
     c.update(tg_name=(who.get("first_name") or "")[:40], username=who.get("username") or "")
     if info:
@@ -81,11 +88,11 @@ def handle_start(state: dict, msg: dict) -> None:
     lines = [f"👋 ¡Hola {formatting.escape(name)}! Bienvenido a <b>Stakevision</b> 👁",
              "Pronósticos de fútbol con valor, analizados con datos y publicados antes de cada partido."]
     if info and info.get("vip"):
-        invite = c.get("vip_link") or _vip_invite(state, name)
+        invite = c.get("vip_link") or _vip_invite(state, name, info.get("days") or 7)
         if invite:
             c["vip_link"] = invite
             lines += ["", "🎟 Te invitaron al <b>canal VIP</b>. Este es tu acceso personal "
-                          "(sirve solo para ti y vence en 7 días):", invite]
+                          f"(sirve solo para ti y vence en {info.get('days') or 7} días):", invite]
     lines += ["", f"🎁 Canal gratis con 1 pick al día: {FREE_LINK}",
               "", "🔞 Contenido solo para mayores de 18 años. Apuesta con responsabilidad: "
                   "solo dinero que puedas perder."]
