@@ -139,6 +139,7 @@ def nba_legs(home: str, away: str, kickoff_iso: str) -> tuple[list[dict], dict]:
             if len(played) < 6 or sum(x["min"] for x in played) / len(played) < 24:
                 continue
             mins = sum(x["min"] for x in played) / len(played)
+            ppg = sum(x["pts"] for x in played) / len(played)
             for stat, (lines, word) in NBA_LINES.items():
                 best = _best_line([x[stat] for x in played], [x for x in lines if x >= MIN_LINE[stat]])
                 if not best:
@@ -147,7 +148,7 @@ def nba_legs(home: str, away: str, kickoff_iso: str) -> tuple[list[dict], dict]:
                 avg = sum(x[stat] for x in played) / n
                 legs.append({"player": played[0]["name"], "pid": pid, "team": team.get("displayName"),
                              "side": side, "stat": stat, "line": ln, "word": word, "hits": hits, "n": n,
-                             "avg": round(avg, 1), "p": _p(hits, n), "min": round(mins, 1),
+                             "avg": round(avg, 1), "p": _p(hits, n), "min": round(mins, 1), "ppg": round(ppg, 1),
                              "label": f"{played[0]['name']}: {ln}+ {word}"})
     return legs, {"home": teams.get("home", {}).get("displayName"), "away": teams.get("away", {}).get("displayName"),
                   "event": e.get("id")}
@@ -227,8 +228,8 @@ def choose(legs: list[dict], k: int = 3, target: float = 3.0) -> dict | None:
     # líneas cercanas a lo que hace siempre pero que igual cumple casi siempre.
     def score(l):
         tight = min(1.0, l["line"] / max(l["avg"], 0.1))       # línea cerca de lo que hace = paga más
-        star = min(1.0, l.get("min", 34) / 34)                   # NBA: figuras con muchos minutos primero
-        return l["p"] * (0.75 + 0.25 * tight) * (0.6 + 0.4 * star)
+        star = min(1.0, l.get("min", 34) / 34) * min(1.0, l.get("ppg", 22) / 22)   # NBA: las figuras primero
+        return l["p"] * (0.75 + 0.25 * tight) * (0.45 + 0.55 * star)
     pool = sorted(legs, key=score, reverse=True)
     pick, used, per_team, per_stat = [], set(), {}, {}
     for l in pool:
