@@ -685,6 +685,67 @@ def _refresh_recap_texts(state: dict) -> None:
             p["ig_res_caption"] = r["ig"]
 
 
+def _halftime_check(state: dict, p: dict, now) -> None:
+    """Entretiempo: publica en los canales del pick el marcador al descanso, goles, estadísticas y cómo va."""
+    if (p["status"] != "published" or p.get("ht_done") or len(p["legs"]) != 1
+            or (p["legs"][0].get("sport") or "soccer") != "soccer" or not p.get("channel_msgs")):
+        return
+    kick = store.parse_ts(p["kickoff"])
+    if now < kick + timedelta(minutes=44):
+        return
+    if now > kick + timedelta(minutes=85):
+        p["ht_done"] = "missed"
+        return
+    from . import commons, espn, halftime, layouts
+    l = p["legs"][0]
+    rep = espn.live_report(l["home"], l["away"], l["kickoff"])
+    if not rep or rep.get("state") == "post":
+        if rep:
+            p["ht_done"] = "missed"
+        return
+    if not halftime.is_halftime(rep):
+        return
+    p["ht_done"] = "sent"
+    st = halftime.status(l, rep["home"]["score"], rep["away"]["score"], grade_leg)
+    photo = None
+    cache = _upload_file(p, "pickphoto")
+    if os.path.exists(cache):
+        with open(cache, "rb") as f:
+            photo = (f.read(), p.get("pick_photo_credit"))
+    if not photo:
+        scorers = [g["full"] for g in reversed(rep["goals"]) if g["kind"] != "own" and g["full"]]
+        for name, team in [(n, False) for n in scorers[:2]] + [(rep["home"]["name"], True), (rep["away"]["name"], True)]:
+            photo = commons.photo(name, team=team)
+            if photo:
+                break
+    league = (l.get("league") or "").split("·")[-1].strip()
+    sel = formatting.outcome_label(l)
+    data = {"report": rep, "eyebrow": league or "Pick en juego", "photo": photo[0] if photo else None,
+            "credit": photo[1]["text"] if photo and photo[1] else None, "stats": halftime.stats(rep),
+            "pick_label": sel[:sel.index(" (")] if " (" in sel else sel, "odds": formatting.odds(p["price"]),
+            "status": st}
+    try:
+        image = layouts.halftime(data, p.get("theme") or "dark")
+    except Exception:
+        traceback.print_exc()
+        image = None
+    text = halftime.caption(p, rep, st)
+    for where, mid in (p.get("channel_msgs") or {}).items():
+        chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
+        try:
+            if image and formatting.caption_fits(text):
+                telegram.send_photo(chat, image, caption=text, reply_to=mid)
+            else:
+                if image:
+                    telegram.send_photo(chat, image, reply_to=mid)
+                telegram.send(chat, text, reply_to=mid)
+        except telegram.TelegramError as e:
+            print(f"No se pudo publicar el entretiempo en {where}: {e}")
+    if state.get("owner_chat"):
+        telegram.send(state["owner_chat"], f"⏸️ Publiqué el entretiempo del pick #{p['id']} "
+                                           f"({rep['home']['score']}-{rep['away']['score']}).")
+
+
 def _recap_share(state: dict, p: dict, where: str) -> None:
     chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
     r = p["recap"]
@@ -913,6 +974,10 @@ def _handle_update(state: dict, u: dict) -> None:
         if chat == owner and (msg.get("photo") or msg.get("document")):
             _receive_upload(state, msg)
             return
+        if chat != owner and text.lower().startswith("/start"):
+            from . import guests
+            guests.handle_start(state, msg)
+            return
         if text.lower().startswith("/vincular") and not text.lower().startswith("/vincular_vip"):
             if _code_ok(text):
                 state["owner_chat"] = chat
@@ -921,6 +986,15 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.send(chat, "⚠️ Ese código no coincide con LINK_CODE. Revísalo y vuelve a enviar /vincular CODIGO")
         elif chat == owner and text.startswith("/estado"):
             telegram.send(chat, _status_text(state))
+        elif chat == owner and text.lower().startswith("/enlace"):
+            from . import guests
+            guests.link_command(state, text)
+        elif chat == owner and text.lower().startswith("/mensaje"):
+            from . import guests
+            guests.message_command(state, text)
+        elif chat == owner and text.lower().startswith("/contactos"):
+            from . import guests
+            guests.contacts_command(state)
         elif chat == owner and text.lower().startswith("/invitar"):
             _invite_command(state, text)
         elif chat == owner and text.lower().startswith("/anular"):
@@ -1294,6 +1368,8 @@ HELP_TEXT = (
     "/adelanto 8 10:00 · adelanto del pick #8 para historias (pistas + pick tapado hasta las 10:00)\n"
     "/invitar Juan · enlace VIP de un solo uso que vence en 7 días (/invitar Juan 30 para 30 días)\n"
     "/anular Juan · anula ese enlace\n"
+    "/enlace Juan · enlace personal al bot: al tocar Iniciar recibe su acceso VIP y te aviso\n"
+    "/mensaje Juan hola · le escribe a un contacto que ya inició el bot · /contactos · la lista\n"
     "/estado · candidatos pendientes, picks en juego, historial y consultas usadas\n"
     "/ayuda · esta lista\n\n"
     "El escaneo automático sigue saliendo todos los días a las 09:07."
@@ -1444,7 +1520,7 @@ def poll() -> None:
 
     now = store.now_utc()
     owner = state.get("owner_chat")
-    if owner and state.get("cmds_v") != 7:
+    if owner and state.get("cmds_v") != 8:
         try:  # menú de comandos en Telegram (solo visible en tu chat con el bot)
             telegram._call("setMyCommands", scope={"type": "chat", "chat_id": owner}, commands=[
                 {"command": "buscar", "description": "Analizar ahora y recibir el top 3"},
@@ -1454,9 +1530,12 @@ def poll() -> None:
                 {"command": "postpartido", "description": "Imagen post partido de cualquier partido (ej. Vasco vs Boca)"},
                 {"command": "adelanto", "description": "Adelanto del pick para historias (ej. /adelanto 8 10:00)"},
                 {"command": "invitar", "description": "Enlace VIP de un solo uso (ej. /invitar Juan)"},
+                {"command": "enlace", "description": "Enlace personal al bot para un contacto (ej. /enlace Juan)"},
+                {"command": "mensaje", "description": "Escribirle a un contacto (ej. /mensaje Juan hola)"},
+                {"command": "contactos", "description": "Quiénes iniciaron el bot"},
                 {"command": "estado", "description": "Pendientes, picks en juego e historial"},
                 {"command": "ayuda", "description": "Lista de comandos"}])
-            state["cmds_v"] = 7
+            state["cmds_v"] = 8
         except Exception as e:
             print(f"No se pudo registrar el menú de comandos: {e}")
     _migrate_stakes(state, now)
@@ -1479,6 +1558,10 @@ def poll() -> None:
                 telegram.edit_buttons_off(owner, p["share_msg"], "⌛ Ya no está vigente")
         _remind(state, p, now)
         _recap_retry(state, p, now)
+        try:
+            _halftime_check(state, p, now)
+        except Exception:
+            traceback.print_exc()
         if (p["status"] == "settled" and p.get("result") == "W" and p.get("settled_at")
                 and now - store.parse_ts(p["settled_at"]) < timedelta(hours=48)):
             from . import instagram

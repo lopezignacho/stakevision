@@ -86,7 +86,8 @@ def _side(t: dict, x: dict, agg: dict) -> dict:
             "abbr": (team.get("abbreviation") or "")[:4].upper(),
             "color": _rgb(team.get("color"), (40, 44, 50)), "alt": _rgb(team.get("alternateColor"), (240, 240, 240)),
             "score": _int(x.get("score")) or 0, "winner": bool(x.get("winner")),
-            "agg": _int(x.get("aggregateScore", agg.get(str(team.get("id"))))), **t}
+            "agg": _int(x.get("aggregateScore", agg.get(str(team.get("id"))))),
+            "stats": {s.get("name"): s.get("displayValue") for s in x.get("statistics") or [] if s.get("name")}, **t}
 
 
 def _int(v):
@@ -101,8 +102,13 @@ def report_from_event(e: dict, c: dict, h: dict, a: dict) -> dict:
     series = c.get("series") or {}
     agg = {str(s.get("id")): s.get("aggregateScore") for s in series.get("competitors") or []}
     home, away = _side({"side": "home"}, h, agg), _side({"side": "away"}, a, agg)
-    goals = []
+    goals, reds = [], []
     for d in c.get("details") or []:
+        if d.get("redCard"):
+            who = (d.get("athletesInvolved") or [{}])[0]
+            tid = str((d.get("team") or {}).get("id") or "")
+            reds.append({"label": _minute(d.get("clock") or {})[1], "side": "home" if tid == home["id"] else "away",
+                         "player": who.get("shortName") or who.get("displayName") or ""})
         if not d.get("scoringPlay") or d.get("shootout"):
             continue
         who = (d.get("athletesInvolved") or [{}])[0]
@@ -116,8 +122,11 @@ def report_from_event(e: dict, c: dict, h: dict, a: dict) -> dict:
                       "full": who.get("fullName") or who.get("displayName") or ""})
     goals.sort(key=lambda g: g["min"])
     leg = (c.get("leg") or {}).get("value")
-    return {"id": e.get("id"), "home": home, "away": away, "goals": goals,
-            "state": ((e.get("status") or {}).get("type") or {}).get("state") or "",
+    st = e.get("status") or {}
+    return {"id": e.get("id"), "home": home, "away": away, "goals": goals, "reds": reds,
+            "state": (st.get("type") or {}).get("state") or "",
+            "status_name": (st.get("type") or {}).get("name") or "", "period": st.get("period") or 0,
+            "clock": st.get("displayClock") or "",
             "series": ({"title": series.get("title") or "", "leg": leg, "done": bool(series.get("completed"))}
                        if series else None),
             "stage": ((e.get("season") or {}).get("slug") or ""),
@@ -131,6 +140,12 @@ def match_report(home: str, away: str, kickoff_iso: str, sport: str = "soccer") 
         return None
     r = report_from_event(*found)
     return r if r["state"] == "post" else None
+
+
+def live_report(home: str, away: str, kickoff_iso: str, sport: str = "soccer") -> dict | None:
+    """Datos del partido en cualquier momento (en vivo, entretiempo o terminado)."""
+    found = _find(home, away, kickoff_iso, sport)
+    return report_from_event(*found) if found else None
 
 
 def find_recent(team_a: str, team_b: str, days: int = 3, sport: str = "soccer"):

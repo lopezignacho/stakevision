@@ -374,3 +374,78 @@ def cycle(current: str | None, kind: str) -> str:
     opts = RECAP_LAYOUTS if kind == "recap" else PICK_LAYOUTS
     i = opts.index(current) if current in opts else 0
     return opts[(i + 1) % len(opts)]
+
+
+# ---------------------------------------------------------------- entretiempo
+def halftime(m: dict, theme: str = "dark") -> bytes:
+    """Entretiempo: foto, marcador al descanso, goles, barras de estadísticas y cómo va el pick.
+    m = {"report", "eyebrow", "photo", "credit", "stats": [(label, local, visita, unidad)],
+         "pick_label", "odds", "status": (W|L|V|?, texto)}"""
+    T = P._mag(theme)
+    rep = m["report"]
+    home, away = rep["home"], rep["away"]
+    hacc, aacc = P._accents(home, away, theme)
+    im = Image.new("RGBA", (W, H), T["bg"] + (255,))
+    _photo_area(im, m, (0, 0, W, 660), T, side="center", fade=("bottom", "top"))
+    d = ImageDraw.Draw(im)
+    P._put_logo(im, 165, theme, 56, 40)
+    if m.get("eyebrow"):
+        f = P._oswald(22)
+        tw = P._spaced_len(d, m["eyebrow"].upper(), f, 3) + 44
+        _pill(d, (W - 40 - tw, 56), m["eyebrow"].upper(), f, T["brand"], (11, 26, 6) if theme == "dark" else (255, 255, 255))
+    ft = P._bebas(84)
+    title = "ENTRETIEMPO"
+    tw = d.textlength(title, font=ft) + 60
+    d.rounded_rectangle((40, 470, 40 + tw, 470 + 98), 14, fill=T["brand"])
+    d.text((70, 470 + 80), title, font=ft, fill=(11, 26, 6) if theme == "dark" else (255, 255, 255), anchor="ls")
+    # marcador
+    P._mag_card(im, (40, 590, 1040, 770), T, r=28)
+    d = ImageDraw.Draw(im)
+    im.alpha_composite(P.shield(home, 104), (74, 612))
+    im.alpha_composite(P.shield(away, 104), (W - 74 - 104, 612))
+    fs = P._bebas(180)
+    hs, as_ = str(home["score"]), str(away["score"])
+    gap = 110
+    total = d.textlength(hs, font=fs) + gap + d.textlength(as_, font=fs)
+    x = (W - total) / 2
+    lead = "home" if home["score"] > away["score"] else "away" if away["score"] > home["score"] else ""
+    d.text((x, 748), hs, font=fs, fill=hacc if lead == "home" else T["fg"], anchor="ls")
+    d.rectangle((x + d.textlength(hs, font=fs) + 30, 676, x + d.textlength(hs, font=fs) + gap - 30, 686), fill=T["brand"])
+    d.text((x + d.textlength(hs, font=fs) + gap, 748), as_, font=fs, fill=aacc if lead == "away" else T["fg"], anchor="ls")
+    fn = P._oswald(22)
+    d.text((78, 806), _team_name(home).upper(), font=fn, fill=T["sub"], anchor="ls")
+    an = _team_name(away).upper()
+    d.text((W - 78 - d.textlength(an, font=fn), 806), an, font=fn, fill=T["sub"], anchor="ls")
+    goals = " · ".join(f"{g['label']} {_goal_name(g)}" for g in rep["goals"]) or "Todavía sin goles"
+    goals, fg = P._wrap_fit(d, "⚽ " + goals if rep["goals"] else goals, "Medium", 22, 620)
+    P._ctext(d, 788, goals.replace("⚽ ", ""), fg, T["sub"])
+    # estadísticas
+    y = 880
+    fl, fv = P._oswald(20), P._bebas(36)
+    for label, hv, av, unit in (m.get("stats") or [])[:4]:
+        tot = (hv + av) or 1
+        P._ctext(d, y - 30, label.upper(), fl, T["muted"])
+        hvs, avs = f"{hv:.0f}{unit}", f"{av:.0f}{unit}"
+        d.text((70, y + 22), hvs, font=fv, fill=T["fg"], anchor="ls")
+        d.text((W - 70 - d.textlength(avs, font=fv), y + 22), avs, font=fv, fill=T["fg"], anchor="ls")
+        bx0, bx1, by = 170, W - 170, y + 6
+        split = bx0 + (bx1 - bx0) * hv / tot
+        d.rounded_rectangle((bx0, by, max(bx0 + 6, split - 3), by + 12), 6, fill=hacc)
+        d.rounded_rectangle((min(bx1 - 6, split + 3), by, bx1, by + 12), 6, fill=aacc)
+        y += 72
+    # cómo va el pick
+    res, txt = m["status"]
+    col = {"W": P.BRAND, "L": (227, 38, 46), "V": (110, 116, 124)}.get(res, (230, 170, 30))
+    ink = (11, 26, 6) if res == "W" else (255, 255, 255)
+    by0 = max(y + 6, 1150)
+    d.rounded_rectangle((40, by0, 1040, by0 + 120), 22, fill=col)
+    head = f"NUESTRO PICK: {m['pick_label'].upper()} @ {m['odds']}"
+    head, fh = P._wrap_fit(d, head, "Bold", 24, 920)
+    d.text((70, by0 + 46), head, font=fh, fill=ink, anchor="ls")
+    import re as _re
+    txt = _re.sub(r"[\u2190-\u2BFF\U0001F000-\U0001FAFF\uFE0F]", "", txt).strip()
+    t2, f2 = P._wrap_fit(d, txt, "Medium", 23, 920)
+    d.text((70, by0 + 92), t2, font=f2, fill=ink, anchor="ls")
+    _legal(d, T, 1318)
+    _credit(im, T, m.get("credit"), x=1046, y=150)
+    return P._jpeg(im)

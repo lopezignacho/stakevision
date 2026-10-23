@@ -572,3 +572,53 @@ assert any(m_ == "revokeChatInviteLink" for m_, _ in tg_calls)
 assert any("https://t.me/+abc" in t for _, t, *_ in sent) and "anulado" in sent[-1][1]
 telegram._call = lambda *a, **k: True
 print("OK invitar")
+
+# 20) contactos: /enlace, /start con código, /mensaje
+tg_calls = []
+def _fake_call(method, **kw):
+    tg_calls.append((method, kw))
+    return {"username": "StakevisionBot"} if method == "getMe" else {"invite_link": "https://t.me/+vip1"}
+telegram._call = _fake_call
+updates_q.append({"update_id": 1000, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/enlace Juan"}})
+main.poll()
+link = next(t for _, t, *_ in reversed(sent) if "t.me/StakevisionBot?start=" in t)
+code = link.split("start=")[1].split()[0]
+updates_q.append({"update_id": 1001, "message": {"chat": {"id": 555, "type": "private"},
+                                                 "from": {"first_name": "Juanito", "username": "juanito"},
+                                                 "text": f"/start {code}"}})
+main.poll()
+welcome = next(t for ch, t, *_ in sent if ch == 555)
+assert "Hola Juan" in welcome and "https://t.me/+vip1" in welcome and "18" in welcome
+assert any(ch == OWNER and "Juan" in t and "VIP" in t for ch, t, *_ in sent[-2:])
+updates_q.append({"update_id": 1002, "message": {"chat": {"id": OWNER, "type": "private"}, "text": "/mensaje Juan hoy hay pick especial"}})
+main.poll()
+assert any(ch == 555 and "pick especial" in t for ch, t, *_ in sent)
+# otra persona con el mismo código no recibe VIP
+updates_q.append({"update_id": 1003, "message": {"chat": {"id": 556, "type": "private"}, "from": {"first_name": "Otro"},
+                                                 "text": f"/start {code}"}})
+main.poll()
+assert "t.me/+vip1" not in next(t for ch, t, *_ in sent if ch == 556)
+telegram._call = lambda *a, **k: True
+print("OK contactos")
+
+# 21) entretiempo
+from datetime import datetime as _dt, timezone as _tz  # noqa: E402
+fxh = _json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "espn_halftime.json")))
+ch_ = fxh["competition"]
+rep_ht = espn.report_from_event(fxh["event"], ch_, *[next(x for x in ch_["competitors"] if x["homeAway"] == s_)
+                                                     for s_ in ("home", "away")])
+espn.live_report = lambda *a, **k: rep_ht
+st = store.load()
+ph_ = st["picks"][p8["id"]]
+ph_["kickoff"] = (_dt.now(_tz.utc) - timedelta(minutes=50)).strftime("%Y-%m-%dT%H:%M:%SZ")
+ph_["legs"][0]["kickoff"] = ph_["kickoff"]
+ph_["next_check"] = (_dt.now(_tz.utc) + timedelta(hours=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+store.save(st)
+n = len(photos)
+main.poll()
+new = photos[n:]
+assert any(ch == config.FREE_CHANNEL and c and "ENTRETIEMPO" in c for ch, c in new), new
+assert store.load()["picks"][p8["id"]]["ht_done"] == "sent"
+main.poll()
+assert not any(c and "ENTRETIEMPO" in c for ch, c in photos[n + len(new):])
+print("OK entretiempo")
