@@ -589,8 +589,9 @@ def _delete_pick_posts(state: dict, p: dict) -> list[str]:
         if not chat:
             continue
         ok = telegram.delete_message(chat, mid)
-        if p.get("has_photo") and ok:
-            telegram.delete_message(chat, mid - 1)   # si el texto no cupo, la imagen salió justo antes
+        # Si el texto no cupo como pie de foto, la imagen salió justo antes como mensaje aparte.
+        if ok and p.get("has_photo") and not formatting.caption_fits(formatting.channel_post(p, where)):
+            telegram.delete_message(chat, mid - 1)
         if ok:
             done.append("VIP" if where == "vip" else "Gratis")
             p["channel_msgs"].pop(where, None)
