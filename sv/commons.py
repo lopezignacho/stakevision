@@ -120,7 +120,7 @@ def player_candidates(name: str, teams: list[str], since: int = 0) -> list[dict]
     las categorías, que sea de cuando ya jugaba ahí y que no sea con su selección."""
     from datetime import date
     this_year = date.today().year
-    since = since or this_year - 2
+    since = max(since or 0, this_year - 3)   # reciente: así no aparece alguien que ya se fue del club
     toks = _team_tokens(teams)
     pool: dict[str, dict] = {}
     nick = sorted(toks, key=len, reverse=True)[0] if toks else ""
