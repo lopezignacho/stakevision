@@ -174,7 +174,21 @@ def find_recent(team_a: str, team_b: str, days: int = 3, sport: str = "soccer", 
 
 
 def preview(home: str, away: str, kickoff_iso: str, sport: str = "soccer") -> dict | None:
-    """Equipos (nombre, sigla y colores) de un partido por jugarse."""
+    """Equipos (nombre, sigla y colores) de un partido por jugarse, en el orden local/visita del pick."""
+    if sport == "basketball":
+        from . import nba
+        found = nba.find_event(home, away, kickoff_iso)
+        if not found:
+            return None
+        e, inverted = found
+        c = (e.get("competitions") or [{}])[0]
+        comp = c.get("competitors") or []
+        h = next((x for x in comp if x.get("homeAway") == "home"), {})
+        a = next((x for x in comp if x.get("homeAway") == "away"), {})
+        if inverted:
+            h, a = a, h
+        return {"home": _side({"side": "home"}, h, {}), "away": _side({"side": "away"}, a, {}),
+                "venue": ((c.get("venue") or {}).get("fullName") or "")}
     found = _find(home, away, kickoff_iso, sport)
     if not found:
         return None

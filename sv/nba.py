@@ -410,3 +410,86 @@ def live_alerts(state: dict) -> list[str]:
         for k in list(seen)[:-60]:
             seen.pop(k, None)
     return alerts
+
+
+# ---------------------------------------------------------------- previa exclusiva VIP (20-30 min antes)
+STATUS_ES = {"out": "Fuera", "doubtful": "Muy dudoso", "questionable": "Duda", "day-to-day": "Día a día",
+             "probable": "Probable", "suspension": "Suspendido"}
+
+
+def _news_for(ctx: dict, hours: int = 48) -> list[str]:
+    """Titulares recientes que nombran a alguno de los dos equipos (ESPN: del partido y de cada equipo)."""
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    nick = [_plain(ctx[s]["name"]).split()[-1] for s in ("home", "away") if ctx[s].get("name")]
+    arts = list(((_get("/summary", event=ctx.get("event")) or {}).get("news") or {}).get("articles") or [])
+    for s in ("home", "away"):
+        if ctx[s].get("id"):
+            arts += _get("/news", team=ctx[s]["id"], limit=8).get("articles") or []
+    out, seen = [], set()
+    for a in arts:
+        head = (a.get("headline") or "").strip()
+        try:
+            when = datetime.fromisoformat((a.get("published") or "").replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if not head or head in seen or when < since:
+            continue
+        text = _plain(head + " " + (a.get("description") or ""))
+        if nick and not any(n in text for n in nick):
+            continue
+        seen.add(head)
+        out.append((when, head))
+    out.sort(reverse=True)
+    return [h for _w, h in out[:4]]
+
+
+def pregame(pick: dict, minutes: int, ctx: dict | None = None) -> str | None:
+    """Previa para el VIP a minutos del salto inicial: bajas al minuto, cómo llegan, pronóstico y noticias."""
+    esc = formatting.escape
+    leg = pick["legs"][0]
+    ctx = ctx or context(leg["home"], leg["away"], leg["kickoff"])
+    if not ctx:
+        return None
+    H, A = ctx["home"], ctx["away"]
+    tz = ZoneInfo(config.TIMEZONE)
+    ko = datetime.fromisoformat(leg["kickoff"].replace("Z", "+00:00")).astimezone(tz)
+    rec = lambda t: f" ({t['record']})" if t.get("record") else ""  # noqa: E731
+    lines = [f"🏀 <b>PREVIA VIP · faltan {minutes} min</b>",
+             f"{esc(H['name'])}{rec(H)} vs {esc(A['name'])}{rec(A)} · {ko:%H:%M}",
+             f"🎯 Nuestro pick: <b>{esc(formatting.outcome_label(leg))}</b> @ {formatting.odds(pick['price'])}", ""]
+    lines.append("🚑 <b>Bajas y dudas (al minuto)</b>")
+    for T in (H, A):
+        rows = [i for i in T.get("injuries") or [] if (i.get("status") or "").lower() in STATUS_ES]
+        if not rows:
+            lines.append(f"• {esc(T['name'])}: sin bajas reportadas.")
+            continue
+        rows.sort(key=lambda i: (not i.get("key"), list(STATUS_ES).index(i["status"].lower())))
+        lines.append(f"• {esc(T['name'])}: " + "; ".join(
+            f"{esc(i['name'])}{' ⭐' if i.get('key') else ''} — {STATUS_ES[i['status'].lower()]}"
+            + (f" ({esc(i['type'])})" if i.get("type") else "") for i in rows[:5]))
+    lines += ["", "📊 <b>Cómo llegan</b>"]
+    for T in (H, A):
+        f = _form(T)
+        if not f["n"]:
+            continue
+        rest = T.get("rest_days")
+        rest_txt = (" · back-to-back ⚠️" if rest is not None and rest < 1.6
+                    else f" · {rest:.0f} días de descanso" if rest is not None else "")
+        lines.append(f"• {esc(T['name'])}: {f['w']}-{f['n'] - f['w']} en sus últimos {f['n']}"
+                     f"{' (incluye la temporada pasada)' if f['only_last_season'] else ''}, "
+                     f"anota {f['pf']:.1f} y recibe {f['pa']:.1f}{rest_txt}"
+                     + (f" · {f['streak']}" if f["streak"] else ""))
+    if H.get("espn_prob") or A.get("espn_prob"):
+        fav = H if (H.get("espn_prob") or 0) >= (A.get("espn_prob") or 0) else A
+        lines.append(f"🔮 El pronóstico de ESPN favorece a {esc(fav['name'])} ({formatting.pct(fav['espn_prob'])}).")
+    pros, cons = arguments(dict(leg, edge=0, fair_odds=leg.get("fair_odds") or pick["price"]), ctx)
+    pros = [x for x in pros if "cuota" not in x.lower()]
+    cons = [x for x in cons if "cuota" not in x.lower()]
+    if pros or cons:
+        lines += ["", "🧠 <b>Nuestro pick a minutos del inicio</b>"]
+        lines += [f"✅ {esc(x)}" for x in pros[:4]] + [f"⚠️ {esc(x)}" for x in cons[:3]]
+    news = _news_for(ctx)
+    if news:
+        lines += ["", "📰 <b>Últimas noticias</b> (ESPN, en inglés)"] + [f"• {esc(h)}" for h in news]
+    lines += ["", "Exclusivo VIP 👑 · 🔞 +18 · Juega con responsabilidad."]
+    return "\n".join(lines)

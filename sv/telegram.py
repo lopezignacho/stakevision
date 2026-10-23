@@ -97,3 +97,29 @@ def download(file_id: str) -> bytes:
     if not r.ok:
         raise TelegramError("No se pudo descargar el archivo")   # sin URL: lleva el token
     return r.content
+
+
+def delete_message(chat_id, message_id: int) -> bool:
+    try:
+        return bool(_call("deleteMessage", chat_id=chat_id, message_id=message_id))
+    except TelegramError as e:
+        print(f"No se pudo borrar el mensaje: {e}")
+        return False
+
+
+def edit_photo(chat_id, message_id: int, photo: bytes, caption: str | None = None) -> bool:
+    """Cambia la foto de un mensaje ya publicado (mantiene el lugar en el canal). False si no se pudo."""
+    import json
+    if not config.TELEGRAM_TOKEN:
+        raise TelegramError("Falta TELEGRAM_TOKEN")
+    media = {"type": "photo", "media": "attach://photo"}
+    if caption:
+        media.update(caption=caption, parse_mode="HTML")
+    r = requests.post(f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/editMessageMedia",
+                      data={"chat_id": chat_id, "message_id": message_id, "media": json.dumps(media)},
+                      files={"photo": ("pick.jpg", photo, "image/jpeg")}, timeout=60)
+    res = r.json()
+    if not res.get("ok"):
+        print(f"editMessageMedia: {res.get('description')}")
+        return False
+    return True

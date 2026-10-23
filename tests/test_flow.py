@@ -813,3 +813,52 @@ pc = st["picks"][cid]
 assert "free" in pc.get("channel_msgs", {}) and "vip" in pc["channel_msgs"] and pc["auto_free"], pc.get("status")
 assert st["auto_free"]["pid"] == cid and st["auto_free"]["status"] == "published"
 print("OK pick gratis automático")
+
+# 26) regla: NBA exclusiva del VIP, previa VIP y corrección de un pick publicado
+from sv import nba  # noqa: E402
+st = store.load()
+pn = st["picks"][pidn]   # pick NBA de la sección 23
+pn["status"] = "selected"
+pn["kickoff"] = main._iso(store.now_utc() + timedelta(minutes=20))
+pn.pop("channel_msgs", None)
+store.save(st)
+flat = [d for row in main.SHARE_BUTTONS(pn) for _, d in row]
+assert f"pv:{pidn}" in flat and not any(d.startswith(("pg:", "pf:", "pi:", "ad:")) for d in flat), flat
+for act in ("pg", "pf", "pv"):
+    updates_q.append({"update_id": 1500 + len(act) + ord(act[1]), "callback_query": {
+        "id": act, "data": f"{act}:{pidn}", "message": {"chat": {"id": OWNER}, "message_id": 160}}})
+nba.pregame = lambda p, m, ctx=None: f"🏀 PREVIA VIP · faltan {m} min"
+n = len(sent)
+main.poll()
+st = store.load()
+pn = st["picks"][pidn]
+assert set(pn["channel_msgs"]) == {"vip"}, pn["channel_msgs"]
+assert not any(c == config.FREE_CHANNEL for c, *_ in sent[n:])
+assert "exclusiva del VIP" in main._force_free(st, pidn)
+# previa VIP 20 min antes (salió en la misma revisión en que se publicó)
+pre = [(c, t) for c, t, _, _ in sent[n:] if "PREVIA VIP" in (t or "")]
+assert pre and all(c == VIP for c, _ in pre), sent[n:]
+main.poll()
+assert len([1 for _, t, _, _ in sent[n:] if "PREVIA VIP" in (t or "")]) == 1   # una sola vez
+# corrección: si un NBA quedó en Gratis, se borra de ahí y se cambia la imagen del VIP
+deleted, edited = [], []
+telegram.delete_message = lambda c, m: deleted.append((c, m)) or True
+telegram.edit_photo = lambda c, m, ph, caption=None: edited.append((c, m)) or True
+st = store.load()
+st["picks"][pidn]["channel_msgs"]["free"] = 999
+st["auto_free"] = {"date": main._local_today(), "status": "published", "pid": pidn}
+store.save(st)
+import json  # noqa: E402
+os.makedirs(os.path.join(config.ROOT, "data"), exist_ok=True)
+rp = os.path.join(tmp, "repair.json")
+_root = config.ROOT
+config.ROOT = tmp
+os.makedirs(os.path.join(tmp, "data"), exist_ok=True)
+with open(os.path.join(tmp, "data", "repair.json"), "w") as f:
+    json.dump({"id": "t1", "pid": pidn}, f)
+main.poll()
+config.ROOT = _root
+st = store.load()
+assert deleted == [(config.FREE_CHANNEL, 999)] and edited and "free" not in st["picks"][pidn]["channel_msgs"]
+assert st["auto_free"] == {}
+print("OK NBA solo VIP + previa + corrección")

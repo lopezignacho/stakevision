@@ -25,6 +25,17 @@ def SHARE_BUTTONS(p: dict) -> list:
     pid, msgs = p["id"], p.get("channel_msgs") or {}
     rows = []
     vip_done, free_done = "vip" in msgs, "free" in msgs
+    if _vip_only(p):   # NBA: exclusivo del canal VIP (sin Gratis ni Instagram antes del partido)
+        rows.append([("✅ En VIP" if vip_done else "👑 Enviar a VIP (exclusivo NBA)", "noop" if vip_done else f"pv:{pid}")])
+        photo = p.get("pick_style") == "photo"
+        rows.append([("🧾 Volver al cupón" if photo else "📰 Versión con foto", f"st:{pid}"),
+                     ("🖼 Adjuntar mi imagen", f"yp:{pid}")])
+        if photo:
+            rows.append([("🌙 Modo noche" if p.get("theme") == "light" else "☀️ Modo día", f"th:{pid}"),
+                         ("🔀 Otro diseño", f"dl:{pid}")])
+        if not msgs:
+            rows.append([("❌ Descartar", f"r:{pid}")])
+        return rows
     if not vip_done and not free_done:
         rows.append([("👑 Enviar a VIP", f"pv:{pid}"), ("🎁 Enviar a Gratis", f"pg:{pid}")])
         rows.append([("👑🎁 Enviar a VIP + Gratis", f"pf:{pid}")])
@@ -49,6 +60,11 @@ def SHARE_BUTTONS(p: dict) -> list:
     if not msgs and not st:
         rows.append([("❌ Descartar", f"r:{pid}")])
     return rows
+
+
+def _vip_only(p: dict) -> bool:
+    """Regla: la NBA es exclusiva del VIP; el gratis del día siempre es fútbol."""
+    return any((l.get("sport") or "soccer") == "basketball" for l in p.get("legs") or []) or p.get("sport") == "basketball"
 
 
 def _share_panel(state: dict, p: dict) -> None:
@@ -167,8 +183,8 @@ def _auto_pool(state: dict, publish_at) -> list:
     from zoneinfo import ZoneInfo
     pool = []
     for p in state["picks"].values():
-        if p["status"] != "candidate" or p.get("live") or p.get("kind") != "simple":
-            continue
+        if p["status"] != "candidate" or p.get("live") or p.get("kind") != "simple" or _vip_only(p):
+            continue   # el gratis siempre es fútbol
         made = store.parse_ts(p["created_at"]).astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat()
         if made != today or store.parse_ts(p["kickoff"]) < lead:
             continue
@@ -242,7 +258,7 @@ def _auto_free_choose(state: dict, skip: list | None = None) -> bool:
             and (state["picks"].get(x[0]) or {}).get("status") == "candidate"]
     if not pool:
         state["auto_free"] = {"date": today, "status": "none", "pool": []}
-        telegram.send(owner, "🤖 Pick gratis automático: hoy ninguna opción cumple (cuota 1.65–2.00, cerca de la "
+        telegram.send(owner, "🤖 Pick gratis automático: hoy ninguna opción de fútbol cumple (cuota 1.65–2.00, cerca de la "
                              "cuota justa y con tiempo antes del partido). Si quieres, elige uno a mano con 🎁.")
         return False
     pid, opt = pool[0]
@@ -445,6 +461,8 @@ def _force_free(state: dict, pid: str, opt: str = "A") -> str:
     now = store.now_utc()
     if not p:
         return f"No encuentro el pick #{pid}."
+    if _vip_only(p):
+        return f"El pick #{pid} es de NBA: la NBA es exclusiva del VIP. El gratis del día tiene que ser fútbol."
     if "free" in (p.get("channel_msgs") or {}):
         return f"El pick #{pid} ya estaba en el canal Gratis."
     if p["status"] not in ("candidate", "selected", "published"):
@@ -498,6 +516,83 @@ def _force_free_file(state: dict) -> None:
     err = _force_free(state, str(req.get("pid", "")).lstrip("#"), req.get("opt") or "A")
     if err:
         telegram.send(state["owner_chat"], "⚠️ Pick gratis elegido: " + formatting.escape(err))
+
+
+def _repair_pick(state: dict, pid: str) -> str:
+    """Arregla un pick ya publicado con las reglas nuevas: imagen nueva (referente del equipo) y,
+    si es NBA, lo saca del canal Gratis y de la cola de Instagram (la NBA es exclusiva del VIP)."""
+    p = state["picks"].get(pid)
+    if not p:
+        return f"No encuentro el pick #{pid}."
+    notes = []
+    for f in (_upload_file(p, "pickphoto"), _pick_photo_file(p)):
+        if os.path.exists(f):
+            os.remove(f)
+    _make_pick_photo(p)
+    p["pick_style"] = "photo"
+    image = _pick_image(p)
+    msgs = p.setdefault("channel_msgs", {})
+    if _vip_only(p) and "free" in msgs:
+        ok = telegram.delete_message(config.FREE_CHANNEL, msgs["free"])
+        if ok:
+            msgs.pop("free")
+            p["free"] = False
+            notes.append("lo borré del canal Gratis")
+        else:
+            notes.append("⚠️ no pude borrarlo del canal Gratis (Telegram no lo permitió): bórralo a mano")
+    if "vip" in msgs and state.get("vip_chat") and image:
+        text = formatting.channel_post(p)
+        if telegram.edit_photo(state["vip_chat"], msgs["vip"], image, text if formatting.caption_fits(text) else None):
+            notes.append("cambié la imagen en el VIP (mismo mensaje)")
+        else:
+            telegram.send_photo(state["vip_chat"], image, caption="🖼 Imagen actualizada del pick 👆", reply_to=msgs["vip"])
+            notes.append("mandé la imagen nueva en el VIP como respuesta al pick")
+    if _vip_only(p):
+        if p.get("ig_pre_status") == "queued":
+            p["ig_pre_status"] = "skipped"
+            try:
+                from . import instagram
+                os.remove(instagram.image_path(f"pre-{p['id']}"))
+            except OSError:
+                pass
+            notes.append("lo saqué de la cola de Instagram")
+        elif p.get("ig_pre_status") == "posted":
+            notes.append("⚠️ ya estaba en Instagram: bórralo a mano desde la app (Instagram no deja borrarlo al bot)")
+        p.pop("auto_free", None)
+        af = state.get("auto_free") or {}
+        if af.get("pid") == pid:
+            state["auto_free"] = {}   # el gratis de hoy vuelve a elegirse (fútbol) tras el escaneo de las 09:07
+            notes.append("el gratis de hoy se elegirá de nuevo, de fútbol, tras el escaneo de las 09:07")
+    owner = state.get("owner_chat")
+    if owner and image:
+        cr = p.get("pick_photo_credit") or {}
+        who = f" · {cr['player']}" if cr.get("player") else ""
+        telegram.send_photo(owner, image, caption=f"🔧 <b>Pick #{pid} corregido</b>{formatting.escape(who)}\n"
+                                                  + "\n".join(f"• {formatting.escape(n)}" for n in notes))
+    return ""
+
+
+def _repair_file(state: dict) -> None:
+    """data/repair.json ({"id": "...", "pid": "37"}): corrección de un pick publicado, una sola vez."""
+    import json
+    path = os.path.join(config.ROOT, "data", "repair.json")
+    if not os.path.exists(path) or not state.get("owner_chat"):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("repair_done") or []):
+        return
+    state.setdefault("repair_done", []).append(req["id"])
+    try:
+        err = _repair_pick(state, str(req.get("pid", "")).lstrip("#"))
+    except Exception as e:  # noqa: BLE001
+        traceback.print_exc()
+        err = f"falló la corrección: {e}"
+    if err:
+        telegram.send(state["owner_chat"], "⚠️ " + formatting.escape(err))
 
 
 def _free_command(state: dict, text: str) -> None:
@@ -977,22 +1072,21 @@ def _pick_photo_file(p: dict) -> str:
 
 def _make_pick_photo(p: dict, user_photo: bytes | None = None, reuse: bool = False) -> bool:
     """Versión del pick con foto real del equipo (Commons, o la tuya) y colores de ESPN. Se guarda para reutilizarla."""
-    from . import commons, espn, postimage, teaser
+    from . import espn, teaser
     l = p["legs"][0]
-    teams = espn.preview(l["home"], l["away"], l["kickoff"])
-    side = {"1": "home", "2": "away"}.get(str(l.get("outcome")), "home")
-    names = [l[side], l["away" if side == "home" else "home"]]
-    if teams:
-        names = [teams[side]["name"], teams["away" if side == "home" else "home"]["name"]] + names
+    try:
+        teams = espn.preview(l["home"], l["away"], l["kickoff"], l.get("sport") or "soccer")
+    except Exception:
+        traceback.print_exc()
+        teams = None
     cache = _upload_file(p, "pickphoto")
     photo = (user_photo, None) if user_photo else None
     if not photo and reuse and os.path.exists(cache):
         with open(cache, "rb") as f:
             photo = (f.read(), p.get("pick_photo_credit"))
-    for n in ([] if photo or reuse else dict.fromkeys(names)):
-        photo = commons.photo(n, team=True)
-        if photo:
-            break
+    if not photo and not reuse:
+        from . import matchphoto
+        photo = matchphoto.for_pick(l, teams)   # un referente del equipo, con su camiseta si se puede
     if photo:
         os.makedirs(os.path.dirname(cache), exist_ok=True)
         with open(cache, "wb") as f:
@@ -1028,7 +1122,7 @@ def _publish(state: dict, p: dict, free: bool, vip_too: bool = True) -> None:
     vip = state.get("vip_chat")
     if vip_too and vip and "vip" not in msgs:
         msgs["vip"] = _post(vip, text, image)
-    if free and "free" not in msgs:
+    if free and "free" not in msgs and not _vip_only(p):
         msgs["free"] = _post(config.FREE_CHANNEL, text, image)
     if p["status"] != "published":
         p.update(status="published", published_at=_iso(store.now_utc()), has_photo=bool(image))
@@ -1071,9 +1165,42 @@ def _settle(state: dict, p: dict, result: str) -> None:
     _after_result(state, p)
 
 
+def _nba_pregame(state: dict, p: dict, now) -> bool:
+    """NBA: previa exclusiva en el VIP 20-30 min antes (bajas al minuto, forma, pronóstico y noticias).
+    True si ya se encargó del aviso de este pick."""
+    if not _vip_only(p) or len(p["legs"]) != 1:
+        return False
+    if p.get("pregame") or p["status"] != "published":
+        return True
+    kick = store.parse_ts(p["kickoff"])
+    if not (kick - timedelta(minutes=config.NBA_PREGAME_MIN) <= now < kick - timedelta(minutes=8)):
+        return True
+    p["pregame"] = "sent"
+    p["reminded"] = True
+    from . import nba
+    try:
+        text = nba.pregame(p, int((kick - now).total_seconds() // 60))
+    except Exception:
+        traceback.print_exc()
+        text = None
+    text = text or formatting.pre_kickoff(p, int((kick - now).total_seconds() // 60))
+    for where, mid in (p.get("channel_msgs") or {}).items():
+        if where != "vip":
+            continue
+        try:
+            telegram.send(state["vip_chat"], text, reply_to=mid)
+        except telegram.TelegramError as e:
+            print(f"No se pudo enviar la previa NBA: {e}")
+    if state.get("owner_chat"):
+        telegram.send(state["owner_chat"], f"🏀 Publiqué en el VIP la previa del pick #{p['id']}.")
+    return True
+
+
 def _remind(state: dict, p: dict, now) -> None:
     """Aviso en los canales cuando faltan ~30 minutos para el partido."""
     if p["status"] != "published" or p.get("reminded"):
+        return
+    if config.NBA_PREGAME and _nba_pregame(state, p, now):
         return
     kick = store.parse_ts(p["kickoff"])
     start = kick - timedelta(minutes=config.REMINDER_BEFORE_MIN)
@@ -1297,7 +1424,12 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
         with open(_upload_file(p), "rb") as f:
             photo = (f.read(), None)
     else:
-        photo = commons.photo(who["full"]) if who else None
+        photo = None
+        if who:
+            from . import matchphoto
+            t = rep.get(who.get("side")) or {}
+            photo = (matchphoto.for_scorer(who["full"], [x for x in (t.get("name"), t.get("short")) if x])
+                     or commons.photo(who["full"]))
     data = recap.build(p, rep, photo, old.get("custom_title"))
     data["credit"] = photo[1]["text"] if photo and photo[1] else None
     from . import layouts
@@ -1391,7 +1523,7 @@ def _halftime_check(state: dict, p: dict, now) -> None:
     if now > kick + timedelta(minutes=85):
         p["ht_done"] = "missed"
         return
-    from . import commons, espn, halftime, layouts
+    from . import espn, halftime, layouts, matchphoto
     l = p["legs"][0]
     rep = espn.live_report(l["home"], l["away"], l["kickoff"])
     if not rep or rep.get("state") == "post":
@@ -1403,16 +1535,21 @@ def _halftime_check(state: dict, p: dict, now) -> None:
     p["ht_done"] = "sent"
     st = halftime.status(l, rep["home"]["score"], rep["away"]["score"], grade_leg)
     photo = None
+    scorers = [g for g in rep["goals"] if g["kind"] != "own" and g["full"]]
+    if scorers:   # quien marcó, con la camiseta de su club
+        try:
+            photo = matchphoto.for_halftime(rep)
+        except Exception:
+            traceback.print_exc()
     cache = _upload_file(p, "pickphoto")
-    if os.path.exists(cache):
+    if not photo and os.path.exists(cache):   # sin goles: el referente que ya salió con el pick
         with open(cache, "rb") as f:
             photo = (f.read(), p.get("pick_photo_credit"))
     if not photo:
-        scorers = [g["full"] for g in reversed(rep["goals"]) if g["kind"] != "own" and g["full"]]
-        for name, team in [(n, False) for n in scorers[:2]] + [(rep["home"]["name"], True), (rep["away"]["name"], True)]:
-            photo = commons.photo(name, team=team)
-            if photo:
-                break
+        try:
+            photo = matchphoto.for_halftime(rep)
+        except Exception:
+            traceback.print_exc()
     league = (l.get("league") or "").split("·")[-1].strip()
     sel = formatting.outcome_label(l)
     data = {"report": rep, "eyebrow": league or "Pick en juego", "photo": photo[0] if photo else None,
@@ -1574,12 +1711,15 @@ def _teaser_command(state: dict, text: str) -> None:
         p = state["picks"].get(pid)
     else:
         live = [x for x in state["picks"].values() if x["status"] in ("selected", "published")
-                and store.parse_ts(x["kickoff"]) > now]
+                and store.parse_ts(x["kickoff"]) > now and not _vip_only(x)]
         live.sort(key=lambda x: (bool(x.get("free")), x.get("created_at") or ""), reverse=True)
         p = live[0] if live else None
     if not p or p["status"] not in ("selected", "published") or store.parse_ts(p["kickoff"]) <= now:
         telegram.send(owner, "Usa /adelanto, el número del pick y (si quieres) la hora en que lo revelas. "
                              "Ejemplo: /adelanto 8 10:00\nEl pick tiene que estar elegido y su partido aún no empieza.")
+        return
+    if _vip_only(p):
+        telegram.send(owner, "La NBA es exclusiva del VIP: no lleva adelanto público.")
         return
     _teaser(state, p, teaser.parse_reveal(" ".join(x for x in parts if x.lstrip("#") != pid)),
             vip=any(x.lower() == "vip" for x in parts))
@@ -1807,6 +1947,10 @@ def _handle_update(state: dict, u: dict) -> None:
         if p["status"] not in ("selected", "published"):
             telegram.answer(cb["id"], "Este pick ya no está disponible")
             return
+        if action != "pv" and _vip_only(p):
+            telegram.answer(cb["id"], "La NBA es exclusiva del VIP")
+            telegram.set_buttons(owner, cb["message"]["message_id"], SHARE_BUTTONS(p))
+            return
         late = _expires(p) <= store.now_utc() and not p.get("live")
         if action in ("pv", "pf", "pg"):
             if late and not p.get("channel_msgs"):
@@ -1869,7 +2013,7 @@ def _handle_update(state: dict, u: dict) -> None:
         if not state.get("vip_chat"):
             telegram.answer(cb["id"], "Primero vincula el canal VIP con /vincular_vip")
             return
-        _publish(state, p, free=(action == "f"))
+        _publish(state, p, free=(action == "f") and not _vip_only(p))
         note = "✅ Publicado en VIP + Gratis" if action == "f" else "✅ Publicado en VIP"
         telegram.edit_buttons_off(owner, cb["message"]["message_id"], note)
         telegram.answer(cb["id"], "Publicado")
@@ -1919,6 +2063,9 @@ def _handle_update(state: dict, u: dict) -> None:
                 telegram.edit_buttons_off(owner, p["share_msg"], "↪️ Reemplazada por la versión de abajo")
             _share_panel(state, p)
             telegram.answer(cb["id"])
+            return
+        if action in ("ad", "ia", "ag") and _vip_only(p):
+            telegram.answer(cb["id"], "La NBA es exclusiva del VIP: sin adelanto público")
             return
         if action == "ad":
             if store.parse_ts(p["kickoff"]) <= store.now_utc():
@@ -2335,6 +2482,7 @@ def poll() -> None:
     _refresh_recap_texts(state)
     _nba_daily(state)
     try:
+        _repair_file(state)
         _force_free_file(state)
         _auto_free_tick(state, now)
     except Exception:
