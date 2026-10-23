@@ -72,8 +72,11 @@ def _share_panel(state: dict, p: dict) -> None:
     owner = state.get("owner_chat")
     if not owner:
         return
-    image = _pick_image(p)
-    head = (f"🖼 <b>Pick #{p['id']} listo para compartir</b>\n"
+    tier = "free" if (p.get("auto_free") or p.get("free")) and not _vip_only(p) else "vip"
+    image = _pick_image(p, tier)
+    look = ("" if _vip_only(p) else
+            "\n🎨 En VIP sale en dorado con «PICK VIP»; en Gratis e Instagram, en verde con «PICK GRATIS».")
+    head = (f"🖼 <b>Pick #{p['id']} listo para compartir</b>{look}\n"
             "Elige dónde publicarlo (puedes usar varios botones). Este es el texto que sale con la imagen:")
     text = formatting.channel_post(p)
     full = f"{head}\n\n{text}"
@@ -295,7 +298,7 @@ def _auto_free_choose(state: dict, skip: list | None = None) -> bool:
            f"Se publica sola a las <b>{hhmm}</b> en {where}.\n"
            "Revisa la cuota en tu app. Puedes publicarlo ya, cambiarlo por la siguiente opción"
            + (f" (quedan {others})" if others else "") + " o no publicar gratis hoy.")
-    image = _pick_image(p)
+    image = _pick_image(p, "free")
     msg = telegram.send_photo(owner, image, caption=cap) if image else telegram.send(owner, cap)
     state["auto_free"]["msg"] = msg["message_id"]
     telegram.set_buttons(owner, msg["message_id"], AUTO_FREE_BUTTONS(pid))
@@ -311,7 +314,7 @@ def _auto_free_publish(state: dict, p: dict) -> None:
     note = "✅ Publicado en " + ("VIP + Gratis" if vip_too else "Gratis")
     from . import instagram
     if config.AUTO_FREE_INSTAGRAM and instagram.enabled(state) and not p.get("ig_pre_status"):
-        image = _pick_image(p)
+        image = _pick_image(p, "free")
         if image:
             from . import postimage
             instagram.save_image(f"pre-{p['id']}", postimage.fit_instagram(image))
@@ -438,7 +441,7 @@ def _free_preview(state: dict) -> None:
            f"🎯 <b>{esc(formatting.outcome_label(l))}</b> @ {formatting.odds(p['price'])}\n"
            f"📈 Probabilidad justa {formatting.pct(p['prob'])} · valor {'+' if p['edge'] >= 0 else ''}"
            f"{formatting.pct(p['edge'])}")
-    image = _pick_image(p)
+    image = _pick_image(p, "free")
     if image and formatting.caption_fits(cap):
         telegram.send_photo(owner, image, caption=cap)
     else:
@@ -530,7 +533,7 @@ def _repair_pick(state: dict, pid: str) -> str:
             os.remove(f)
     _make_pick_photo(p)
     p["pick_style"] = "photo"
-    image = _pick_image(p)
+    image = _pick_image(p, "vip")
     msgs = p.setdefault("channel_msgs", {})
     if _vip_only(p) and "free" in msgs:
         ok = telegram.delete_message(config.FREE_CHANNEL, msgs["free"])
@@ -1094,9 +1097,13 @@ def _make_pick_photo(p: dict, user_photo: bytes | None = None, reuse: bool = Fal
         os.makedirs(os.path.dirname(cache), exist_ok=True)
         with open(cache, "wb") as f:
             f.write(photo[0])
-    from . import layouts
-    image = layouts.render_pick(teaser.pick_photo_data(p, teams, photo), p.get("pick_layout") or "revista",
-                                p.get("theme") or "dark")
+    p.pop("pick_raw", None)
+    p["pick_teams"] = teams   # para dibujar luego la versión de cada canal sin volver a consultar
+    from . import layouts, postimage
+    tier = "vip" if _vip_only(p) else ("free" if p.get("free") else None)
+    with postimage.accent(tier):
+        image = layouts.render_pick(teaser.pick_photo_data(p, teams, photo, tier), p.get("pick_layout") or "revista",
+                                    p.get("theme") or "dark")
     path = _pick_photo_file(p)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "wb") as f:
@@ -1105,13 +1112,28 @@ def _make_pick_photo(p: dict, user_photo: bytes | None = None, reuse: bool = Fal
     return True
 
 
-def _pick_image(p: dict) -> bytes | None:
+def _pick_image(p: dict, tier: str | None = None) -> bytes | None:
+    """Imagen del pick. tier «free» o «vip» la dibuja con la identidad de ese canal
+    (verde «PICK GRATIS» / dorado «PICK VIP»). La NBA siempre es VIP."""
+    if _vip_only(p):
+        tier = "vip"
     if p.get("pick_style") == "photo" and os.path.exists(_pick_photo_file(p)):
+        cache = _upload_file(p, "pickphoto")
+        if tier and os.path.exists(cache) and not p.get("pick_raw"):
+            try:
+                from . import layouts, postimage, teaser
+                with open(cache, "rb") as f:
+                    photo = (f.read(), p.get("pick_photo_credit"))
+                with postimage.accent(tier):
+                    return layouts.render_pick(teaser.pick_photo_data(p, p.get("pick_teams"), photo, tier),
+                                               p.get("pick_layout") or "revista", p.get("theme") or "dark")
+            except Exception:
+                traceback.print_exc()
         with open(_pick_photo_file(p), "rb") as f:
             return f.read()
     try:
         from . import postimage
-        return postimage.render(p)
+        return postimage.render(p, tier)
     except Exception:
         traceback.print_exc()
         return None
@@ -1120,12 +1142,14 @@ def _pick_image(p: dict) -> bytes | None:
 def _publish(state: dict, p: dict, free: bool, vip_too: bool = True) -> None:
     """Publica en VIP (si vip_too) y en Gratis (si free). Si ya estaba en un canal, no lo repite."""
     text = formatting.channel_post(p)
-    image = _pick_image(p)
     msgs = p.setdefault("channel_msgs", {})
     vip = state.get("vip_chat")
+    image = None
     if vip_too and vip and "vip" not in msgs:
+        image = _pick_image(p, "vip")   # dorado «PICK VIP»
         msgs["vip"] = _post(vip, text, image)
     if free and "free" not in msgs and not _vip_only(p):
+        image = _pick_image(p, "free")   # verde «PICK GRATIS»
         msgs["free"] = _post(config.FREE_CHANNEL, text, image)
     if p["status"] != "published":
         p.update(status="published", published_at=_iso(store.now_utc()), has_photo=bool(image))
@@ -2125,7 +2149,7 @@ def _handle_update(state: dict, u: dict) -> None:
             if not instagram.enabled(state):
                 telegram.answer(cb["id"], "Instagram no está conectado")
                 return
-            image = _pick_image(p)
+            image = _pick_image(p, "free")   # Instagram es público: versión «PICK GRATIS»
             if not image:
                 telegram.answer(cb["id"], "No se pudo generar la imagen")
                 return
@@ -2283,6 +2307,7 @@ def _handle_update(state: dict, u: dict) -> None:
                 os.makedirs(os.path.dirname(path), exist_ok=True)
                 with open(path, "wb") as f:
                     f.write(postimage.fit_instagram(raw))
+                p["pick_raw"] = True   # tal cual: sin diseño ni sello de canal
             p["pick_photo_credit"] = None
             p["pick_style"] = "photo"
         except Exception:

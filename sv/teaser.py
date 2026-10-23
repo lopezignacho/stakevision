@@ -97,7 +97,8 @@ def _compact_form(team: str, ms: list[dict]) -> str:
     return f"{team}: " + (f"{streak}, " if streak else "") + f"{g}G {e}E {pp}P en sus últimos {len(last)}"
 
 
-def pick_photo_data(p: dict, teams: dict | None, photo: tuple[bytes, dict | None] | None) -> dict:
+def pick_photo_data(p: dict, teams: dict | None, photo: tuple[bytes, dict | None] | None,
+                    tier: str | None = None) -> dict:
     l = p["legs"][0]
     ko = _local(l["kickoff"])
     league = (l.get("league") or "").split("·")[-1].strip()
@@ -115,8 +116,9 @@ def pick_photo_data(p: dict, teams: dict | None, photo: tuple[bytes, dict | None
     if not lines:
         lines = [f"Cuota justa estimada {formatting.odds(l['fair_odds'])} contra {formatting.odds(l['price'])} disponible."]
     sel = formatting.outcome_label(l)
-    return {"eyebrow": eyebrow, "headline": ("PICK VIP" if (l.get("sport") or "soccer") == "basketball"
-                                 else "PICK GRATIS" if p.get("free") else "PICK DEL DÍA"),
+    if tier is None:
+        tier = "vip" if (l.get("sport") or "soccer") == "basketball" else ("free" if p.get("free") else None)
+    return {"eyebrow": eyebrow, "headline": {"vip": "PICK VIP", "free": "PICK GRATIS"}.get(tier, "PICK DEL DÍA"),
             "teams": teams, "selection": sel[:sel.index(" (")] if " (" in sel else sel,
             "odds": formatting.odds(p["price"]), "stake": p.get("stake"), "lines": lines[:3],
             "photo": photo[0] if photo else None, "credit": photo[1]["text"] if photo and photo[1] else None}

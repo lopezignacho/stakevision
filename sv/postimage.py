@@ -96,7 +96,13 @@ def _leg_height(l: dict) -> int:
     return 230 if _selection_parts(l)[1] else 196
 
 
-def render(pick: dict) -> bytes:
+def render(pick: dict, tier: str | None = None) -> bytes:
+    """Cupón del pick. tier: «free» (sello verde PICK GRATIS) o «vip» (dorado, PICK VIP)."""
+    with accent(tier):
+        return _render_coupon(pick, tier)
+
+
+def _render_coupon(pick: dict, tier: str | None) -> bytes:
     legs = pick["legs"]
     sports = []
     for l in legs:
@@ -132,7 +138,15 @@ def render(pick: dict) -> bytes:
     ImageDraw.Draw(shadow).rounded_rectangle((card_x, card_y + 14, card_x + card_w, card_y + card_h + 14), 34, fill=(0, 0, 0, 150))
     im.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(22)))
     d = ImageDraw.Draw(im)
-    d.rounded_rectangle((card_x, card_y, card_x + card_w, card_y + card_h), 34, fill=(255, 255, 255))
+    d.rounded_rectangle((card_x, card_y, card_x + card_w, card_y + card_h), 34, fill=(255, 255, 255),
+                        outline=GOLD if tier == "vip" else None, width=6 if tier == "vip" else 0)
+    if tier in ("free", "vip"):   # sello del canal sobre el borde de la tarjeta
+        label = "PICK VIP · EXCLUSIVO" if tier == "vip" else "PICK GRATIS DEL DÍA"
+        fpl = _font("Bold", 30)
+        pw = d.textlength(label, font=fpl) + 64
+        px0 = (W - pw) / 2
+        d.rounded_rectangle((px0, card_y - 30, px0 + pw, card_y + 30), 30, fill=GOLD if tier == "vip" else BRAND)
+        d.text((W / 2, card_y + 1), label, font=fpl, fill=(20, 16, 4) if tier == "vip" else (11, 26, 6), anchor="mm")
 
     x0, x1 = card_x + pad, card_x + card_w - pad
     y = card_y + pad
@@ -902,6 +916,28 @@ def _clusters(goals: list, gap: int = 10) -> list[list]:
         else:
             out.append([g])
     return out
+
+
+GOLD, L_GOLD = (236, 188, 66), (170, 124, 16)
+
+
+class accent:
+    """Colores por canal: «vip» cambia el verde de la marca por dorado mientras se dibuja la imagen."""
+
+    def __init__(self, tier: str | None):
+        self.tier = tier
+
+    def __enter__(self):
+        global BRAND, L_GREEN, GREEN
+        self._old = (BRAND, L_GREEN, GREEN)
+        if self.tier == "vip":
+            BRAND, L_GREEN, GREEN = GOLD, L_GOLD, L_GOLD
+        return self
+
+    def __exit__(self, *exc):
+        global BRAND, L_GREEN, GREEN
+        BRAND, L_GREEN, GREEN = self._old
+        return False
 
 
 def _mag(theme: str) -> dict:
