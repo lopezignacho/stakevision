@@ -2676,6 +2676,7 @@ HELP_TEXT = (
     "/compartir 8 · vuelve a mandarte la imagen del pick #8 (o su post partido, si ya terminó)\n"
     "/titular 8 MARACA-NAZO · cambia el titular de la imagen post partido del pick #8\n"
     "/postpartido Vasco vs Boca | Sudamericana · imagen post partido de cualquier partido terminado\n"
+    "/entretiempo Vasco vs Boca · vista previa del entretiempo de un partido (solo para ti)\n"
     "/adelanto 8 10:00 · adelanto del pick #8 para historias (pistas + pick tapado hasta las 10:00)\n"
     "/invitar Juan · enlace VIP de un solo uso que vence en 7 días (/invitar Juan 30 para 30 días)\n"
     "/anular Juan · anula ese enlace\n"
