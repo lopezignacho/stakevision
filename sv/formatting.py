@@ -366,26 +366,26 @@ def instagram_caption(pick: dict, streak: int = 1) -> str:
 
 
 def instagram_pick_caption(pick: dict) -> str:
-    """Texto para Instagram de un pick antes del partido (texto plano)."""
+    """Texto para Instagram de un pick antes del partido (texto plano), con el mismo argumento que Telegram:
+    resumen, 3 datos con emoji y probabilidad estimada."""
     import html as _h
     import re as _re
+    from . import argument
     emoji = {"soccer": "⚽", "tennis": "🎾", "basketball": "🏀"}
-    lines = ["👁 PICK STAKEVISION" + (" · 🔴 EN VIVO" if pick.get("live") else ""), ""]
+    lines = ["👁 STAKEVISION · PICK GRATIS 🎁" + (" · 🔴 EN VIVO" if pick.get("live") else ""), ""]
     for l in pick["legs"]:
         lines.append(f"{emoji.get(l.get('sport') or 'soccer', '🏟')} {l['home']} vs {l['away']}")
         lines.append(f"🏆 {l['league']} · 🕒 {local_time(l['kickoff'])}")
         lines.append(f"🎯 {outcome_label(l)} @ {odds(l['price'])}")
-    lines.append(f"📈 Cuota {odds(pick['price'])} · Stake {pick['stake']}/10")
-    ana = _h.unescape(_re.sub(r"<[^>]+>", "", pick.get("analysis") or ""))
-    keep = [x.lstrip("• ").strip() for x in ana.split("\n") if "📊" in x or "🎯" in x or x.startswith("• ")]
-    keep = [x for x in keep if not x.startswith("Valor:")]
-    if keep:
-        lines += [""] + keep[:3]
-    lines += ["", "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio)."]
+    lines.append(("" if len(pick["legs"]) == 1 else f"📈 Cuota total {odds(pick['price'])} · ")
+                 + f"💰 Stake {pick['stake']}/10")
+    body = _h.unescape(_re.sub(r"<[^>]+>", "", argument.body(pick)))
+    lines += ["", body, "", "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio) "
+              "· más pronósticos en el VIP 👑"]
     cr = pick.get("pick_photo_credit") if pick.get("pick_style") == "photo" else None
     if cr and cr.get("author"):
-        lines += [f"📸 Foto: {cr['author']} / Wikimedia Commons ({cr['license']}), modificada. "
+        lines += ["", f"📸 Foto: {cr['author']} / Wikimedia Commons ({cr['license']}), modificada. "
                   "Esta imagen se comparte bajo la misma licencia."]
-    lines += ["🔞 +18 · Juega con responsabilidad. Apostar implica riesgo de pérdida.", "",
+    lines += ["", "🔞 +18 · Juega con responsabilidad. Apostar implica riesgo de pérdida.", "",
               "#Stakevision #PronosticosDeportivos #Futbol #ApuestasDeportivas"]
     return "\n".join(lines)

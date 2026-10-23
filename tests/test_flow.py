@@ -281,7 +281,7 @@ updates_q.append({"update_id": 103, "callback_query": {"id": "s4", "data": f"pi:
 posted.clear()
 main.poll()
 p4s = store.load()["picks"][p4["id"]]
-assert p4s["ig_pre_status"] == "posted" and posted[-1][0] == f"pre-{p4['id']}" and "PICK STAKEVISION" in posted[-1][1]
+assert p4s["ig_pre_status"] == "posted" and posted[-1][0] == f"pre-{p4['id']}" and "STAKEVISION · PICK GRATIS" in posted[-1][1] and "Probabilidad estimada" in posted[-1][1]
 assert sum(1 for ch, *_ in sent if ch == VIP) == n_vip   # no se duplicó en VIP
 print("OK elegir + destinos")
 
