@@ -581,14 +581,43 @@ def _repair_pick(state: dict, pid: str) -> str:
     return ""
 
 
-def _cancel_pick(state: dict, pid: str, refree: bool = False) -> str:
+def _delete_pick_posts(state: dict, p: dict) -> list[str]:
+    """Borra de los canales los mensajes del pick (el pick, su imagen si fue aparte y el adelanto)."""
+    done = []
+    for where, mid in list((p.get("channel_msgs") or {}).items()):
+        chat = state.get("vip_chat") if where == "vip" else config.FREE_CHANNEL
+        if not chat:
+            continue
+        ok = telegram.delete_message(chat, mid)
+        if p.get("has_photo") and ok:
+            telegram.delete_message(chat, mid - 1)   # si el texto no cupo, la imagen salió justo antes
+        if ok:
+            done.append("VIP" if where == "vip" else "Gratis")
+            p["channel_msgs"].pop(where, None)
+    t = p.get("teaser") or {}
+    if t.get("free_msg") and telegram.delete_message(config.FREE_CHANNEL, t["free_msg"]):
+        t.pop("free_msg", None)
+    return done
+
+
+def _cancel_pick(state: dict, pid: str, refree: bool = False, delete_posts: bool = False) -> str:
     """Cancela un pick publicado: sale de la web y no tendrá aviso, entretiempo ni resultado.
     Con refree, busca un gratis nuevo para hoy."""
     p = state["picks"].get(pid)
     if not p:
         return f"No encontré el pick #{pid}."
     was_free = "free" in (p.get("channel_msgs") or {})
+    if p.get("status") == "cancelled" and delete_posts:   # ya cancelado: solo borrar los mensajes
+        done = _delete_pick_posts(state, p)
+        left = [("VIP" if w == "vip" else "Gratis") for w in (p.get("channel_msgs") or {})]
+        if state.get("owner_chat"):
+            telegram.send(state["owner_chat"], f"🗑 Pick #{pid}: "
+                          + (f"borrado de {' y '.join(done)}." if done else "no se borró ningún mensaje.")
+                          + (f" ⚠️ No pude borrarlo de {' y '.join(left)}: bórralo a mano." if left else ""))
+        return ""
     p.update(status="cancelled", free=False, cancelled_at=_iso(store.now_utc()))
+    if delete_posts:
+        _delete_pick_posts(state, p)
     for k in ("ig_pre_status", "ig_story_status"):
         if p.get(k) == "queued":
             p[k] = "skipped"
@@ -637,7 +666,8 @@ def _cancel_file(state: dict) -> None:
     if not req.get("id") or req["id"] in (state.get("cancel_done") or []):
         return
     state.setdefault("cancel_done", []).append(req["id"])
-    err = _cancel_pick(state, str(req.get("pid", "")).lstrip("#"), bool(req.get("refree")))
+    err = _cancel_pick(state, str(req.get("pid", "")).lstrip("#"), bool(req.get("refree")),
+                       bool(req.get("delete_posts")))
     if err:
         telegram.send(state["owner_chat"], "⚠️ " + formatting.escape(err))
 

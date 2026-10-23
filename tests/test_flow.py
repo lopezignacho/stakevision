@@ -1073,4 +1073,8 @@ store.save(st)
 store.export_public(st)
 import json as _j  # noqa: E402
 assert all(r["id"] != "902" for r in _j.load(open(config.PUBLIC_HISTORY))["picks"])
+deleted_ = []
+telegram.delete_message = lambda c, m: deleted_.append((c, m)) or True
+main._cancel_pick(st, "902", delete_posts=True)
+assert (config.FREE_CHANNEL, 5) in deleted_ and (VIP, 6) in deleted_ and not st["picks"]["902"]["channel_msgs"]
 print("OK gratis del día + cancelar")
