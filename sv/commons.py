@@ -91,7 +91,9 @@ def photo(name: str, team: bool = False) -> tuple[bytes, dict] | None:
 BAD = ("ticket", "entrada", "poster", "afiche", "cartel", "card", "cromo", "stamp", "sello", "autograph", "autografo",
        "signature", "firma", "statue", "estatua", "mural", "grave", "tumba", "house", "casa ", "wedding", "boda",
        "logo", "escudo", "crest", "kit", "jersey", "shirt", "camiseta", "museum", "museo", "wax", "cera", "painting",
-       "drawing", "dibujo", "cartoon", "programme", "program", "magazine", "revista", "newspaper", "trophy cabinet")
+       "drawing", "dibujo", "cartoon", "programme", "program", "magazine", "revista", "newspaper", "trophy cabinet",
+       "parade", "desfile", "rally", "ceremony", "ceremonia", "white house", "visit", "visita", "gala", "award",
+       "premio", "premiere", "concert", "red carpet", "meeting", "reunion", "school", "colegio", "hospital")
 _BAD_RE = re.compile(r"\b(" + "|".join(re.escape(b.strip()) for b in BAD) + r")s?\b")
 
 

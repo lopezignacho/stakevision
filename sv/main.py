@@ -1540,10 +1540,19 @@ def _nba_board(state: dict, p: dict, rep: dict, kind: str, photo=None, half_rep=
     if kind == "half":   # en el descanso: el máximo anotador del partido
         allp = [(x, s) for s in ("home", "away") for x in rep[s]["leaders"][:1]]
         fig = max(allp, key=lambda t: t[0]["pts"]) if allp else None
-    if photo is None and fig:
-        t = rep[fig[1]]
+    if photo is None:   # la figura; si no hay foto suya con esa camiseta, otro líder; luego referentes del equipo
+        tries = ([(fig[0]["name"], fig[1])] if fig else []) + \
+                [(x["name"], s_) for s_ in ("home", "away") for x in rep[s_]["leaders"][:3]
+                 if not fig or x["name"] != fig[0]["name"]]
         try:
-            photo = matchphoto.for_scorer(fig[0]["name"], [t["name"], t["short"]])
+            for name, s_ in tries[:5]:
+                photo = matchphoto.for_scorer(name, [rep[s_]["name"], rep[s_]["short"]])
+                if photo:
+                    break
+            for s_ in ([fig[1]] if fig else []) + ["home", "away"]:
+                if photo:
+                    break
+                photo = matchphoto.referent([rep[s_]["name"], rep[s_]["short"]], "basketball")
         except Exception:
             traceback.print_exc()
     if photo is None and os.path.exists(_upload_file(p, "pickphoto")):
