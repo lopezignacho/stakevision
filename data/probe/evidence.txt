@@ -1,0 +1,6 @@
+fixture API-Football: True ('Junior', 'Águilas Doradas')
+contexto historial: False None
+h2h: []
+espn form: ([(1, 3), (1, 3), (2, 2), (1, 1), (0, 0)], [(0, 2), (2, 0), (2, 2), (1, 1), (2, 1)])
+evidencia: {"form": [7, 10], "h2h": [0, 0], "rate": 0.7, "verdict": "ok", "h2h_goals": null, "h2h_n": 0}
+📚 Datos: forma reciente 7/10 → ✅ los datos acompañan
