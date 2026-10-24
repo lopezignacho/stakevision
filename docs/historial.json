@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-24T16:27:53.013353+00:00",
+ "updated_at": "2026-10-24T16:30:44.340546+00:00",
  "summary": {
-  "picks": 11,
-  "wins": 8,
+  "picks": 12,
+  "wins": 9,
   "losses": 2,
-  "hit_rate": 0.8,
-  "yield": 0.44,
+  "hit_rate": 0.8182,
+  "yield": 0.4674,
   "avg_odds": 1.77,
-  "units": 14.96
+  "units": 17.76
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 4,
    "prob": 0.5844,
    "free": true,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Racing Santander",
@@ -32,7 +32,10 @@
      "mtype": "totals",
      "handicap": 2.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      2,
+      1
+     ]
     }
    ],
    "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.71).\nProbabilidad estimada: 58,4%. Para no perder a esta cuota se necesita 58,8%."
