@@ -156,6 +156,15 @@
   table { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 15px; }
   th { text-align: left; padding: 14px 18px; font-weight: 500; color: var(--muted); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; background: var(--card); }
   td { padding: 14px 18px; border-top: 1px solid var(--line-strong); vertical-align: top; }
+  .hist-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+  .hist-bar h3 { margin: 0; font-size: 24px; }
+  .hist-bar p { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+  .hist-btn { min-height: 46px; padding: 0 20px; font-size: 15px; }
+  .hist-btn svg { width: 20px; height: 20px; }
+  .chan { display: inline-block; padding: 3px 10px; border-radius: 999px; font: 700 12px/1.4 'DM Sans', sans-serif; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+  .chan.free { background: rgba(126, 217, 87, .16); color: var(--win); border: 1px solid rgba(126, 217, 87, .45); }
+  .chan.vip { background: rgba(236, 188, 66, .16); color: #c9951c; border: 1px solid rgba(236, 188, 66, .5); }
+  td.mono { white-space: nowrap; }
   .res { font-weight: 700; }
   .res.W { color: var(--win); } .res.L { color: var(--loss); } .res.V { color: var(--void); } .res.P { color: var(--muted); }
 
@@ -333,11 +342,18 @@
       <h2>Verdes y rojas. Todas.</h2>
       <p class="lead">Los picks VIP aparecen aquí cuando su partido termina. Nada se edita ni se borra.</p>
     </div>
+    <div class="hist-bar">
+      <div><h3 id="hist-title">Últimos picks</h3><p id="hist-sub">Los 5 picks más recientes</p></div>
+      <button class="btn hist-btn" id="hist-toggle" type="button" aria-expanded="false" aria-controls="history-body" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+        <span id="hist-toggle-label">Ver historial</span>
+      </button>
+    </div>
     <div class="table-box">
       <table>
-        <thead><tr><th>Fecha</th><th>Partido</th><th>Mercado</th><th>Cuota</th><th>Stake</th><th>Resultado</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Partido</th><th>Canal</th><th>Mercado</th><th>Cuota</th><th>Stake</th><th>Resultado</th></tr></thead>
         <tbody id="history-body">
-          <tr><td colspan="6" class="muted" style="text-align:center; padding:40px 18px">El historial comienza el día del lanzamiento.</td></tr>
+          <tr><td colspan="7" class="muted" style="text-align:center; padding:40px 18px">El historial comienza el día del lanzamiento.</td></tr>
         </tbody>
       </table>
     </div>
@@ -618,17 +634,38 @@
     if (data.updated_at) document.getElementById('s-updated').textContent = 'Actualizado: ' + fmtDate(data.updated_at) + '.';
 
     var picks = data.picks || [];
-    if (picks.length) {
-      document.getElementById('history-body').innerHTML = picks.map(function (p) {
+    var LAST_N = 5, showAll = false;
+    function renderHistory() {
+      var rows = showAll ? picks : picks.slice(0, LAST_N);
+      document.getElementById('history-body').innerHTML = rows.map(function (p) {
         var match = p.legs.map(function (l) { return esc(l.home) + (l.score ? ' <b class="mono">' + l.score[0] + '-' + l.score[1] + '</b> ' : ' vs ') + esc(l.away) + '<br><span class="muted" style="font-size:13px">' + esc(l.league) + '</span>'; }).join('<br>');
         var market = p.legs.map(function (l) { return '<strong>' + esc(label(l)) + '</strong>'; }).join('<br>');
         var r = RES[p.result] || ['⏳ En juego', 'P'];
         function cell(label, html, cls) { return '<td' + (cls ? ' class="' + cls + '"' : '') + ' data-label="' + label + '"><span class="v">' + html + '</span></td>'; }
-        return '<tr>' + cell('Fecha', fmtDate(p.kickoff), 'mono') + cell('Partido', match) +
-          cell('Mercado', market + (p.kind === 'doble' ? ' <span class="muted">(doble)</span>' : '')) +
+        var chan = p.free ? '<span class="chan free">Free</span>' : '<span class="chan vip">VIP</span>';
+        return '<tr>' + cell('Fecha', fmtDate(p.kickoff), 'mono') + cell('Partido', match) + cell('Canal', chan) +
+          cell('Mercado', market + (p.kind === 'doble' ? ' <span class="muted">(doble)</span>' : '') +
+               (p.kind === 'builder' ? ' <span class="muted">(Bet Builder)</span>' : '')) +
           cell('Cuota', p.price.toFixed(2), 'mono') + cell('Stake', p.stake + '/10', 'mono') +
           cell('Resultado', r[0], 'res ' + r[1]) + '</tr>';
       }).join('');
+      document.getElementById('hist-title').textContent = showAll ? 'Historial completo' : 'Últimos picks';
+      document.getElementById('hist-sub').textContent = showAll ? picks.length + ' picks, del más reciente al más antiguo'
+        : 'Los ' + Math.min(LAST_N, picks.length) + ' picks más recientes';
+      document.getElementById('hist-toggle-label').textContent = showAll ? 'Ver solo los últimos 5' : 'Ver historial';
+      document.getElementById('hist-toggle').setAttribute('aria-expanded', showAll ? 'true' : 'false');
+    }
+    if (picks.length) {
+      renderHistory();
+      var tg = document.getElementById('hist-toggle');
+      if (picks.length > LAST_N) {
+        tg.hidden = false;
+        tg.addEventListener('click', function () {
+          showAll = !showAll;
+          renderHistory();
+          if (!showAll) document.getElementById('historial').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
     }
 
     // Tarjeta principal: el pick gratis más relevante (el próximo por jugar; si no hay, el último).

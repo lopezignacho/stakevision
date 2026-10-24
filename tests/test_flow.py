@@ -1125,3 +1125,17 @@ main._lineup_check(st, pl_, store.now_utc())
 _rq_mod.get = _orig_get
 assert pl_["lineup_checked"] == "done" and any("Saka" in (t or "") for _, t, *_ in sent[n:]), sent[n:]
 print("OK plantel actual + alineaciones")
+
+# 34) línea protegida: «más de 2.5» → «más de 2» si existe a buena cuota
+from sv.value import Pick, Selection  # noqa: E402
+def _sel(h, price, fair):
+    return Selection(fixture_id="fx55", home="Audax Italiano", away="Huachipato", league="Chile", kickoff=main._iso(store.now_utc()),
+                     market_id=f"m{h}", market="Totales", mtype="totals", outcome_id="o", outcome="Más", handicap=h,
+                     price=price, fair_prob=fair, ref_price=1 / fair)
+s25, s20 = _sel(2.5, 1.90, 0.55), _sel(2.0, 1.62, 0.63)
+pk = main._protect(Pick("simple", [s25]), [s25, s20])
+assert pk.legs[0].handicap == 2.0, pk.legs[0].handicap
+assert main._protect(Pick("simple", [s25]), [s25, _sel(2.0, 1.45, 0.70)]).legs[0].handicap == 2.5
+assert main._min_odds({"legs": [{"mtype": "totals", "handicap": 2.0}]}) == 1.60
+assert main.grade_leg({"mtype": "totals", "outcome": "Más", "handicap": 2.0}, 1, 1) == "V"
+print("OK línea protegida")

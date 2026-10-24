@@ -215,7 +215,7 @@ def _auto_pool(state: dict, publish_at) -> list:
         for opt, d in (("A", p), ("B", p.get("alt"))):
             if not d or len(d.get("legs") or []) != 1:
                 continue
-            if not (config.ODDS_MIN <= d["price"] <= config.ODDS_MAX) or d["edge"] < config.AUTO_FREE_MIN_EDGE:
+            if not (_min_odds(d) <= d["price"] <= config.ODDS_MAX) or d["edge"] < config.AUTO_FREE_MIN_EDGE:
                 continue
             ev = _leg_evidence(d["legs"][0])
             if ev and ev["verdict"] == "contra":
@@ -771,6 +771,35 @@ def _free_command(state: dict, text: str) -> None:
                   + "\n\n/gratis 37 · usar ese pick como gratis de hoy (sale ya)\n/gratis prueba · ver qué elegiría (solo tú, no publica)\n/gratis apagar · /gratis encender")
 
 
+def _protect(pk, selections):
+    """Totales X.5 → línea entera vecina («más de 2.5» → «más de 2»; «menos de 2.5» → «menos de 3»):
+    si cae justo en la línea se devuelve en vez de perder. Solo si existe a buena cuota y precio justo."""
+    from .value import Pick
+    if pk.kind != "simple":
+        return pk
+    l = pk.legs[0]
+    if not l.mtype.startswith(("totals", "teamtotals")) or l.handicap is None or float(l.handicap) % 1 != 0.5:
+        return pk
+    over = str(l.outcome).lower().startswith(("más", "mas", "over"))
+    target = float(l.handicap) - 0.5 if over else float(l.handicap) + 0.5
+    sibs = [s for s in selections if s.fixture_id == l.fixture_id and s.mtype == l.mtype and s.handicap is not None
+            and abs(float(s.handicap) - target) < 1e-9 and str(s.outcome).lower()[:3] == str(l.outcome).lower()[:3]
+            and config.PROTECTED_MIN_ODDS <= s.price <= config.ODDS_MAX and s.edge >= config.AUTO_FREE_MIN_EDGE]
+    if not sibs:
+        return pk
+    s = max(sibs, key=lambda x: x.edge)
+    return Pick("simple", [s], tier="valor" if s.edge >= config.MIN_EDGE else "justa")
+
+
+def _min_odds(d: dict) -> float:
+    """Piso de cuota: 1.65, o 1.60 para totales de línea entera (protegidos)."""
+    l = (d.get("legs") or [{}])[0]
+    h = l.get("handicap")
+    if (l.get("mtype") or "").startswith(("totals", "teamtotals")) and h is not None and float(h) % 1 == 0:
+        return min(config.ODDS_MIN, config.PROTECTED_MIN_ODDS)
+    return config.ODDS_MIN
+
+
 def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool = False, live: bool = False) -> None:
     state = store.load()
     now = store.now_utc()
@@ -818,6 +847,8 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
     selections = [x for x in selections if x.fixture_id not in busy]
     want = top or config.MAX_CANDIDATES
     picks = build_picks(selections, max_n=want * 2, min_n=(top or config.MIN_DAILY_CANDIDATES) * 2)
+    if config.PROTECTED_LINES:
+        picks = [_protect(pk, selections) for pk in picks]
     # Segunda opinión con datos: los que el H2H y la forma reciente contradicen van al final (o fuera)
     scored = []
     for pk in picks:
