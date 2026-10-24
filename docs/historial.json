@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-24T03:35:22.111052+00:00",
+ "updated_at": "2026-10-24T03:40:32.868738+00:00",
  "summary": {
   "picks": 10,
   "wins": 7,
@@ -10,6 +10,33 @@
   "units": 12.41
  },
  "picks": [
+  {
+   "id": "70",
+   "published_at": "2026-10-24T03:40:27Z",
+   "kickoff": "2026-10-24T14:15:00.000Z",
+   "kind": "simple",
+   "price": 1.7,
+   "stake": 4,
+   "prob": 0.5844,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Racing Santander",
+     "away": "Espanyol Barcelona",
+     "league": "España · LaLiga",
+     "market": "Más/Menos Tiempo Completo",
+     "outcome": "Más",
+     "price": 1.7,
+     "label": "Más de 2.5 goles",
+     "mtype": "totals",
+     "handicap": 2.5,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.71).\nProbabilidad estimada: 58,4%. Para no perder a esta cuota se necesita 58,8%."
+  },
   {
    "id": "55",
    "published_at": "2026-10-23T18:35:21Z",
