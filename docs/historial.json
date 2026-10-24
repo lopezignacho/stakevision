@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-24T01:13:41.187850+00:00",
+ "updated_at": "2026-10-24T01:18:10.748257+00:00",
  "summary": {
-  "picks": 8,
+  "picks": 9,
   "wins": 6,
-  "losses": 1,
-  "hit_rate": 0.8571,
-  "yield": 0.5337,
-  "avg_odds": 1.76,
-  "units": 12.81
+  "losses": 2,
+  "hit_rate": 0.75,
+  "yield": 0.3633,
+  "avg_odds": 1.78,
+  "units": 9.81
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 3,
    "prob": 0.5159,
    "free": true,
-   "result": null,
+   "result": "L",
    "legs": [
     {
      "home": "Audax Italiano",
@@ -32,7 +32,10 @@
      "mtype": "totals",
      "handicap": 2.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      1,
+      1
+     ]
     }
    ],
    "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.94).\nProbabilidad estimada: 51,6%. Para no perder a esta cuota se necesita 52,6%."
