@@ -351,7 +351,7 @@
     </div>
     <div class="table-box">
       <table>
-        <thead><tr><th>Fecha</th><th>Partido</th><th>Mercado</th><th>Canal</th><th>Cuota</th><th>Stake</th><th>Resultado</th></tr></thead>
+        <thead><tr><th>Canal</th><th>Fecha</th><th>Partido</th><th>Mercado</th><th>Cuota</th><th>Stake</th><th>Resultado</th></tr></thead>
         <tbody id="history-body">
           <tr><td colspan="7" class="muted" style="text-align:center; padding:40px 18px">El historial comienza el día del lanzamiento.</td></tr>
         </tbody>
@@ -643,9 +643,9 @@
         var r = RES[p.result] || ['⏳ En juego', 'P'];
         function cell(label, html, cls) { return '<td' + (cls ? ' class="' + cls + '"' : '') + ' data-label="' + label + '"><span class="v">' + html + '</span></td>'; }
         var chan = p.free ? '<span class="chan free">Free</span>' : '<span class="chan vip">VIP</span>';
-        return '<tr>' + cell('Fecha', fmtDate(p.kickoff), 'mono') + cell('Partido', match) +
+        return '<tr>' + cell('Canal', chan) + cell('Fecha', fmtDate(p.kickoff), 'mono') + cell('Partido', match) +
           cell('Mercado', market + (p.kind === 'doble' ? ' <span class="muted">(doble)</span>' : '') +
-               (p.kind === 'builder' ? ' <span class="muted">(Bet Builder)</span>' : '')) + cell('Canal', chan) +
+               (p.kind === 'builder' ? ' <span class="muted">(Bet Builder)</span>' : '')) +
           cell('Cuota', p.price.toFixed(2), 'mono') + cell('Stake', p.stake + '/10', 'mono') +
           cell('Resultado', r[0], 'res ' + r[1]) + '</tr>';
       }).join('');
