@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-24T04:35:24.850027+00:00",
+ "updated_at": "2026-10-24T04:40:31.611822+00:00",
  "summary": {
-  "picks": 10,
-  "wins": 7,
+  "picks": 11,
+  "wins": 8,
   "losses": 2,
-  "hit_rate": 0.7778,
-  "yield": 0.4003,
+  "hit_rate": 0.8,
+  "yield": 0.44,
   "avg_odds": 1.77,
-  "units": 12.41
+  "units": 14.96
  },
  "picks": [
   {
@@ -36,6 +36,36 @@
     }
    ],
    "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.71).\nProbabilidad estimada: 58,4%. Para no perder a esta cuota se necesita 58,8%."
+  },
+  {
+   "id": "37",
+   "published_at": "2026-10-23T04:30:28Z",
+   "kickoff": "2026-10-24T02:00:00.000Z",
+   "kind": "simple",
+   "price": 1.85,
+   "stake": 3,
+   "prob": null,
+   "free": false,
+   "result": "W",
+   "legs": [
+    {
+     "home": "Los Angeles Lakers",
+     "away": "LA Clippers",
+     "league": "USA · NBA",
+     "market": "Más/Menos (incl. tiempo extra)",
+     "outcome": "Más",
+     "price": 1.85,
+     "label": "Más de 226.5 puntos",
+     "mtype": "totals",
+     "handicap": 226.5,
+     "sport": "basketball",
+     "score": [
+      125,
+      117
+     ]
+    }
+   ],
+   "analysis": null
   },
   {
    "id": "55",
