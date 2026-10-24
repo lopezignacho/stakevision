@@ -161,10 +161,43 @@
   .hist-bar p { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
   .hist-btn { min-height: 46px; padding: 0 20px; font-size: 15px; }
   .hist-btn svg { width: 20px; height: 20px; }
+  .hist-btn[hidden], .hist-filters[hidden], .hist-sum[hidden] { display: none; }
   .chan { display: inline-block; padding: 3px 10px; border-radius: 999px; font: 700 12px/1.4 'DM Sans', sans-serif; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
   .chan.free { background: rgba(126, 217, 87, .16); color: var(--win); border: 1px solid rgba(126, 217, 87, .45); }
   .chan.vip { background: rgba(236, 188, 66, .16); color: #c9951c; border: 1px solid rgba(236, 188, 66, .5); }
   td.mono { white-space: nowrap; }
+  .hist-filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .hist-filters button { min-height: 40px; padding: 0 18px; border-radius: 999px; border: 1.5px solid var(--outline); background: transparent; color: var(--text); font: 700 14px 'DM Sans', sans-serif; cursor: pointer; }
+  .hist-filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #000; }
+  .hist-sum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; max-width: 420px; }
+  .hist-sum div { display: flex; flex-direction: column; align-items: center; padding: 10px 6px; border-radius: 12px; background: var(--card); border: 1px solid var(--line-strong); }
+  .hist-sum b { font: 700 20px 'Poppins', sans-serif; }
+  .hist-sum span { font-size: 12px; color: var(--muted); }
+  .hist-sum .W b { color: var(--win); } .hist-sum .L b { color: var(--loss); } .hist-sum .V b { color: var(--void); }
+  .hist-cards { display: none; list-style: none; margin: 0; padding: 0; gap: 10px; }
+  .hc { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--line-strong); min-width: 0; }
+  .hc-top, .hc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .hc-top > span:first-child { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .hc-date { font: 500 12px 'JetBrains Mono', monospace; color: var(--muted); white-space: nowrap; }
+  .hc .chan { font-size: 10px; padding: 2px 8px; }
+  .hc-match { font-weight: 700; font-size: 15px; line-height: 1.35; }
+  .hc-foot { font-size: 13px; color: var(--soft); }
+  .hc-foot > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hc-foot .mono { font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+  .pill { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; border: 1px solid currentColor; }
+  .pill.W { color: var(--win); } .pill.L { color: var(--loss); } .pill.V { color: var(--void); } .pill.P { color: var(--muted); }
+  .hist-empty { padding: 32px 16px; text-align: center; color: var(--muted); border: 1px dashed var(--line-strong); border-radius: 14px; }
+  /* Historial en tablet y celular: tarjetas (2 columnas en tablet, 1 en celular) */
+  @media (max-width: 960px) {
+    .table-box { display: none; }
+    .hist-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  }
+  @media (max-width: 640px) {
+    .hist-cards { grid-template-columns: 1fr; gap: 10px; }
+    .hist-sum { max-width: none; }
+    .hist-bar { margin-bottom: 14px; }
+    .hist-bar .hist-btn { width: 100%; justify-content: center; }
+  }
   .res { font-weight: 700; }
   .res.W { color: var(--win); } .res.L { color: var(--loss); } .res.V { color: var(--void); } .res.P { color: var(--muted); }
 
@@ -213,16 +246,6 @@
     .stat b { font-size: 30px; }
     .price { font-size: 34px; }
     .help { padding: 20px; }
-    /* Historial como tarjetas en vez de tabla */
-    .table-box { border: 0; background: transparent; overflow: visible; }
-    table, thead, tbody, tr, td { display: block; min-width: 0; width: 100%; }
-    thead { display: none; }
-    tbody tr { background: var(--card); border: 1px solid var(--line-strong); border-radius: 14px; padding: 6px 16px; margin-bottom: 12px; }
-    tbody td { border: 0; padding: 8px 0; display: flex; justify-content: space-between; gap: 16px; text-align: right; }
-    tbody td::before { content: attr(data-label); color: var(--muted); font: 500 13px 'DM Sans', sans-serif; text-align: left; flex-shrink: 0; padding-top: 2px; }
-    tbody td .v { min-width: 0; }
-    tbody td[colspan] { display: block; text-align: center; }
-    tbody td[colspan]::before { content: none; }
   }
   @media (max-width: 380px) {
     .chips { grid-template-columns: 1fr 1fr; }
@@ -344,11 +367,18 @@
     </div>
     <div class="hist-bar">
       <div><h3 id="hist-title">Últimos picks</h3><p id="hist-sub">Los 5 picks más recientes</p></div>
-      <button class="btn hist-btn" id="hist-toggle" type="button" aria-expanded="false" aria-controls="history-body" hidden>
+      <button class="btn hist-btn" id="hist-toggle" type="button" aria-expanded="false" aria-controls="history-body hist-cards" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
         <span id="hist-toggle-label">Ver historial</span>
       </button>
     </div>
+    <div class="hist-filters" role="group" aria-label="Filtrar por canal">
+      <button type="button" data-f="all" aria-pressed="true">Todos</button>
+      <button type="button" data-f="free" aria-pressed="false">Free</button>
+      <button type="button" data-f="vip" aria-pressed="false">VIP</button>
+    </div>
+    <div class="hist-sum" id="hist-sum" aria-live="polite" hidden></div>
+    <ul class="hist-cards" id="hist-cards"></ul>
     <div class="table-box">
       <table>
         <thead><tr><th>Canal</th><th>Fecha</th><th>Partido</th><th>Mercado</th><th>Cuota</th><th>Stake</th><th>Resultado</th></tr></thead>
@@ -634,10 +664,13 @@
     if (data.updated_at) document.getElementById('s-updated').textContent = 'Actualizado: ' + fmtDate(data.updated_at) + '.';
 
     var picks = data.picks || [];
-    var LAST_N = 5, showAll = false;
+    var LAST_N = 5, showAll = false, filt = 'all';
+    var FNAME = { all: 'picks', free: 'picks gratis', vip: 'picks VIP' };
     function renderHistory() {
-      var rows = showAll ? picks : picks.slice(0, LAST_N);
-      document.getElementById('history-body').innerHTML = rows.map(function (p) {
+      var pool = picks.filter(function (p) { return filt === 'all' || (filt === 'free' ? p.free : !p.free); });
+      var rows = showAll ? pool : pool.slice(0, LAST_N);
+      var empty = 'Aún no hay ' + FNAME[filt] + ' en el historial.';
+      document.getElementById('history-body').innerHTML = rows.length ? rows.map(function (p) {
         var match = p.legs.map(function (l) { return esc(l.home) + (l.score ? ' <b class="mono">' + l.score[0] + '-' + l.score[1] + '</b> ' : ' vs ') + esc(l.away) + '<br><span class="muted" style="font-size:13px">' + esc(l.league) + '</span>'; }).join('<br>');
         var market = p.legs.map(function (l) { return '<strong>' + esc(label(l)) + '</strong>'; }).join('<br>');
         var r = RES[p.result] || ['⏳ En juego', 'P'];
@@ -648,24 +681,50 @@
                (p.kind === 'builder' ? ' <span class="muted">(Bet Builder)</span>' : '')) +
           cell('Cuota', p.price.toFixed(2), 'mono') + cell('Stake', p.stake + '/10', 'mono') +
           cell('Resultado', r[0], 'res ' + r[1]) + '</tr>';
+      }).join('') : '<tr><td colspan="7" class="muted" style="text-align:center; padding:40px 18px">' + empty + '</td></tr>';
+      // Tarjetas (tablet y celular)
+      document.getElementById('hist-cards').innerHTML = rows.length ? rows.map(function (p) {
+        var r = RES[p.result] || ['⏳ En juego', 'P'];
+        var match = p.legs.map(function (l) { return esc(l.home) + (l.score ? ' ' + l.score[0] + '-' + l.score[1] + ' ' : ' vs ') + esc(l.away); }).join(' + ');
+        var market = p.legs.map(function (l) { return esc(label(l)); }).join(' + ') + (p.kind === 'builder' ? ' (Bet Builder)' : '');
+        var chan = p.free ? '<span class="chan free">Free</span>' : '<span class="chan vip">VIP</span>';
+        return '<li class="hc"><div class="hc-top"><span>' + chan + '<span class="hc-date">' + fmtDate(p.kickoff) + '</span></span>' +
+          '<span class="pill ' + r[1] + '">' + r[0] + '</span></div>' +
+          '<span class="hc-match">' + match + '</span>' +
+          '<div class="hc-foot"><span title="' + market + '">' + market + '</span><span class="mono">' + p.price.toFixed(2) + ' · ' + p.stake + '/10</span></div></li>';
+      }).join('') : '<li class="hist-empty">' + empty + '</li>';
+      // Resumen de lo que se ve
+      var c = { W: 0, L: 0, V: 0 };
+      rows.forEach(function (p) { if (c[p.result] != null) c[p.result]++; });
+      var sum = document.getElementById('hist-sum');
+      sum.hidden = !rows.length;
+      sum.innerHTML = [['W', 'Verdes', 'Verde'], ['L', 'Rojas', 'Roja'], ['V', 'Nulas', 'Nula']].map(function (k) {
+        return '<div class="' + k[0] + '"><b>' + c[k[0]] + '</b><span>' + (c[k[0]] === 1 ? k[2] : k[1]) + '</span></div>';
       }).join('');
       document.getElementById('hist-title').textContent = showAll ? 'Historial completo' : 'Últimos picks';
-      document.getElementById('hist-sub').textContent = showAll ? picks.length + ' picks, del más reciente al más antiguo'
-        : 'Los ' + Math.min(LAST_N, picks.length) + ' picks más recientes';
+      document.getElementById('hist-sub').textContent = showAll ? pool.length + ' ' + FNAME[filt] + ', del más reciente al más antiguo'
+        : 'Los ' + Math.min(LAST_N, pool.length) + ' ' + FNAME[filt] + ' más recientes';
       document.getElementById('hist-toggle-label').textContent = showAll ? 'Ver solo los últimos 5' : 'Ver historial';
-      document.getElementById('hist-toggle').setAttribute('aria-expanded', showAll ? 'true' : 'false');
+      var tg = document.getElementById('hist-toggle');
+      tg.setAttribute('aria-expanded', showAll ? 'true' : 'false');
+      tg.hidden = pool.length <= LAST_N;
     }
     if (picks.length) {
       renderHistory();
-      var tg = document.getElementById('hist-toggle');
-      if (picks.length > LAST_N) {
-        tg.hidden = false;
-        tg.addEventListener('click', function () {
-          showAll = !showAll;
+      document.getElementById('hist-toggle').addEventListener('click', function () {
+        showAll = !showAll;
+        renderHistory();
+        if (!showAll) document.getElementById('historial').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('.hist-filters button'), function (btn) {
+        btn.addEventListener('click', function () {
+          filt = btn.getAttribute('data-f');
+          Array.prototype.forEach.call(document.querySelectorAll('.hist-filters button'), function (o) { o.setAttribute('aria-pressed', o === btn ? 'true' : 'false'); });
           renderHistory();
-          if (!showAll) document.getElementById('historial').scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
-      }
+      });
+    } else {
+      document.querySelector('.hist-filters').hidden = true;
     }
 
     // Tarjeta principal: el pick gratis más relevante (el próximo por jugar; si no hay, el último).
