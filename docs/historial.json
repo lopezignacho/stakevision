@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-24T01:45:34.288524+00:00",
+ "updated_at": "2026-10-24T01:45:46.502220+00:00",
  "summary": {
-  "picks": 9,
-  "wins": 6,
+  "picks": 10,
+  "wins": 7,
   "losses": 2,
-  "hit_rate": 0.75,
-  "yield": 0.3633,
-  "avg_odds": 1.78,
-  "units": 9.81
+  "hit_rate": 0.7778,
+  "yield": 0.4003,
+  "avg_odds": 1.77,
+  "units": 12.41
  },
  "picks": [
   {
@@ -39,6 +39,33 @@
     }
    ],
    "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.94).\nProbabilidad estimada: 51,6%. Para no perder a esta cuota se necesita 52,6%."
+  },
+  {
+   "id": "40",
+   "published_at": "2026-10-23T06:36:09Z",
+   "kickoff": "2026-10-23T19:45:00.000Z",
+   "kind": "simple",
+   "price": 1.65,
+   "stake": 4,
+   "prob": null,
+   "free": false,
+   "result": "W",
+   "legs": [
+    {
+     "home": "Vitoria SC Guimaraes",
+     "away": "Maritimo Madeira",
+     "league": "Portugal · Liga Portugal",
+     "market": "Resultado Tiempo Completo",
+     "outcome": "1",
+     "price": 1.65,
+     "label": "Gana Vitoria SC Guimaraes",
+     "mtype": "1x2",
+     "handicap": 0.0,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": null
   },
   {
    "id": "22",
