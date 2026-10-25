@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-25T21:10:50.659206+00:00",
+ "updated_at": "2026-10-25T21:15:28.869732+00:00",
  "summary": {
-  "picks": 12,
+  "picks": 13,
   "wins": 9,
-  "losses": 2,
-  "hit_rate": 0.8182,
-  "yield": 0.4674,
+  "losses": 3,
+  "hit_rate": 0.75,
+  "yield": 0.3276,
   "avg_odds": 1.77,
-  "units": 17.76
+  "units": 13.76
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 4,
    "prob": 0.5812,
    "free": true,
-   "result": null,
+   "result": "L",
    "legs": [
     {
      "home": "AZ Alkmaar",
@@ -32,7 +32,10 @@
      "mtype": "totals",
      "handicap": 3.0,
      "sport": "soccer",
-     "score": null
+     "score": [
+      0,
+      2
+     ]
     }
    ],
    "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.72): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\nProbabilidad estimada: 58,1%. Para no perder a esta cuota se necesita 57,1%."
