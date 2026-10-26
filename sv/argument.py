@@ -238,7 +238,16 @@ def _nba(l: dict) -> list[str]:
             kv = sum(map(fns[0], venue))
             if kv * 2 > len(venue) and kv != km:
                 where = "de local" if side == "home" else "de visita"
-                facts.append((3, f"{where.capitalize()}, se cumplió en {kv} de sus últimos {len(venue)}."))
+                if t == "spreads" and line is not None:
+                    hh = nbadata._line_for_team(l)
+                    k = nbadata.need_txt(hh)
+                    v_txt = (f"{'no perdió' if hh > 0 else 'ganó'} por {k} o más en {kv} de sus últimos {len(venue)}"
+                             if hh < 0 else f"no perdió por {k} o más en {kv} de sus últimos {len(venue)}")
+                elif t == "moneyline":
+                    v_txt = f"ganó {kv} de sus últimos {len(venue)}"
+                else:
+                    v_txt = f"lo cumplió en {kv} de sus últimos {len(venue)}"
+                facts.append((3, f"{where.capitalize()}, {mn} {v_txt}."))
     outs = op.get("key_out") or []
     if outs and t != "totals":
         names = ", ".join(f"{x['name']} ({x['pts']:g} pts por partido)".replace(".", ",") for x in outs[:2])
