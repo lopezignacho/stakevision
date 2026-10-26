@@ -22,7 +22,8 @@ for i, c in enumerate(rows[:6]):
         continue
     img, cr = got
     open(f"{OUT}/cand{i}.jpg", "wb").write(img)
-    n = dict(news, photo=img, source=f"Foto: {c['author']} / Wikimedia Commons ({c['license']}), modificada · " + news["source_short"])
+    n = dict(news, photo=img, source="Fuentes: " + news["source_short"],
+             credit=f"Foto de referencia: {c['author']} / Wikimedia Commons ({c['license']}), modificada")
     open(f"{OUT}/news{i}.jpg", "wb").write(newsimage.render_news(n))
     info.append({k: c[k] for k in ("title", "author", "license", "year", "page", "desc")})
 json.dump(info, open(f"{OUT}/list.json", "w"), ensure_ascii=False, indent=1)

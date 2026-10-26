@@ -58,8 +58,14 @@ def _chip(d, x, y, text, fill, ink, size=30, pad=22):
     return w
 
 
-def _footer(im, d, source: str):
+def _footer(im, d, source: str, credit: str | None = None):
     y = H - 92
+    if credit:   # crédito de la foto (licencia libre): en su propia línea, sobre la firma
+        cf = P._font("Regular", 20)
+        txt = credit
+        while d.textlength(txt, font=cf) > P.W - 120 and len(txt) > 20:
+            txt = txt[:-2]
+        d.text((60, y - 52), txt if txt == credit else txt.rstrip() + "…", font=cf, fill=(190, 196, 206), anchor="lm")
     d.line((60, y - 24, P.W - 60, y - 24), fill=(255, 255, 255, 60), width=2)
     d.text((60, y + 10), source, font=P._font("Regular", 24), fill=(205, 210, 220), anchor="lm")
     ig = P._font("Medium", 30)
@@ -87,39 +93,48 @@ def render_news(n: dict) -> bytes:
     im = _photo_backdrop(n["photo"], n["colors"], n.get("photo_focus")) if n.get("photo") else _backdrop(*n["colors"])
     d = ImageDraw.Draw(im)
     P._put_logo(im, 300, "dark", 60, 54)
-    _chip(d, P.W - 60 - 290, 70, n["tag"], n.get("tag_color", (255, 77, 64)), WHITE, 30)
-    # kicker + titular (con foto, el texto empieza más abajo)
-    y = 560 if n.get("photo") else 250
-    d.text((60, y), n["kicker"], font=P._font("Bold", 30), fill=n.get("accent", (255, 196, 0)))
-    y += 54
-    hf = _bebas(132)
-    for line in _wrap(d, n["headline"], hf, P.W - 120)[:3]:
+    photo = bool(n.get("photo"))
+    tf = P._font("Bold", 30)
+    tw = d.textlength(n["tag"], font=tf) + 44
+    _chip(d, P.W - 60 - tw, 70, n["tag"], n.get("tag_color", (255, 77, 64)), WHITE, 30)
+    if n.get("status") and photo:   # con foto, el estado va arriba, bajo la etiqueta
+        sw = d.textlength(n["status"], font=P._font("Bold", 24)) + 40
+        _chip(d, P.W - 60 - sw, 138, n["status"], n.get("status_color", (255, 196, 0)), (20, 16, 4), 24, 20)
+    # kicker + titular (con foto, el texto va en la mitad de abajo)
+    y = 600 if photo else 250
+    d.text((60, y), n["kicker"], font=P._font("Bold", 28 if photo else 30), fill=n.get("accent", (255, 196, 0)))
+    y += 50
+    hs, step = (112, 104) if photo else (132, 122)
+    hf = _bebas(hs)
+    for line in _wrap(d, n["headline"], hf, P.W - 120)[:2 if photo else 3]:
         d.text((60, y), line, font=hf, fill=WHITE)
-        y += 122
+        y += step
     if n.get("sub"):
-        sf = P._font("Medium", 34)
+        sf = P._font("Medium", 30 if photo else 34)
         for line in _wrap(d, n["sub"], sf, P.W - 120)[:2]:
             d.text((60, y + 6), line, font=sf, fill=(225, 230, 238))
-            y += 46
+            y += 42
     # tarjeta de datos
-    y += 34
-    ff = P._font("Medium", 31)
-    wrapped = [_wrap(d, f, ff, P.W - 200)[:2] for f in n["facts"]]
-    box_h = 56 + sum(40 * len(w) + 30 for w in wrapped)
+    y += 28
+    ff = P._font("Medium", 28 if photo else 31)
+    lh = 36 if photo else 40
+    facts = n["facts"][:2] if photo else n["facts"]
+    wrapped = [_wrap(d, f, ff, P.W - 200)[:2] for f in facts]
+    box_h = 50 + sum(lh * len(w) + 24 for w in wrapped)
     panel = Image.new("RGBA", im.size, (0, 0, 0, 0))
-    ImageDraw.Draw(panel).rounded_rectangle((48, y, P.W - 48, y + box_h), 28, fill=(10, 12, 18, 175))
+    ImageDraw.Draw(panel).rounded_rectangle((48, y, P.W - 48, y + box_h), 28, fill=(10, 12, 18, 185))
     im.alpha_composite(panel)
     d = ImageDraw.Draw(im)
-    yy = y + 36
+    yy = y + 32
     for lines in wrapped:
-        d.ellipse((80, yy + 13, 94, yy + 27), fill=n.get("accent", (255, 196, 0)))
+        d.ellipse((80, yy + 12, 94, yy + 26), fill=n.get("accent", (255, 196, 0)))
         for ln in lines:
             d.text((116, yy), ln, font=ff, fill=WHITE)
-            yy += 40
-        yy += 30
-    if n.get("status"):
+            yy += lh
+        yy += 24
+    if n.get("status") and not photo:
         _chip(d, 60, y + box_h + 30, n["status"], n.get("status_color", (255, 196, 0)), (20, 16, 4), 28)
-    _footer(im, d, n["source"])
+    _footer(im, d, n["source"], n.get("credit"))
     return P._jpeg(im)
 
 
