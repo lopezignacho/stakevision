@@ -144,9 +144,19 @@ def _end_card(frame: Image.Image, k: float) -> None:
     frame.alpha_composite(layer)
 
 
+def _ffmpeg() -> str:
+    """ffmpeg del sistema o, si no está, el que trae el paquete imageio-ffmpeg."""
+    import shutil
+    exe = shutil.which("ffmpeg")
+    if exe:
+        return exe
+    import imageio_ffmpeg
+    return imageio_ffmpeg.get_ffmpeg_exe()
+
+
 def _encode(make_frame, duration: float, path: str) -> None:
     n = int(duration * FPS)
-    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
+    cmd = [_ffmpeg(), "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}",
            "-r", str(FPS), "-i", "-", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-shortest",
            "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p", "-profile:v", "high",
            "-level", "4.1", "-c:a", "aac", "-b:a", "64k", "-movflags", "+faststart", path]
