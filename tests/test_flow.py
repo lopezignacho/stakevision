@@ -1009,23 +1009,6 @@ row = {"bookmakerOdds": {"betano": {"markets": {"m1": {"outcomes": {"o1": {"play
                                                                      "o2": {"players": {"0": {"price": 1.95}}}}}}}}}
 got = livebb._find_market(row, mk, sig[[s_["label"] for s_ in sig].index("Arsenal: más de 5.5 córners")])
 assert got and got[0] == 1.95 and 1.9 < got[1] < 2.0, got
-# NBA: el builder sale solo entre 40 y 25 min antes
-calls_bb = []
-_orig_send = main._builder_send
-main._builder_send = lambda st_, h, a, ko, lg, sp, quiet=False: calls_bb.append((h, a, sp)) or True
-ko_soon = store.now_utc() + timedelta(minutes=30)
-ko_late = store.now_utc() + timedelta(hours=3)
-nba._get = lambda path, **kw: ({"events": [
-    {"id": "e1", "date": main._iso(ko_soon), "competitions": [{"competitors": [
-        {"homeAway": "home", "team": {"displayName": "Boston Celtics"}}, {"homeAway": "away", "team": {"displayName": "New York Knicks"}}]}]},
-    {"id": "e2", "date": main._iso(ko_late), "competitions": [{"competitors": [
-        {"homeAway": "home", "team": {"displayName": "Miami Heat"}}, {"homeAway": "away", "team": {"displayName": "Orlando Magic"}}]}]}]}
-    if path == "/scoreboard" else {})
-st = store.load()
-main._nba_builders_pregame(st, store.now_utc())
-main._nba_builders_pregame(st, store.now_utc())
-assert calls_bb == [("Boston Celtics", "New York Knicks", "basketball")], calls_bb
-main._builder_send = _orig_send
 print("OK en vivo + builder NBA previo")
 
 
@@ -1206,12 +1189,14 @@ why = next(t for t in msgs if t and "Por qué lo elegí" in t)
 assert "#953" in why and "contradicen" in why and "más probable" in why, why
 print("OK top 3 + motivo del gratis")
 
-# 38) NBA: pronóstico sugerido ~30 min antes de cada partido (una consulta cubre varias horas)
+# 38) NBA (~70 min antes, en orden): previa → pronóstico A/B → Bet Builder; a los ~30 min, aviso si cambian las bajas
+from sv import nbadata as _nd  # noqa: E402
 st = store.load()
-st["nba_queue"], st.pop("nba_odds_until", None)
-tip1 = store.now_utc() + timedelta(minutes=32)
-tip2 = store.now_utc() + timedelta(hours=2)
-main._nba_events = lambda now: [("e1", tip1, "Boston Celtics", "New York Knicks"), ("e2", tip2, "Lakers", "Suns")]
+st["nba_queue"], st["nba_pre"] = [], {}
+st.pop("nba_odds_until", None)
+t0 = store.now_utc()
+tip1, tip2 = t0 + timedelta(minutes=70), t0 + timedelta(hours=3)
+main._nba_events = lambda now: [("e1", tip1, "Boston Celtics", "New York Knicks"), ("e2", tip2, "Los Angeles Lakers", "Phoenix Suns")]
 calls = []
 oddspapi.markets = lambda *a, **k: {}
 oddspapi.upcoming_fixtures = lambda frm, to, sport_id=10: [
@@ -1222,23 +1207,51 @@ def _obt(ids):
     return [{"fixtureId": "n1", "bookmakerOdds": {"a": {}, "b": {}}}, {"fixtureId": "n2", "bookmakerOdds": {"a": {}, "b": {}}}]
 oddspapi.odds_by_tournaments = _obt
 main.selections_for_fixture = lambda fx, row, m, sp="soccer": [fx["fixtureId"]]
+TEAMS = {"n1": ("Boston Celtics", "New York Knicks"), "n2": ("Los Angeles Lakers", "Phoenix Suns")}
 def _d(fid, ko_):
+    h, a = TEAMS[fid]
     return {"kind": "simple", "price": 1.8, "prob": 0.57, "edge": 0.03, "stake": 3, "tier": "valor", "kickoff": main._iso(ko_),
-            "legs": [{"fixture_id": fid, "home": "H" + fid, "away": "A" + fid, "kickoff": main._iso(ko_), "sport": "basketball",
-                      "label": "Gana H", "mtype": "moneyline", "outcome": "1", "price": 1.8, "fair_odds": 1.75, "edge": 0.03,
+            "legs": [{"fixture_id": fid, "home": h, "away": a, "kickoff": main._iso(ko_), "sport": "basketball",
+                      "label": "Gana " + h, "mtype": "moneyline", "outcome": "1", "price": 1.8, "fair_odds": 1.75, "edge": 0.03,
                       "market": "Ganador", "league": "NBA"}]}
 nba.options_for_game = lambda sels: ("a", None, "valor")
 main._nba_pick_dict = lambda fx, a, b, t: _d(fx["fixtureId"], store.parse_ts(fx["startTime"]))
-nba.context = lambda *a, **k: None
+def _team(nm, home):
+    return {"name": nm, "record": "3-2", "games": [{"pf": 110, "pa": 100, "home": home, "season": 2027, "date": "2026-10-20"}] * 6,
+            "injuries": [{"name": "Star Player", "status": "Out", "key": False, "type": ""}], "rest_days": 2.0, "espn_prob": 0.6 if home else 0.4,
+            "home_rec": "", "road_rec": ""}
+nba.context = lambda h, a, k: {"home": _team(h, True), "away": _team(a, False), "inverted": False}
+nba._news_for = lambda ctx, hours=48: []
+KEY = {"on": False}
+def _ka(ctx, ko):
+    if ctx:
+        for s_ in ("home", "away"):
+            ctx[s_]["key_out"] = [{"name": "Star Player", "pts": 24.5, "min": 34}] if (KEY["on"] and s_ == "away") else []
+_nd.key_absences = _ka
 main.nba_candidate_text = lambda d: f"NBA candidato {d['legs'][0]['home']}"
-main._nba_picks_pregame(st, store.now_utc())
-assert len(calls) == 1 and any("NBA candidato Hn1" in t for ch, t, *_ in sent if ch == OWNER)
-assert [q["legs"][0]["fixture_id"] for q in st["nba_queue"]] == ["n2"]
-# 90 min después le toca al segundo, sin volver a consultar cuotas
-main._nba_events = lambda now: [("e2", tip2, "Lakers", "Suns")]
-main._nba_picks_pregame(st, tip2 - timedelta(minutes=33))
-assert len(calls) == 1 and any("NBA candidato Hn2" in t for ch, t, *_ in sent if ch == OWNER) and not st["nba_queue"]
-print("OK NBA sugerido antes de cada partido")
+_orig_bb = main._builder_send
+main._builder_send = lambda st_, h, a, ko, lg, sp, quiet=False: sent.append((OWNER, f"BUILDER {h}")) or True
+n = len(sent)
+main._nba_owner_flow(st, t0)
+seq = [t for ch, t, *_ in sent[n:] if ch == OWNER]
+assert len(calls) == 1 and len(seq) == 3, seq
+assert "PREVIA" in seq[0] and seq[1] == "NBA candidato Boston Celtics" and seq[2] == "BUILDER Boston Celtics", seq
+main._nba_owner_flow(st, t0)                                  # no se repite
+assert len([t for ch, t, *_ in sent[n:] if ch == OWNER]) == 3
+# ~35 min antes: aparece una baja importante nueva → aviso
+KEY["on"] = True
+n = len(sent)
+main._nba_owner_flow(st, tip1 - timedelta(minutes=30))
+alert = [t for ch, t, *_ in sent[n:] if ch == OWNER]
+assert len(alert) == 1 and "Cambio de último minuto" in alert[0] and "Star Player" in alert[0] and "pick #" in alert[0], alert
+# el segundo partido, a su hora, sin volver a consultar cuotas
+KEY["on"] = False
+n = len(sent)
+main._nba_owner_flow(st, tip2 - timedelta(minutes=70))
+seq = [t for ch, t, *_ in sent[n:] if ch == OWNER]
+assert len(calls) == 1 and "PREVIA" in seq[0] and seq[1] == "NBA candidato Los Angeles Lakers" and seq[2].startswith("BUILDER"), seq
+main._builder_send = _orig_bb
+print("OK NBA previa → pronóstico → builder + aviso de bajas")
 
 # 39) formato simple del pick y corrección del gratis de hoy (canales + Instagram)
 from sv import argument as _arg  # noqa: E402

@@ -504,3 +504,47 @@ def pregame(pick: dict, minutes: int, ctx: dict | None = None) -> str | None:
         lines += ["", "📰 <b>Últimas noticias</b> (ESPN, en inglés)"] + [f"• {esc(h)}" for h in news]
     lines += ["", "Exclusivo VIP 👑 · 🔞 +18 · Juega con responsabilidad."]
     return "\n".join(lines)
+
+
+def owner_previa(ctx: dict, minutes: int) -> str:
+    """Previa para el dueño, ANTES del pronóstico: bajas (con aviso si falta alguien importante), forma,
+    pronóstico de ESPN y noticias. ctx con key_out (nbadata.key_absences)."""
+    esc = formatting.escape
+    H, A = ctx["home"], ctx["away"]
+    rec = lambda t: f" ({t['record']})" if t.get("record") else ""  # noqa: E731
+    lines = [f"🏀 <b>PREVIA · faltan {minutes} min</b>", f"<b>{esc(H['name'])}</b>{rec(H)} vs <b>{esc(A['name'])}</b>{rec(A)}", ""]
+    key = [(T, x) for T in (H, A) for x in T.get("key_out") or []]
+    if key:
+        lines.append("⚠️ <b>Bajas importantes:</b> " + "; ".join(
+            f"{esc(T['name'])} sin {esc(x['name'])} ({str(x['pts']).replace('.', ',')} pts, {x['min']} min por partido)"
+            for T, x in key))
+        lines.append("")
+    lines.append("🚑 <b>Bajas y dudas</b>")
+    keyn = {x["name"].lower() for _T, x in key}
+    for T in (H, A):
+        rows = [i for i in T.get("injuries") or [] if (i.get("status") or "").lower() in STATUS_ES]
+        if not rows:
+            lines.append(f"• {esc(T['name'])}: sin bajas reportadas.")
+            continue
+        rows.sort(key=lambda i: (i["name"].lower() not in keyn, list(STATUS_ES).index(i["status"].lower())))
+        lines.append(f"• {esc(T['name'])}: " + "; ".join(
+            f"{esc(i['name'])}{' ⭐' if i['name'].lower() in keyn else ''} — {STATUS_ES[i['status'].lower()]}"
+            for i in rows[:5]))
+    lines += ["", "📊 <b>Cómo llegan</b>"]
+    for T in (H, A):
+        f = _form(T)
+        if not f["n"]:
+            continue
+        rest = T.get("rest_days")
+        rest_txt = (" · jugó anoche ⚠️" if rest is not None and rest < 1.6
+                    else f" · {rest:.0f} días de descanso" if rest is not None else "")
+        lines.append(f"• {esc(T['name'])}: {f['w']}-{f['n'] - f['w']} en sus últimos {f['n']}, "
+                     f"anota {f['pf']:.0f} y recibe {f['pa']:.0f}{rest_txt}" + (f" · {f['streak']}" if f["streak"] else ""))
+    if H.get("espn_prob") or A.get("espn_prob"):
+        fav = H if (H.get("espn_prob") or 0) >= (A.get("espn_prob") or 0) else A
+        lines.append(f"🔮 ESPN favorece a {esc(fav['name'])} ({formatting.pct(fav['espn_prob'])}).")
+    news = _news_for(ctx)
+    if news:
+        lines += ["", "📰 <b>Noticias</b> (ESPN, en inglés)"] + [f"• {esc(h)}" for h in news]
+    lines += ["", "Ahora te llegan el pronóstico sugerido y el Bet Builder de este partido 👇"]
+    return "\n".join(lines)

@@ -2154,13 +2154,14 @@ def _nba_pick_dict(fx, a, b, tier) -> dict:
     return d
 
 
-def _nba_enrich(d: dict, ctx: dict | None) -> None:
+def _nba_enrich(d: dict, ctx: dict | None, skip_absences: bool = False) -> None:
     """Contexto, bajas que pesan y contraste con datos para la opción A y la B."""
     from . import nbadata
-    try:
-        nbadata.key_absences(ctx, d["legs"][0]["kickoff"])
-    except Exception:
-        traceback.print_exc()
+    if not skip_absences:
+        try:
+            nbadata.key_absences(ctx, d["legs"][0]["kickoff"])
+        except Exception:
+            traceback.print_exc()
     for x in (d, d.get("alt")):
         if x:
             x["legs"][0]["nba_ctx"] = ctx
@@ -2168,15 +2169,15 @@ def _nba_enrich(d: dict, ctx: dict | None) -> None:
             x["analysis"] = formatting.analysis(x)
 
 
-def _nba_send_candidate(state: dict, d: dict, now) -> None:
+def _nba_send_candidate(state: dict, d: dict, now, ctx: dict | None = None) -> None:
     from . import nba
     l = d["legs"][0]
-    ctx = None
-    try:
-        ctx = nba.context(l["home"], l["away"], l["kickoff"])   # bajas confirmadas a esta hora
-    except Exception:
-        traceback.print_exc()
-    _nba_enrich(d, ctx)
+    if ctx is None:
+        try:
+            ctx = nba.context(l["home"], l["away"], l["kickoff"])   # bajas confirmadas a esta hora
+        except Exception:
+            traceback.print_exc()
+    _nba_enrich(d, ctx, skip_absences=bool(ctx and any("key_out" in ctx[s_] for s_ in ("home", "away"))))
     contra = lambda x: (x["legs"][0].get("nba_ev") or {}).get("verdict") == "contra"  # noqa: E731
     if contra(d) and d.get("alt") and not contra(d["alt"]):
         alt = d.pop("alt")            # la B pasa a ser la sugerencia: la A va contra los datos
@@ -2199,73 +2200,132 @@ def _nba_send_candidate(state: dict, d: dict, now) -> None:
     state["picks"][pid] = d
 
 
-def _nba_picks_pregame(state: dict, now) -> None:
-    """Pronóstico NBA sugerido de cada partido, ~30 min antes (junto con su Bet Builder).
-    Una sola consulta de cuotas cubre los partidos de las próximas horas; cada uno se te envía a su hora."""
-    if not state.get("owner_chat") or not config.NBA_ENABLED or not config.NBA_PREGAME_PICKS:
-        return
+def _nba_cover_odds(state: dict, now) -> None:
+    """Una consulta de cuotas cubre los partidos de las próximas horas: deja en cola la opción A/B de cada uno
+    (o una marca de «sin opción») para entregarla junto a la previa de su partido."""
     from . import nba
-    lo, hi = config.NBA_BUILDER_BEFORE_MIN
     queue = state.setdefault("nba_queue", [])
-    until = state.get("nba_odds_until")
-    due = [ko for _id, ko, _h, _a in _nba_events(now) if ko - timedelta(minutes=hi) <= now <= ko - timedelta(minutes=lo)]
-    if due and not (until and max(due) <= store.parse_ts(until)):
-        frm, to = now, now + timedelta(hours=config.NBA_PICKS_LOOKAHEAD_H)
-        markets = oddspapi.markets(sport_id=config.NBA_SPORT_ID)
-        fixtures = oddspapi.upcoming_fixtures(_iso(frm), _iso(to), sport_id=config.NBA_SPORT_ID)
-        by_id = {f["fixtureId"]: f for f in fixtures if f.get("tournamentId") == config.NBA_TOURNAMENT
-                 and frm <= store.parse_ts(f["startTime"]) <= to}
-        busy = {l.get("fixture_id") for p in state["picks"].values() for l in p["legs"]
-                if p["status"] in ("candidate", "selected", "published")}
-        busy |= {q["legs"][0].get("fixture_id") for q in queue}
-        none = []
-        rows = oddspapi.odds_by_tournaments([config.NBA_TOURNAMENT]) if by_id else []
-        state["nba_odds_until"] = _iso(to)   # cubierto (si la consulta falla, se reintenta en la próxima revisión)
-        if rows:
-            for row in rows:
-                fx = by_id.get(row.get("fixtureId"))
-                if not fx or fx["fixtureId"] in busy:
-                    continue
-                opt = (nba.options_for_game(selections_for_fixture(fx, row, markets, "basketball"))
-                       if len(row.get("bookmakerOdds") or {}) >= 2 else None)
-                if opt:
-                    queue.append(_nba_pick_dict(fx, *opt))
-                else:
-                    none.append(f"{fx.get('participant1Name')} vs {fx.get('participant2Name')}")
-        if none:
-            telegram.send(state["owner_chat"], "🏀 Sin pronóstico NBA (ninguna cuota en "
-                          f"{config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f} cerca de la justa): "
-                          + "; ".join(formatting.escape(x) for x in none) + ". El Bet Builder sí te llega.")
-    keep = []
-    for d in queue:
-        ko = store.parse_ts(d["kickoff"])
-        if now >= ko - timedelta(minutes=5):
-            continue   # ya empezó: se descarta
-        if now >= ko - timedelta(minutes=hi):
-            try:
-                _nba_send_candidate(state, d, now)
-            except Exception:
-                traceback.print_exc()
+    frm, to = now, now + timedelta(hours=config.NBA_PICKS_LOOKAHEAD_H)
+    markets = oddspapi.markets(sport_id=config.NBA_SPORT_ID)
+    fixtures = oddspapi.upcoming_fixtures(_iso(frm), _iso(to), sport_id=config.NBA_SPORT_ID)
+    by_id = {f["fixtureId"]: f for f in fixtures if f.get("tournamentId") == config.NBA_TOURNAMENT
+             and frm <= store.parse_ts(f["startTime"]) <= to}
+    busy = {l.get("fixture_id") for p in state["picks"].values() for l in p["legs"]
+            if p["status"] in ("candidate", "selected", "published")}
+    busy |= {(q.get("legs") or [q])[0].get("fixture_id") for q in queue}
+    rows = oddspapi.odds_by_tournaments([config.NBA_TOURNAMENT]) if by_id else []
+    state["nba_odds_until"] = _iso(to)   # cubierto (si la consulta falla, se reintenta en la próxima revisión)
+    for row in rows:
+        fx = by_id.get(row.get("fixtureId"))
+        if not fx or fx["fixtureId"] in busy:
             continue
-        keep.append(d)
-    state["nba_queue"] = keep
+        opt = (nba.options_for_game(selections_for_fixture(fx, row, markets, "basketball"))
+               if len(row.get("bookmakerOdds") or {}) >= 2 else None)
+        queue.append(_nba_pick_dict(fx, *opt) if opt else
+                     {"none": True, "fixture_id": fx["fixtureId"], "home": fx.get("participant1Name") or "",
+                      "away": fx.get("participant2Name") or "", "kickoff": fx["startTime"]})
 
 
-def _nba_builders_pregame(state: dict, now) -> None:
-    """Bet Builder NBA de cada partido, entre 40 y 25 min antes (con las lesiones ya confirmadas)."""
-    if not state.get("owner_chat") or not config.NBA_ENABLED:
+def _nba_take(state: dict, ko, h: str, a: str) -> dict | None:
+    """Saca de la cola la entrada del partido (por hora y nombres de los equipos)."""
+    queue = state.get("nba_queue") or []
+    for q in queue:
+        l = (q.get("legs") or [q])[0]
+        if abs((store.parse_ts(q["kickoff"]) - ko).total_seconds()) > 20 * 60:
+            continue
+        names = (l.get("home") or "", l.get("away") or "")
+        if any(_name_hit(h, n) for n in names) and any(_name_hit(a, n) for n in names):
+            queue.remove(q)
+            return q
+    return None
+
+
+def _ctx_for(ctx: dict | None, home: str) -> dict | None:
+    """El contexto de ESPN en el orden local/visita del pick (OddsPapi puede tenerlos al revés)."""
+    if not ctx or _name_hit(home, ctx["home"]["name"]):
+        return ctx
+    return dict(ctx, home=ctx["away"], away=ctx["home"])
+
+
+def _nba_owner_flow(state: dict, now) -> None:
+    """NBA, para cada partido y en este orden (todo a ti, ~70 min antes):
+    1) previa: bajas (con aviso si falta alguien importante), forma, ESPN y noticias;
+    2) pronóstico sugerido (opción A y B) armado con esas bajas;
+    3) Bet Builder.
+    Con eso decides y la apuesta va al VIP. A los ~30 min se revisan de nuevo las bajas y te aviso si cambió algo."""
+    owner = state.get("owner_chat")
+    if not owner or not config.NBA_ENABLED or not config.NBA_PREGAME_PICKS:
         return
-    lo, hi = config.NBA_BUILDER_BEFORE_MIN
-    done = state.setdefault("bb_nba_done", [])
-    for eid, ko, h, a in _nba_events(now):
-        if eid in done or not (ko - timedelta(minutes=hi) <= now <= ko - timedelta(minutes=lo)):
-            continue
-        done.append(eid)
+    from . import nba, nbadata
+    lo, hi = config.NBA_OWNER_BEFORE_MIN
+    done = state.setdefault("nba_pre", {})
+    events = _nba_events(now)
+    due = [(eid, ko, h, a) for eid, ko, h, a in events
+           if eid not in done and ko - timedelta(minutes=hi) <= now <= ko - timedelta(minutes=lo)]
+    until = state.get("nba_odds_until")
+    if due and not (until and max(ko for _e, ko, _h, _a in due) <= store.parse_ts(until)):
         try:
+            _nba_cover_odds(state, now)
+        except Exception:
+            traceback.print_exc()
+    for eid, ko, h, a in due:
+        done[eid] = {"ko": _iso(ko), "key": [], "rechecked": False}
+        mins = int((ko - now).total_seconds() // 60)
+        ctx = None
+        try:   # 1) previa
+            ctx = nba.context(h, a, _iso(ko))
+            nbadata.key_absences(ctx, _iso(ko))
+            if ctx:
+                done[eid]["key"] = [x["name"] for s_ in ("home", "away") for x in ctx[s_].get("key_out") or []]
+                telegram.send(owner, nba.owner_previa(ctx, mins))
+        except Exception:
+            traceback.print_exc()
+        try:   # 2) pronóstico A/B
+            q = _nba_take(state, ko, h, a)
+            if q and not q.get("none"):
+                _nba_send_candidate(state, q, now, _ctx_for(ctx, q["legs"][0]["home"]))
+            else:
+                why = ("ninguna cuota en " f"{config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f} cerca de la justa" if q
+                       else "no encontré sus cuotas")
+                telegram.send(owner, f"🏀 {formatting.escape(a)} @ {formatting.escape(h)}: sin pronóstico sugerido ({why}).")
+        except Exception:
+            traceback.print_exc()
+        try:   # 3) Bet Builder
             _builder_send(state, h, a, _iso(ko), "USA · NBA", "basketball", quiet=True)
         except Exception:
             traceback.print_exc()
-    del done[:-200]
+    # Revisión de bajas a ~30 min: solo te escribo si apareció una baja importante nueva
+    rlo, rhi = config.NBA_INJURY_RECHECK_MIN
+    for eid, ko, h, a in events:
+        info = done.get(eid)
+        if not info or info.get("rechecked") or not (ko - timedelta(minutes=rhi) <= now <= ko - timedelta(minutes=rlo)):
+            continue
+        info["rechecked"] = True
+        try:
+            ctx = nba.context(h, a, _iso(ko))
+            nbadata.key_absences(ctx, _iso(ko))
+        except Exception:
+            traceback.print_exc()
+            continue
+        if not ctx:
+            continue
+        new = [(ctx[s_]["name"], x) for s_ in ("home", "away") for x in ctx[s_].get("key_out") or []
+               if x["name"] not in info["key"]]
+        if not new:
+            continue
+        mine = [p for p in state["picks"].values() if p.get("sport") == "basketball" and p["status"] in ("candidate", "selected", "published")
+                and abs((store.parse_ts(p["kickoff"]) - ko).total_seconds()) < 1200
+                and _name_hit(h, p["legs"][0]["home"] + " " + p["legs"][0]["away"])]
+        txt = (f"⚠️ <b>Cambio de último minuto · {formatting.escape(a)} @ {formatting.escape(h)}</b>\n"
+               + "\n".join(f"• {formatting.escape(t)} no tendrá a {formatting.escape(x['name'])} "
+                            f"({str(x['pts']).replace('.', ',')} pts por partido)" for t, x in new))
+        if mine:
+            txt += "\n\n" + "\n".join(f"Tu pick #{p['id']} ({'publicado' if p['status'] == 'published' else 'sin publicar'}): "
+                                       "revisa si sigue valiendo antes del inicio." for p in mine)
+        telegram.send(owner, txt)
+    for eid in [k for k, v in done.items() if store.parse_ts(v["ko"]) < now - timedelta(hours=12)]:
+        done.pop(eid)
+    state["nba_queue"] = [q for q in state.get("nba_queue") or [] if store.parse_ts(q["kickoff"]) > now]
 
 
 def _live_builders(state: dict) -> None:
@@ -3471,7 +3531,7 @@ def poll() -> None:
     _migrate_stakes(state, now)
     _refresh_recap_texts(state)
     _nba_daily(state)
-    for fn in (_nba_picks_pregame, _nba_builders_pregame, lambda st, _now: _live_builders(st)):
+    for fn in (_nba_owner_flow, lambda st, _now: _live_builders(st)):
         try:
             fn(state, now)
         except Exception:
