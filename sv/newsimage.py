@@ -66,14 +66,29 @@ def _footer(im, d, source: str):
     d.text((P.W - 60 - tw, y + 10), "@" + P.INSTAGRAM, font=ig, fill=WHITE, anchor="lm")
 
 
+def _photo_backdrop(photo: bytes, colors, focus=None) -> Image.Image:
+    """Foto arriba a todo ancho que se funde hacia abajo con los colores del equipo (el texto queda legible)."""
+    base = _backdrop(*colors)
+    ph_h = 820
+    ph = P._enhance(P._cover(photo, (P.W, ph_h), focus=focus)).convert("RGBA")
+    mask = Image.linear_gradient("L").resize((P.W, ph_h)).point(lambda v: int(255 - max(0, v - 70) * 255 / 185))
+    base.paste(ph, (0, 0), mask)
+    shade = Image.new("RGBA", (P.W, H), (0, 0, 0, 0))   # sombra arriba para el logo
+    top = Image.linear_gradient("L").resize((P.W, 260)).point(lambda v: int((255 - v) * 0.55))
+    shade.paste(Image.new("RGBA", (P.W, 260), (0, 0, 0, 255)), (0, 0), top)
+    base.alpha_composite(shade)
+    return base
+
+
 def render_news(n: dict) -> bytes:
-    """n = {tag, tag_color, colors:[c1,c2], kicker, headline, sub, facts:[...], status, status_color, source}"""
-    im = _backdrop(*n["colors"])
+    """n = {tag, tag_color, colors:[c1,c2], kicker, headline, sub, facts:[...], status, status_color, source,
+    photo (bytes, opcional), photo_focus, credit}"""
+    im = _photo_backdrop(n["photo"], n["colors"], n.get("photo_focus")) if n.get("photo") else _backdrop(*n["colors"])
     d = ImageDraw.Draw(im)
     P._put_logo(im, 300, "dark", 60, 54)
     _chip(d, P.W - 60 - 290, 70, n["tag"], n.get("tag_color", (255, 77, 64)), WHITE, 30)
-    # kicker + titular
-    y = 250
+    # kicker + titular (con foto, el texto empieza más abajo)
+    y = 560 if n.get("photo") else 250
     d.text((60, y), n["kicker"], font=P._font("Bold", 30), fill=n.get("accent", (255, 196, 0)))
     y += 54
     hf = _bebas(132)
