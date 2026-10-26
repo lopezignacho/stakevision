@@ -73,9 +73,9 @@ def candidates(name: str, limit: int = 30, team: bool = False, query: str | None
     return out
 
 
-def photo(name: str, team: bool = False) -> tuple[bytes, dict] | None:
+def photo(name: str, team: bool = False, sport: str = "soccer") -> tuple[bytes, dict] | None:
     """(jpeg, crédito) de la mejor foto libre del jugador (o del equipo), o None."""
-    for c in candidates(name, team=team)[:3]:
+    for c in [c for c in candidates(name, team=team) if sport_ok(c, sport, need_word=team)][:3]:
         try:
             r = requests.get(c["url"], headers=UA, timeout=40)
             if r.ok and len(r.content) > 20000:
@@ -117,7 +117,7 @@ NATIONAL = ("national", "seleccion", "selección", "world cup", "copa mundial", 
             "canada", "japan", "cote", "ivoire", "morocco", "senegal", "nigeria", "cameroon", "ghana", "australia")
 
 
-def player_candidates(name: str, teams: list[str], since: int = 0) -> list[dict]:
+def player_candidates(name: str, teams: list[str], since: int = 0, sport: str = "soccer") -> list[dict]:
     """Fotos del jugador con la camiseta de SU club: que el club aparezca en el título, la descripción o
     las categorías, que sea de cuando ya jugaba ahí y que no sea con su selección."""
     from datetime import date
@@ -143,6 +143,8 @@ def player_candidates(name: str, teams: list[str], since: int = 0) -> list[dict]
                                                 "eurobasket", "fiba", "copa america", "copa américa"))
         if not c["year"] or c["year"] < since:
             continue   # de antes de llegar al club: puede tener otra camiseta
+        if not sport_ok(c, sport):
+            continue   # otro deporte, o un equipo femenino/juvenil del mismo club
         c["team_hit"] = bool(toks & words_t) or bool(toks & words_all)
         c["title_hit"] = bool(toks & words_t)
         out.append(c)
@@ -161,9 +163,10 @@ def _download(c: dict) -> tuple[bytes, dict] | None:
     return None
 
 
-def player_photo(name: str, teams: list[str], since: int = 0, need_team: bool = True) -> tuple[bytes, dict] | None:
+def player_photo(name: str, teams: list[str], since: int = 0, need_team: bool = True,
+                 sport: str = "soccer") -> tuple[bytes, dict] | None:
     """(jpeg, crédito) del jugador con la camiseta de su club; o None."""
-    for c in player_candidates(name, teams, since)[:6]:
+    for c in player_candidates(name, teams, since, sport)[:6]:
         if need_team and not c["team_hit"]:
             continue
         if not c["team_hit"] and c.get("national"):
@@ -176,7 +179,46 @@ def player_photo(name: str, teams: list[str], since: int = 0, need_team: bool = 
     return None
 
 
-def team_photo(team: str) -> tuple[bytes, dict] | None:
+# ---------------------------------------------------------------- deporte correcto (nunca una foto de otro deporte)
+OTHER_SPORTS = {
+    "soccer": ("basketball", "baloncesto", "basquetbol", "basquet", "basket", "volleyball", "voleibol", "volley",
+               "handball", "balonmano", "futsal", "futbol sala", "rugby", "hockey", "tennis", "tenis", "waterpolo",
+               "water polo", "baseball", "beisbol", "esports", "e-sports", "boxing", "boxeo", "athletics", "atletismo",
+               "swimming", "natacion", "cycling", "ciclismo", "nba", "fiba", "liga nacional de basquetbol"),
+    "basketball": ("football", "futbol", "soccer", "fussball", "calcio", "volleyball", "voleibol", "handball",
+                   "rugby", "hockey", "tennis", "baseball", "wnba"),
+}
+# Nuestros picks son de competencias masculinas: fotos de equipos femeninos o juveniles, no.
+NOT_MEN = ("women", "woman", "womens", "femenin", "femenil", "feminin", "ladies", "mujeres", "girls", "u17", "u-17",
+           "u19", "u-19", "u20", "u-20", "u21", "u-21", "u23", "sub 17", "sub-17", "sub 20", "sub-20", "sub 21",
+           "sub-21", "youth", "juvenil", "juveniles", "academy", "academia", "cadete")
+SPORT_WORDS = {"soccer": ("football", "futbol", "soccer", "fussball", "calcio", "futebol", "voetbal"),
+               "basketball": ("basketball", "baloncesto", "basquetbol", "nba")}
+
+
+def _blob(c: dict) -> str:
+    return f" {_plain(c.get('title', ''))} {c.get('desc', '')} {c.get('cats', '')} "
+
+
+def sport_ok(c: dict, sport: str | None, need_word: bool = False) -> bool:
+    """¿La foto es del deporte del pick (y no de un equipo femenino o juvenil)? need_word: además debe
+    nombrar el deporte (para fotos de club, donde el nombre del club solo no basta: la U tiene básquetbol)."""
+    if not sport:
+        return True
+    blob = _blob(c)
+    words = set(re.split(r"[^a-z0-9]+", blob))
+    def has(term):
+        return (term in words) if " " not in term and "-" not in term else (term in blob)
+    if any(has(w) or (len(w) > 5 and w in blob) for w in OTHER_SPORTS.get(sport, ())):
+        return False
+    if any(has(w) or (len(w) > 5 and w in blob) for w in NOT_MEN):
+        return False
+    if need_word and not any(w in blob for w in SPORT_WORDS.get(sport, ())):
+        return False
+    return True
+
+
+def team_photo(team: str, sport: str = "soccer") -> tuple[bytes, dict] | None:
     """Foto reciente de un partido, el estadio o la hinchada del club (nunca entradas, afiches ni escudos)."""
     from datetime import date
     this_year = date.today().year
@@ -184,6 +226,8 @@ def team_photo(team: str) -> tuple[bytes, dict] | None:
         t = f" {_plain(c['title'])} "
         if _BAD_RE.search(t) or not c["year"] or c["year"] < this_year - 4 or "unknown author" in _plain(c["author"]):
             continue
+        if not sport_ok(c, sport, need_word=True):
+            continue   # p. ej. «Universidad de Chile» también es básquetbol y fútbol femenino
         got = _download(c)
         if got:
             return got

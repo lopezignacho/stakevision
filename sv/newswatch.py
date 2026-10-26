@@ -183,7 +183,8 @@ def _render(item: dict) -> tuple[bytes, str | None, dict]:
         if item.get("photo_file"):
             got = commons.file_photo(item["photo_file"])
         elif item.get("player"):
-            got = commons.player_photo(item["player"], item.get("teams") or [], need_team=True)
+            got = commons.player_photo(item["player"], item.get("teams") or [], need_team=True,
+                                       sport=item.get("sport") or ("basketball" if "NBA" in item.get("kicker", "") else "soccer"))
         if got:
             photo = got[0]
             cr = got[1] or {}

@@ -384,6 +384,7 @@ _Image.new("RGB", (800, 1100), (40, 90, 160)).save(buf, "JPEG")
 espn.match_report = lambda *a, **k: rep_
 commons.photo = lambda name: (buf.getvalue(), {"author": "Autor", "license": "CC BY-SA 4.0", "page": "x",
                                                "text": "Foto: Autor / Wikimedia Commons · CC BY-SA 4.0 · modificada"})
+commons.team_photo = lambda team, sport="soccer": commons.photo(team)   # foto de partido del club (fútbol)
 st = store.load()
 pr = st["picks"][p6["id"]]
 pr.update(status="published", result=None)
@@ -1428,3 +1429,17 @@ main._instagram_queue(st, store.now_utc())
 assert pr["ig_res_status"] == "posted"                                       # paso 2: publicado
 config.IG_REELS = False
 print("OK Reels")
+
+
+# 43) fotos: nunca de otro deporte ni de equipos femeninos/juveniles del mismo club
+from sv import commons as _cm  # noqa: E402
+bad = {"title": "File:Universidad de Chile vs Obras Basket - Women's League Americas 2025.jpg", "desc": "partido de baloncesto",
+       "cats": "basketball in chile"}
+fem = {"title": "File:Universidad de Chile femenino 2025.jpg", "desc": "futbol femenino", "cats": "women's association football"}
+okf = {"title": "File:Universidad de Chile vs Colo-Colo 2025.jpg", "desc": "partido de futbol", "cats": "football in chile"}
+nameonly = {"title": "File:Universidad de Chile 2025.jpg", "desc": "", "cats": ""}
+nbaf = {"title": "File:Jalen Williams OKCThunder 2025 NBA Cup.jpg", "desc": "at 2025 nba cup", "cats": ""}
+assert not _cm.sport_ok(bad, "soccer", True) and not _cm.sport_ok(fem, "soccer", True)
+assert _cm.sport_ok(okf, "soccer", True) and not _cm.sport_ok(nameonly, "soccer", True)
+assert _cm.sport_ok(nbaf, "basketball") and not _cm.sport_ok(nbaf, "soccer")
+print("OK fotos del deporte correcto")

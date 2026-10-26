@@ -1913,8 +1913,8 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
         if who:
             from . import matchphoto
             t = rep.get(who.get("side")) or {}
-            photo = (matchphoto.for_scorer(who["full"], [x for x in (t.get("name"), t.get("short")) if x])
-                     or commons.team_photo(t.get("name") or "") or commons.photo(who["full"]))
+            photo = (matchphoto.for_scorer(who["full"], [x for x in (t.get("name"), t.get("short")) if x], "soccer")
+                     or commons.team_photo(t.get("name") or "", "soccer"))   # sin foto segura: colores del equipo
     data = recap.build(p, rep, photo, old.get("custom_title"))
     data["credit"] = photo[1]["text"] if photo and photo[1] else None
     from . import layouts
@@ -2624,6 +2624,77 @@ def _recap_share(state: dict, p: dict, where: str) -> None:
         telegram.send(chat, text)
 
 
+def _recap_fix(state: dict, p: dict) -> list[str]:
+    """Rehace el postpartido de un pick (otra foto, mismo resumen) y lo corrige donde ya salió:
+    edita la imagen en VIP/Gratis y prepara el Reel nuevo para Instagram."""
+    notes = []
+    r = p.get("recap") or {}
+    old_reel = r.pop("reel", None)
+    if r.get("photo_src") != "user":
+        r.pop("credit", None)
+    if not _recap(state, p, reuse=True):
+        return ["⚠️ No pude rehacer el postpartido (ESPN no respondió). Reintenta en unos minutos."]
+    r = p["recap"]
+    with open(_recap_file(p), "rb") as f:
+        image = f.read()
+    for where, mid in (r.get("msgs") or {}).items():
+        chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
+        name = "VIP" if where == "vip" else "Gratis"
+        cap = r["tg"] if formatting.caption_fits(r["tg"]) else None
+        if telegram.edit_photo(chat, mid, image, cap):
+            notes.append(f"{name}: imagen corregida (mismo mensaje)")
+        else:
+            notes.append(f"⚠️ {name}: no pude editar la imagen; bórrala y compártela de nuevo desde el panel")
+    from . import instagram
+    if r.get("reel") and old_reel and r["reel"] == old_reel:   # nombre nuevo: que Instagram no use la versión vieja
+        new_key = f"{old_reel}-v{int(store.now_utc().timestamp())}"
+        os.replace(instagram.video_path(old_reel), instagram.video_path(new_key))
+        r["reel"] = new_key
+    st_ = p.get("ig_res_status")
+    p.pop("ig_res_job", None)
+    if st_ == "queued":
+        notes.append("Instagram: aún no salía; saldrá el Reel corregido")
+    elif st_ == "posted":
+        owner = state.get("owner_chat")
+        if owner and r.get("reel"):
+            with open(instagram.video_path(r["reel"]), "rb") as f:
+                msg = telegram.send_video(owner, f.read(), caption=f"🎬 <b>Reel corregido · pick #{p['id']}</b>\n"
+                                          "Instagram no deja al bot borrar publicaciones: borra el Reel anterior desde la app "
+                                          "y toca «Publicar versión nueva».")
+            telegram.set_buttons(owner, msg["message_id"], [[("📸 Publicar versión nueva", f"rp:{p['id']}")],
+                                                            [("Dejar Instagram como está", f"ipn:{p['id']}")]])
+            notes.append("Instagram: te mandé el Reel corregido con el botón para publicarlo")
+    return notes
+
+
+def _recap_fix_file(state: dict) -> None:
+    """data/recap_fix.json ({"id": "...", "pid": "117"}): rehace y corrige un postpartido ya compartido, una vez."""
+    import json
+    path = os.path.join(config.ROOT, "data", "recap_fix.json")
+    owner = state.get("owner_chat")
+    if not os.path.exists(path) or not owner:
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("recap_fix_done") or []):
+        return
+    state.setdefault("recap_fix_done", []).append(req["id"])
+    p = state["picks"].get(str(req.get("pid", "")).lstrip("#"))
+    if not p:
+        telegram.send(owner, "⚠️ No encontré el pick para corregir su postpartido.")
+        return
+    try:
+        notes = _recap_fix(state, p)
+    except Exception as e:  # noqa: BLE001
+        traceback.print_exc()
+        notes = [f"⚠️ falló la corrección: {e}"]
+    telegram.send(owner, f"🔧 <b>Postpartido del pick #{p['id']} corregido</b> (la foto no era del partido)\n"
+                  + "\n".join(f"• {formatting.escape(n)}" for n in notes))
+
+
 def _revoke_command(state: dict, text: str) -> None:
     owner = state["owner_chat"]
     name = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
@@ -3209,6 +3280,16 @@ def _handle_update(state: dict, u: dict) -> None:
             telegram.answer(cb["id"], "Se publica en Instagram en unos minutos")
         telegram.set_buttons(owner, cb["message"]["message_id"], RECAP_BUTTONS(p))
 
+    elif action == "rp":   # Reel corregido del postpartido (tras borrar el anterior)
+        if p.get("ig_res_status") == "queued":
+            telegram.answer(cb["id"], "Ya está en cola")
+        else:
+            p["ig_res_status"] = "queued"
+            p.pop("ig_res_job", None)
+            p.pop("ig_res_tries", None)
+            telegram.edit_buttons_off(owner, cb["message"]["message_id"], "⏳ Se publica en Instagram en unos minutos")
+            telegram.answer(cb["id"], "Se publica en unos minutos")
+
     elif action in ("ip", "ipn"):   # versión nueva del pick en Instagram (tras borrar la antigua)
         if action == "ipn":
             telegram.edit_buttons_off(owner, cb["message"]["message_id"], "Instagram queda como está")
@@ -3574,6 +3655,7 @@ def poll() -> None:
         _cancel_file(state)
         _repair_file(state)
         _refresh_file(state)
+        _recap_fix_file(state)
         _force_free_file(state)
         _auto_free_tick(state, now)
     except Exception:

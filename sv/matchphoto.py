@@ -29,12 +29,12 @@ def referent(team_names: list[str], sport: str = "soccer", tries: int = 8):
         if not sq:
             continue
         for pl in sq[:tries]:   # 1) la foto nombra al club
-            got = commons.player_photo(pl["name"], team_names, since=pl.get("since") or 0)
+            got = commons.player_photo(pl["name"], team_names, since=pl.get("since") or 0, sport=sport)
             if got:
                 return got
         for pl in sq[:tries]:   # 2) foto de cuando ya jugaba en el club (y no con su selección)
             if pl.get("since"):
-                got = commons.player_photo(pl["name"], team_names, since=pl["since"], need_team=False)
+                got = commons.player_photo(pl["name"], team_names, since=pl["since"], need_team=False, sport=sport)
                 if got:
                     return got
         return None
@@ -52,7 +52,7 @@ def for_pick(leg: dict, teams: dict | None):
         if got:
             return got
     for names in order:   # sin referentes con su camiseta: partido, estadio o hinchada del club
-        got = commons.team_photo(names[0])
+        got = commons.team_photo(names[0], sport)
         if got:
             return got
     return None
@@ -63,7 +63,7 @@ def for_scorer(full_name: str, team_names: list[str], sport: str = "soccer"):
     una foto de cuando ya jugaba ahí aunque no nombre al club."""
     if not full_name:
         return None
-    got = commons.player_photo(full_name, team_names)
+    got = commons.player_photo(full_name, team_names, sport=sport)
     if got:
         return got
     try:
@@ -73,7 +73,7 @@ def for_scorer(full_name: str, team_names: list[str], sport: str = "soccer"):
     key = commons._plain(full_name)
     pl = next((x for x in sq if commons._plain(x["name"]) == key), None)
     if pl and pl.get("since"):
-        return commons.player_photo(full_name, team_names, since=pl["since"], need_team=False)
+        return commons.player_photo(full_name, team_names, since=pl["since"], need_team=False, sport=sport)
     return None
 
 
@@ -88,7 +88,7 @@ def for_halftime(rep: dict):
         if got:
             return got
     for side in ("home", "away"):
-        got = commons.team_photo((rep.get(side) or {}).get("name") or "")
+        got = commons.team_photo((rep.get(side) or {}).get("name") or "", "soccer")
         if got:
             return got
     return None
