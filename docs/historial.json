@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-26T23:10:36.423661+00:00",
+ "updated_at": "2026-10-26T23:15:52.605933+00:00",
  "summary": {
-  "picks": 13,
-  "wins": 9,
+  "picks": 14,
+  "wins": 10,
   "losses": 3,
-  "hit_rate": 0.75,
-  "yield": 0.3276,
-  "avg_odds": 1.77,
-  "units": 13.76
+  "hit_rate": 0.7692,
+  "yield": 0.36,
+  "avg_odds": 1.76,
+  "units": 16.56
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 4,
    "prob": 0.5795,
    "free": true,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Universidad de Chile",
@@ -32,7 +32,10 @@
      "mtype": "spreads",
      "handicap": -0.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      4,
+      1
+     ]
     }
    ],
    "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.73).\nProbabilidad estimada: 58,0%. Para no perder a esta cuota se necesita 58,8%."
