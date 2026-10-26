@@ -170,7 +170,7 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False,
     try:
         _scan_soccer(hours, top, manual, live)
     finally:
-        if not manual and not live and config.NBA_ENABLED:
+        if not manual and not live and config.NBA_ENABLED and config.NBA_DAILY_SCAN:
             try:
                 scan_nba()
             except Exception:
@@ -200,32 +200,95 @@ def AUTO_FREE_BUTTONS(pid: str) -> list:
             [("✋ No publicar hoy", f"fc:{pid}")]]
 
 
-def _auto_pool(state: dict, publish_at) -> list:
-    """Opciones del escaneo de hoy que sirven para el gratis, de la más probable a la menos."""
+def _auto_reject(p: dict, d: dict | None, lead) -> str | None:
+    """Por qué una opción NO sirve para el gratis (None si sirve)."""
+    if not d or len(d.get("legs") or []) != 1:
+        return "no es una apuesta simple"
+    if not _is_today(p["kickoff"]):
+        return "el partido no es de hoy"
+    if store.parse_ts(p["kickoff"]) < lead:
+        return "empieza muy pronto para publicarlo con tiempo"
+    if not (_min_odds(d) <= d["price"] <= config.ODDS_MAX):
+        return f"la cuota {formatting.odds(d['price'])} está fuera del rango"
+    if d["edge"] < config.AUTO_FREE_MIN_EDGE:
+        return "la cuota está muy por debajo de la justa"
+    ev = _leg_evidence(d["legs"][0])
+    if ev and ev["verdict"] == "contra":
+        return "los datos (forma y cara a cara) lo contradicen"
+    return None
+
+
+def _auto_pool(state: dict, publish_at, scored: bool = False) -> list:
+    """Opciones del escaneo de hoy que sirven para el gratis, de la más probable a la menos.
+    Si el escaneo de las 00:05 dejó su top 3, se elige solo entre esos."""
     lead = publish_at + timedelta(minutes=config.AUTO_FREE_MIN_LEAD_MIN)
     today = _local_today()
     from zoneinfo import ZoneInfo
-    pool = []
+    from . import evidence
+    cands = []
     for p in state["picks"].values():
         if p["status"] != "candidate" or p.get("live") or p.get("kind") != "simple" or _vip_only(p):
             continue   # el gratis siempre es fútbol
         made = store.parse_ts(p["created_at"]).astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat()
-        if made != today or store.parse_ts(p["kickoff"]) < lead or not _is_today(p["kickoff"]):   # gratis: partido de HOY
-            continue
+        if made == today:
+            cands.append(p)
+    if any(p.get("daily_top") == today for p in cands):
+        cands = [p for p in cands if p.get("daily_top") == today]
+    pool = []
+    for p in cands:
         for opt, d in (("A", p), ("B", p.get("alt"))):
-            if not d or len(d.get("legs") or []) != 1:
-                continue
-            if not (_min_odds(d) <= d["price"] <= config.ODDS_MAX) or d["edge"] < config.AUTO_FREE_MIN_EDGE:
+            if not d or _auto_reject(p, d, lead):
                 continue
             ev = _leg_evidence(d["legs"][0])
-            if ev and ev["verdict"] == "contra":
-                continue   # el gratis nunca va contra lo que dicen los datos (H2H y forma reciente)
             rank = 2 if ev and ev["verdict"] == "ok" else 1 if not ev else 0
-            from . import evidence
             pool.append((rank, evidence.blend(d["prob"], ev), d["edge"], p["id"], opt))
     # primero los que los datos respaldan; luego la probabilidad final (mercado + datos); luego el valor
     pool.sort(key=lambda x: (x[0], round(x[1], 3), x[2]), reverse=True)
+    if scored:
+        return pool
     return [[pid, opt] for _rk, _pr, _ed, pid, opt in pool]
+
+
+def _auto_free_reason(state: dict, p: dict, opt: str, publish_at) -> str:
+    """«Por qué lo elegí»: comparación con los otros picks del top del día."""
+    from . import evidence
+    today = _local_today()
+    lead = publish_at + timedelta(minutes=config.AUTO_FREE_MIN_LEAD_MIN)
+    me = p
+    l = me["legs"][0]
+    ev = _leg_evidence(l)
+    my_prob = evidence.blend(me["prob"], ev)
+    rivals = [x for x in state["picks"].values() if x.get("daily_top") == today and x["id"] != p["id"]
+              and x["status"] in ("candidate", "selected", "published", "expired")]
+    rivals.sort(key=lambda x: int(x["id"]))
+    out = ["🧠 <b>Por qué lo elegí</b>"]
+    if ev and ev["verdict"] == "ok":
+        out.append("• Los datos lo respaldan: " + evidence.line(ev).split(": ", 1)[-1].split(" → ")[0] + ".")
+    elif ev:
+        out.append("• Los datos acompañan a medias (" + evidence.line(ev).split(": ", 1)[-1].split(" → ")[0]
+                   + "), pero es lo más sólido de hoy.")
+    else:
+        out.append("• Sin historial suficiente para contrastar: manda la probabilidad del mercado.")
+    probs = []
+    for x in rivals:
+        why = _auto_reject(x, x, lead)
+        if why:
+            out.append(f"• #{x['id']} ({formatting.escape(x['legs'][0]['home'])} vs "
+                       f"{formatting.escape(x['legs'][0]['away'])}) quedó fuera: {why}.")
+        else:
+            probs.append(evidence.blend(x["prob"], _leg_evidence(x["legs"][0])))
+    if probs:
+        out.insert(1, f"• Es el más probable del top: {formatting.pct(my_prob)} frente a "
+                   + " y ".join(formatting.pct(q) for q in sorted(probs, reverse=True)) + ".")
+    else:
+        out.insert(1, f"• Probabilidad estimada (mercado + datos): {formatting.pct(my_prob)}.")
+    fair = 1 / me["prob"] if me.get("prob") else None
+    if fair:
+        rel = "por encima de" if me["price"] > fair + 0.005 else "en línea con" if abs(me["price"] - fair) <= 0.005 else "apenas bajo"
+        out.append(f"• Cuota {formatting.odds(me['price'])}, {rel} la justa ({formatting.odds(fair)}).")
+    if opt == "B":
+        out.append("• Uso la opción B del partido: es la más probable de las dos.")
+    return "\n".join(out)
 
 
 EVIDENCE_V = 3   # versión del contraste: si cambia la forma de calcularlo, se recalcula
@@ -311,8 +374,13 @@ def _auto_free_choose(state: dict, skip: list | None = None) -> bool:
             and (state["picks"].get(x[0]) or {}).get("status") == "candidate"]
     if not pool:
         state["auto_free"] = {"date": today, "status": "none", "pool": []}
-        telegram.send(owner, "🤖 Pick gratis automático: hoy ninguna opción de fútbol cumple (cuota 1.65–2.00, cerca de la "
-                             "cuota justa y con tiempo antes del partido). Si quieres, elige uno a mano con 🎁.")
+        lead = at + timedelta(minutes=config.AUTO_FREE_MIN_LEAD_MIN)
+        why = "\n".join(f"• #{x['id']} ({formatting.escape(x['legs'][0]['home'])} vs {formatting.escape(x['legs'][0]['away'])}): "
+                        f"{_auto_reject(x, x, lead) or 'ya no está disponible'}"
+                        for x in state["picks"].values() if x.get("daily_top") == today)
+        telegram.send(owner, "🤖 Pick gratis automático: hoy ninguna opción de fútbol cumple (cuota en rango, cerca de la "
+                             "cuota justa, partido de hoy y con tiempo antes de empezar)."
+                      + (f"\n\n{why}" if why else "") + "\n\nSi quieres, elige uno a mano con /gratis N.")
         return False
     pid, opt = pool[0]
     p = state["picks"][pid]
@@ -338,8 +406,7 @@ def _auto_free_choose(state: dict, skip: list | None = None) -> bool:
            f"🎯 <b>{esc(formatting.outcome_label(l))}</b> @ {formatting.odds(p['price'])}\n"
            f"📈 Probabilidad justa {formatting.pct(p['prob'])} · valor {'+' if p['edge'] >= 0 else ''}"
            f"{formatting.pct(p['edge'])}\n\n"
-           + _evidence_note(l) +
-           f"Es la opción más probable de las {len(pool)} que cumplen hoy. "
+           + _auto_free_reason(state, p, opt, at) + "\n\n" +
            f"Se publica sola a las <b>{hhmm}</b> en {where}.\n"
            "Revisa la cuota en tu app. Puedes publicarlo ya, cambiarlo por la siguiente opción"
            + (f" (quedan {others})" if others else "") + " o no publicar gratis hoy.")
@@ -845,8 +912,10 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
     busy = {l["fixture_id"] for p in state["picks"].values()
             if p["status"] in ("candidate", "published") for l in p["legs"]}
     selections = [x for x in selections if x.fixture_id not in busy]
-    want = top or config.MAX_CANDIDATES
-    picks = build_picks(selections, max_n=want * 2, min_n=(top or config.MIN_DAILY_CANDIDATES) * 2)
+    daily = not manual and not live
+    want = top or (config.DAILY_TOP if daily else config.MAX_CANDIDATES)
+    picks = build_picks(selections, max_n=want * 2,
+                        min_n=(top or (config.DAILY_TOP if daily else config.MIN_DAILY_CANDIDATES)) * 2)
     if config.PROTECTED_LINES:
         picks = [_protect(pk, selections) for pk in picks]
     # Segunda opinión con datos: los que el H2H y la forma reciente contradicen van al final (o fuera)
@@ -884,7 +953,17 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
         return
 
     n_val = sum(1 for p in picks if p.tier == "valor")
-    telegram.send(state["owner_chat"],
+    if daily:
+        free_on = config.AUTO_FREE and not state.get("auto_free_off")
+        telegram.send(state["owner_chat"],
+                      f"{title}: {len(tournaments)} ligas, {analyzed} partidos, {len(selections)} cuotas comparadas.\n"
+                      f"⚽ Te envío los <b>{len(picks)} mejores picks de fútbol de hoy</b> "
+                      f"({n_val} 🟢 con valor y {len(picks) - n_val} ⚖️ de cuota justa).\n"
+                      + ("De estos elijo el pick gratis del día: te llega al final con el motivo. Los otros quedan "
+                         "para el VIP si los apruebas. " if free_on else "Elige 1 para el gratis y los que quieras para el VIP. ")
+                      + "La NBA llega aparte, unos 30 min antes de cada partido. Revisa cada cuota en tu app.")
+    else:
+        telegram.send(state["owner_chat"],
                   f"{title}: {len(tournaments)} ligas, {analyzed} partidos, {len(selections)} cuotas comparadas.\n"
                   f"{'Tu top ' + str(len(picks)) if manual else 'Te envío ' + str(len(picks)) + ' candidatos'}: "
                   f"{n_val} 🟢 con valor y {len(picks) - n_val} ⚖️ de cuota justa.\n"
@@ -906,6 +985,8 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
         state["seq"] += 1
         pid = str(state["seq"])
         d.update(id=pid, status="candidate", created_at=_iso(now), stake_v=2)
+        if daily:
+            d["daily_top"] = _local_today()
         if live:
             d["live"] = True
             try:
@@ -1392,9 +1473,23 @@ def _post_result(state: dict, p: dict, text: str) -> None:
             print(f"No se pudo publicar resultado en {where}: {e}")
 
 
+def _loss_text(p: dict) -> str:
+    """Roja: mensaje corto con lo que pasó (marcador y, si ESPN los tiene, remates al arco)."""
+    from . import loss
+    rep = None
+    l = p["legs"][0]
+    if len(p["legs"]) == 1 and (l.get("sport") or "soccer") == "soccer" and p.get("kind") != "builder":
+        try:
+            from . import espn
+            rep = espn.match_report(l["home"], l["away"], l["kickoff"])
+        except Exception:
+            traceback.print_exc()
+    return loss.message(p, rep)
+
+
 def _settle(state: dict, p: dict, result: str) -> None:
     p.update(result=result, status="settled", settled_at=_iso(store.now_utc()))
-    _post_result(state, p, formatting.result_post(p))
+    _post_result(state, p, _loss_text(p) if result == "L" else formatting.result_post(p))
     _after_result(state, p)
 
 
@@ -1477,17 +1572,32 @@ def _auto_result(state: dict, p: dict, owner, now, last_kick) -> None:
 
 
 def _streak(state: dict, p: dict) -> int:
-    """Verdes seguidos terminando en este pick (las nulas no cortan la racha)."""
-    done = sorted((x for x in state["picks"].values() if x.get("status") == "settled"),
-                  key=lambda x: (x.get("settled_at") or "", x["kickoff"]))
-    n = 0
-    for x in reversed(done[:done.index(p) + 1] if p in done else done):
-        if x.get("result") == "V":
+    """Verdes seguidos REALES terminando en este pick, para no mostrar una racha falsa.
+    Cuenta todos los picks publicados (Gratis y VIP, por orden de partido): una roja corta la racha,
+    las nulas no suman ni cortan, y un pick anterior que aún no se resuelve también la corta
+    (no se puede afirmar una racha que todavía no se sabe)."""
+    def published(x):
+        return (x.get("channel_msgs") or x.get("published_at")) and not x.get("news") and x.get("status") != "cancelled"
+
+    def key(x):
+        return (max(l["kickoff"] for l in x["legs"]), x.get("settled_at") or "", int(x["id"]) if str(x["id"]).isdigit() else 0)
+
+    if p.get("result") != "W":
+        return 0
+    mine = key(p)
+    earlier = sorted((x for x in state["picks"].values() if published(x) and x is not p and key(x) < mine),
+                     key=key, reverse=True)
+    n = 1
+    for x in earlier:
+        if x.get("status") in ("selected",):
+            continue   # aprobado pero nunca publicado
+        r = x.get("result") if x.get("status") == "settled" else None
+        if r == "V":
             continue
-        if x.get("result") != "W":
-            break
+        if r != "W":
+            break   # roja, o un pick anterior que aún no termina
         n += 1
-    return max(n, 1)
+    return n
 
 
 def _instagram_kit(state: dict, p: dict) -> None:
@@ -1582,7 +1692,8 @@ def _correct(state: dict, p: dict, result: str) -> None:
         except telegram.TelegramError as e:
             print(f"No se pudo marcar la corrección en {where}: {e}")
     p.update(result=result, corrected_at=_iso(store.now_utc()))
-    _post_result(state, p, formatting.result_correction(p))
+    _post_result(state, p, (_loss_text(p) + "\n<i>(resultado corregido)</i>") if result == "L"
+                 else formatting.result_correction(p))
     _after_result(state, p)
 
 
@@ -1705,7 +1816,12 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
 
 
 def _after_result(state: dict, p: dict) -> None:
-    """Con el resultado listo: imagen post partido (fútbol, pick simple) o la celebración de siempre."""
+    """Con el resultado listo: imagen post partido (fútbol, pick simple) o la celebración de siempre.
+    Las rojas no llevan imagen: solo el mensaje corto que ya salió en los canales."""
+    if p.get("result") == "L":
+        p["ig_kit_sent"] = True
+        p.pop("recap_pending", None)
+        return
     if not _recap_supported(p):
         _instagram_kit(state, p)
         return
@@ -1888,25 +2004,122 @@ def _daily_builders(state: dict) -> None:
                 break
 
 
+def _nba_events(now) -> list:
+    """Partidos NBA del día (ESPN, gratis): [(id, inicio, local, visita)]."""
+    from . import nba
+    from zoneinfo import ZoneInfo
+    out = []
+    day = now.astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+    for e in nba._get("/scoreboard", dates=day).get("events") or []:
+        if not e.get("date"):
+            continue
+        ko = store.parse_ts(e["date"].replace("Z", ":00Z") if len(e["date"]) == 17 else e["date"])
+        c = e["competitions"][0]["competitors"]
+        out.append((e.get("id"), ko, next(x for x in c if x["homeAway"] == "home")["team"]["displayName"],
+                    next(x for x in c if x["homeAway"] == "away")["team"]["displayName"]))
+    return out
+
+
+def _nba_pick_dict(fx, a, b, tier) -> dict:
+    """Candidato NBA (opción A y B) sin número todavía; el contexto se arma al enviarlo."""
+    from . import nba
+    from .value import Pick
+
+    def build(sel, t, role):
+        d = Pick("simple", [sel], tier=t).to_dict()
+        d["legs"][0]["label"] = formatting.outcome_label(d["legs"][0])
+        d["why"] = nba.why_line(sel, role)
+        return d
+
+    d = build(a, tier, "A")
+    if b:
+        d["alt"] = build(b, "valor" if b.edge >= config.MIN_EDGE else "justa", "B")
+    d["sport"] = "basketball"
+    return d
+
+
+def _nba_send_candidate(state: dict, d: dict, now) -> None:
+    from . import nba
+    l = d["legs"][0]
+    ctx = None
+    try:
+        ctx = nba.context(l["home"], l["away"], l["kickoff"])   # bajas confirmadas a esta hora
+    except Exception:
+        traceback.print_exc()
+    for x in (d, d.get("alt")):
+        if x:
+            x["legs"][0]["nba_ctx"] = ctx
+            x["analysis"] = formatting.analysis(x)
+    state["seq"] += 1
+    pid = str(state["seq"])
+    d.update(id=pid, status="candidate", created_at=_iso(now), stake_v=2, sport="basketball", pregame_pick=True)
+    msg = telegram.send(state["owner_chat"], nba_candidate_text(d), NBA_BUTTONS(pid, bool(d.get("alt"))))
+    d["owner_msg"] = msg["message_id"]
+    state["picks"][pid] = d
+
+
+def _nba_picks_pregame(state: dict, now) -> None:
+    """Pronóstico NBA sugerido de cada partido, ~30 min antes (junto con su Bet Builder).
+    Una sola consulta de cuotas cubre los partidos de las próximas horas; cada uno se te envía a su hora."""
+    if not state.get("owner_chat") or not config.NBA_ENABLED or not config.NBA_PREGAME_PICKS:
+        return
+    from . import nba
+    lo, hi = config.NBA_BUILDER_BEFORE_MIN
+    queue = state.setdefault("nba_queue", [])
+    until = state.get("nba_odds_until")
+    due = [ko for _id, ko, _h, _a in _nba_events(now) if ko - timedelta(minutes=hi) <= now <= ko - timedelta(minutes=lo)]
+    if due and not (until and max(due) <= store.parse_ts(until)):
+        frm, to = now, now + timedelta(hours=config.NBA_PICKS_LOOKAHEAD_H)
+        markets = oddspapi.markets(sport_id=config.NBA_SPORT_ID)
+        fixtures = oddspapi.upcoming_fixtures(_iso(frm), _iso(to), sport_id=config.NBA_SPORT_ID)
+        by_id = {f["fixtureId"]: f for f in fixtures if f.get("tournamentId") == config.NBA_TOURNAMENT
+                 and frm <= store.parse_ts(f["startTime"]) <= to}
+        busy = {l.get("fixture_id") for p in state["picks"].values() for l in p["legs"]
+                if p["status"] in ("candidate", "selected", "published")}
+        busy |= {q["legs"][0].get("fixture_id") for q in queue}
+        none = []
+        rows = oddspapi.odds_by_tournaments([config.NBA_TOURNAMENT]) if by_id else []
+        state["nba_odds_until"] = _iso(to)   # cubierto (si la consulta falla, se reintenta en la próxima revisión)
+        if rows:
+            for row in rows:
+                fx = by_id.get(row.get("fixtureId"))
+                if not fx or fx["fixtureId"] in busy:
+                    continue
+                opt = (nba.options_for_game(selections_for_fixture(fx, row, markets, "basketball"))
+                       if len(row.get("bookmakerOdds") or {}) >= 2 else None)
+                if opt:
+                    queue.append(_nba_pick_dict(fx, *opt))
+                else:
+                    none.append(f"{fx.get('participant1Name')} vs {fx.get('participant2Name')}")
+        if none:
+            telegram.send(state["owner_chat"], "🏀 Sin pronóstico NBA (ninguna cuota en "
+                          f"{config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f} cerca de la justa): "
+                          + "; ".join(formatting.escape(x) for x in none) + ". El Bet Builder sí te llega.")
+    keep = []
+    for d in queue:
+        ko = store.parse_ts(d["kickoff"])
+        if now >= ko - timedelta(minutes=5):
+            continue   # ya empezó: se descarta
+        if now >= ko - timedelta(minutes=hi):
+            try:
+                _nba_send_candidate(state, d, now)
+            except Exception:
+                traceback.print_exc()
+            continue
+        keep.append(d)
+    state["nba_queue"] = keep
+
+
 def _nba_builders_pregame(state: dict, now) -> None:
     """Bet Builder NBA de cada partido, entre 40 y 25 min antes (con las lesiones ya confirmadas)."""
     if not state.get("owner_chat") or not config.NBA_ENABLED:
         return
-    from . import nba
-    from zoneinfo import ZoneInfo
     lo, hi = config.NBA_BUILDER_BEFORE_MIN
     done = state.setdefault("bb_nba_done", [])
-    day = now.astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d")
-    for e in nba._get("/scoreboard", dates=day).get("events") or []:
-        if e.get("id") in done or not e.get("date"):
+    for eid, ko, h, a in _nba_events(now):
+        if eid in done or not (ko - timedelta(minutes=hi) <= now <= ko - timedelta(minutes=lo)):
             continue
-        ko = store.parse_ts(e["date"].replace("Z", ":00Z") if len(e["date"]) == 17 else e["date"])
-        if not (ko - timedelta(minutes=hi) <= now <= ko - timedelta(minutes=lo)):
-            continue
-        done.append(e.get("id"))
-        c = e["competitions"][0]["competitors"]
-        h = next(x for x in c if x["homeAway"] == "home")["team"]["displayName"]
-        a = next(x for x in c if x["homeAway"] == "away")["team"]["displayName"]
+        done.append(eid)
         try:
             _builder_send(state, h, a, _iso(ko), "USA · NBA", "basketball", quiet=True)
         except Exception:
@@ -3105,7 +3318,7 @@ def poll() -> None:
     _migrate_stakes(state, now)
     _refresh_recap_texts(state)
     _nba_daily(state)
-    for fn in (_nba_builders_pregame, lambda st, _now: _live_builders(st)):
+    for fn in (_nba_picks_pregame, _nba_builders_pregame, lambda st, _now: _live_builders(st)):
         try:
             fn(state, now)
         except Exception:

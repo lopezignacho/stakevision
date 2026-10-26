@@ -165,7 +165,7 @@ main.poll()
 st = store.load()
 assert st["picks"][pid]["result"] == "L" and len(edited) == 2 and "corregido" in edited[0][2]
 # la roja corregida sale como texto nuevo en ambos canales
-assert sum(1 for ch, t, *_ in sent[n_before_fix:] if ch in (VIP, config.FREE_CHANNEL) and "ROJA" in t) == 2
+assert sum(1 for ch, t, *_ in sent[n_before_fix:] if ch in (VIP, config.FREE_CHANNEL) and "❌" in t and "corregido" in t) == 2
 pub = json.load(open(config.PUBLIC_HISTORY))
 assert pub["summary"]["losses"] == 1 and pub["summary"]["wins"] == 0
 print("OK flujo completo:", len(sent), "mensajes simulados")
@@ -1139,3 +1139,103 @@ assert main._protect(Pick("simple", [s25]), [s25, _sel(2.0, 1.45, 0.70)]).legs[0
 assert main._min_odds({"legs": [{"mtype": "totals", "handicap": 2.0}]}) == 1.60
 assert main.grade_leg({"mtype": "totals", "outcome": "Más", "handicap": 2.0}, 1, 1) == "V"
 print("OK línea protegida")
+
+# 35) racha real: una roja (o un pick anterior sin resolver) la corta; las nulas no
+def _pk(i, ko_h, res=None, status="settled", ch=True):
+    ko = main._iso(store.now_utc() - timedelta(hours=ko_h))
+    return {"id": str(i), "status": status, "result": res, "kickoff": ko, "settled_at": ko,
+            "channel_msgs": {"free": 1} if ch else {}, "legs": [{"kickoff": ko}]}
+st_s = {"picks": {}}
+for x in (_pk(901, 50, "W"), _pk(902, 40, "L"), _pk(903, 30, "W"), _pk(904, 20, "V"), _pk(905, 10, "W"),
+          _pk(906, 15, None, "candidate", ch=False)):
+    st_s["picks"][x["id"]] = x
+assert main._streak(st_s, st_s["picks"]["905"]) == 2      # 905 y 903 (la nula 904 no corta; la roja 902 sí)
+assert main._streak(st_s, st_s["picks"]["901"]) == 1
+st_s["picks"]["907"] = _pk(907, 12, None, "published")      # un pick anterior aún en juego
+assert main._streak(st_s, st_s["picks"]["905"]) == 1
+print("OK racha real")
+
+# 36) roja: mensaje corto, variado y sin imagen
+from sv import loss  # noqa: E402
+pl = {"id": "71", "price": 1.75, "kind": "simple", "result": "L",
+      "legs": [{"home": "AZ Alkmaar", "away": "FC Twente", "sport": "soccer", "mtype": "totals", "outcome": "Más",
+                "handicap": 3.5, "score": [0, 2], "label": "Más de 3.5 goles"}]}
+rep_ = {"home": {"stats": {"shotsOnTarget": "6"}}, "away": {"stats": {"shotsOnTarget": "5"}}}
+m1 = loss.message(pl, rep_)
+assert "AZ Alkmaar 0-2 FC Twente" in m1 and "❌" in m1 and "+18" in m1 and "11 remates al arco" in m1, m1
+assert "GOLPE" not in m1.upper() and len(m1) < 400
+m2 = loss.message(dict(pl, id="72"), None)
+assert m1 != m2
+pw = dict(pl, legs=[dict(pl["legs"][0], mtype="1x2", outcome="1", score=[1, 1])])
+assert "no pudo pasar del empate" in loss.message(pw, None)
+st = store.load()
+pl.update(status="published", channel_msgs={"free": 5}, kickoff="2026-10-25T18:00:00Z")
+pl["legs"][0]["kickoff"] = pl["kickoff"]
+st["picks"]["71"] = pl
+espn.match_report = lambda *a, **k: rep_
+n, nph = len(sent), len(photos)
+main._settle(st, pl, "L")
+assert len(photos) == nph and any(ch == config.FREE_CHANNEL and "AZ Alkmaar 0-2" in t for ch, t, *_ in sent[n:])
+assert not pl.get("recap") and not pl.get("recap_pending")
+print("OK roja corta sin imagen")
+
+# 37) 00:05: top 3 de fútbol y el gratis con su motivo
+st = store.load()
+for x in list(st["picks"].values()):
+    if x["status"] == "candidate":
+        x["status"] = "expired"
+st["auto_free"] = {}
+st.pop("auto_free_off", None)
+today = main._local_today()
+now_ = store.now_utc()
+ko = main._iso(min(now_ + timedelta(hours=4), main._end_of_today() - timedelta(minutes=5)))
+def _cand(i, prob, price, verdict):
+    return {"id": str(i), "status": "candidate", "kind": "simple", "price": price, "prob": prob, "edge": prob * price - 1,
+            "stake": 3, "tier": "justa", "created_at": main._iso(now_), "kickoff": ko, "daily_top": today, "analysis": "",
+            "legs": [{"home": f"Local{i}", "away": f"Visita{i}", "kickoff": ko, "sport": "soccer", "mtype": "totals",
+                      "outcome": "Más", "handicap": 1.5, "price": price, "label": "Más de 1.5 goles", "evidence_v": main.EVIDENCE_V,
+                      "evidence": {"form": [7, 10], "venue": [0, 0], "h2h": [4, 5], "rate": 0.7, "verdict": verdict,
+                                   "h2h_goals": 2.8, "h2h_n": 5, "table": None}}]}
+for c in (_cand(951, 0.60, 1.70, "ok"), _cand(952, 0.56, 1.80, "ok"), _cand(953, 0.58, 1.75, "contra")):
+    st["picks"][c["id"]] = c
+n = len(sent) + len(photos)
+assert main._auto_free_choose(st)
+assert st["auto_free"]["pid"] == "951"
+msgs = [t for ch, t, *_ in sent if ch == OWNER][-3:] + [c for ch, c in photos if ch == OWNER][-2:]
+why = next(t for t in msgs if t and "Por qué lo elegí" in t)
+assert "#953" in why and "contradicen" in why and "más probable" in why, why
+print("OK top 3 + motivo del gratis")
+
+# 38) NBA: pronóstico sugerido ~30 min antes de cada partido (una consulta cubre varias horas)
+st = store.load()
+st["nba_queue"], st.pop("nba_odds_until", None)
+tip1 = store.now_utc() + timedelta(minutes=32)
+tip2 = store.now_utc() + timedelta(hours=2)
+main._nba_events = lambda now: [("e1", tip1, "Boston Celtics", "New York Knicks"), ("e2", tip2, "Lakers", "Suns")]
+calls = []
+oddspapi.markets = lambda *a, **k: {}
+oddspapi.upcoming_fixtures = lambda frm, to, sport_id=10: [
+    {"fixtureId": "n1", "tournamentId": config.NBA_TOURNAMENT, "startTime": main._iso(tip1)},
+    {"fixtureId": "n2", "tournamentId": config.NBA_TOURNAMENT, "startTime": main._iso(tip2)}]
+def _obt(ids):
+    calls.append(ids)
+    return [{"fixtureId": "n1", "bookmakerOdds": {"a": {}, "b": {}}}, {"fixtureId": "n2", "bookmakerOdds": {"a": {}, "b": {}}}]
+oddspapi.odds_by_tournaments = _obt
+main.selections_for_fixture = lambda fx, row, m, sp="soccer": [fx["fixtureId"]]
+def _d(fid, ko_):
+    return {"kind": "simple", "price": 1.8, "prob": 0.57, "edge": 0.03, "stake": 3, "tier": "valor", "kickoff": main._iso(ko_),
+            "legs": [{"fixture_id": fid, "home": "H" + fid, "away": "A" + fid, "kickoff": main._iso(ko_), "sport": "basketball",
+                      "label": "Gana H", "mtype": "moneyline", "outcome": "1", "price": 1.8, "fair_odds": 1.75, "edge": 0.03,
+                      "market": "Ganador", "league": "NBA"}]}
+nba.options_for_game = lambda sels: ("a", None, "valor")
+main._nba_pick_dict = lambda fx, a, b, t: _d(fx["fixtureId"], store.parse_ts(fx["startTime"]))
+nba.context = lambda *a, **k: None
+main.nba_candidate_text = lambda d: f"NBA candidato {d['legs'][0]['home']}"
+main._nba_picks_pregame(st, store.now_utc())
+assert len(calls) == 1 and any("NBA candidato Hn1" in t for ch, t, *_ in sent if ch == OWNER)
+assert [q["legs"][0]["fixture_id"] for q in st["nba_queue"]] == ["n2"]
+# 90 min después le toca al segundo, sin volver a consultar cuotas
+main._nba_events = lambda now: [("e2", tip2, "Lakers", "Suns")]
+main._nba_picks_pregame(st, tip2 - timedelta(minutes=33))
+assert len(calls) == 1 and any("NBA candidato Hn2" in t for ch, t, *_ in sent if ch == OWNER) and not st["nba_queue"]
+print("OK NBA sugerido antes de cada partido")
