@@ -28,9 +28,31 @@ def money(n: float) -> str:
 
 
 def stake_line(stake: int) -> str:
-    share = stake * 0.5   # 1/10 = 0,5 % del bankroll
-    return (f"💰 <b>Stake {stake}/10:</b> apuesta el {share:g}%".replace(".", ",")
-            + f" de tu bankroll (tu fondo para apostar). Si tienes $100.000, son {money(100000 * share / 100)}.")
+    return f"💰 <b>Stake {stake}/10</b>"
+
+
+SHORT = {"Universidad de Chile": "la U", "Universidad Católica": "la UC", "Universidad de Concepción": "la UdeC",
+         "Unión Española": "Unión Española", "Colo-Colo": "Colo-Colo"}
+GENERIC = {"universidad", "club", "real", "deportivo", "deportes", "atlético", "atletico", "unión", "union", "sporting",
+           "inter", "athletic", "racing", "independiente", "san", "santa", "rayo", "red", "borussia", "bayer",
+           "manchester", "west", "aston", "nottingham", "crystal", "sheffield", "newcastle", "paris", "olympique",
+           "new", "los", "las", "el", "la", "cd", "cf", "fc", "ac", "sc", "ca", "audax", "o'higgins"}
+
+
+def short(name: str) -> str:
+    """Nombre corto para no repetir el nombre completo en cada línea («Everton Viña del Mar» → «Everton»).
+    El nombre completo ya va en el título del partido."""
+    n = team(name)
+    if n in SHORT:
+        return SHORT[n]
+    w = n.split()
+    if len(w) >= 3 and w[0].lower() not in GENERIC and w[1].lower() not in ("de", "del"):
+        return w[0]
+    return n
+
+
+def _cap(t: str) -> str:
+    return t[:1].upper() + t[1:] if t else t
 
 
 # ---------------------------------------------------------------- fútbol
@@ -54,7 +76,7 @@ def _n(k: int, one: str, many: str) -> str:
 
 def _soccer(l: dict) -> list[str]:
     H, A, h2h = _games(l)
-    hn, an = escape(team(l["home"])), escape(team(l["away"]))
+    hn, an = escape(short(l["home"])), escape(short(l["away"]))
     t, o, line = l.get("mtype", ""), str(l.get("outcome", "")).strip().lower(), l.get("handicap")
     ev = l.get("evidence") or {}
     table = ev.get("table") or {}
@@ -91,7 +113,7 @@ def _soccer(l: dict) -> list[str]:
             if k * 2 > len(venue):
                 facts.append((1, say(k, len(venue), f"partidos {where}")))
         last = me[:5]
-        if len(last) >= 4:
+        if len(last) >= 4 and not any(pr == 1 for pr, _f in facts):   # la forma de local/visita ya lo dice
             k = sum(map(ok, last))
             if k * 2 > len(last):
                 facts.append((4, say(k, len(last), "partidos")))
@@ -109,7 +131,7 @@ def _soccer(l: dict) -> list[str]:
                 facts.append((0, say_h2h(k, len(mine_h2h))))
         tm, to = table.get(side), table.get("away" if side == "home" else "home")
         if tm and to and tm.get("rank") and to.get("rank") and tm["rank"] < to["rank"]:
-            facts.append((3, f"En la tabla, {mn} va {tm['rank']}º y {on} {to['rank']}º."))
+            facts.append((3, f"En la tabla, {mn} va {tm['rank']}º y {on}, {to['rank']}º."))
     elif t in ("totals", "teamtotals-team1", "teamtotals-team2") and line is not None:
         over = o.startswith(("más", "mas", "over"))
         lim = float(line)
@@ -162,10 +184,16 @@ def _soccer(l: dict) -> list[str]:
             if k * 2 > len(h2h):
                 facts.append((0, f"En los últimos {len(h2h)} cruces entre ellos, {what} en {k}."))
     facts.sort(key=lambda x: x[0])
-    return [f for _p, f in facts]
+    return [_cap(f) for _p, f in facts]
 
 
 # ---------------------------------------------------------------- NBA
+def _nick(t: dict) -> str:
+    """NBA: el apodo basta («Boston Celtics» → «Celtics»; «Portland Trail Blazers» → «Trail Blazers»)."""
+    n = t.get("name") or ""
+    return " ".join(n.split()[-2:]) if n.endswith("Trail Blazers") else n.split()[-1] if n else n
+
+
 def _nba(l: dict) -> list[str]:
     from . import nba
     ctx = l.get("nba_ctx")
@@ -185,27 +213,27 @@ def _nba(l: dict) -> list[str]:
         exp = (fh["pf"] + fa["pa"]) / 2 + (fa["pf"] + fh["pa"]) / 2
         if (exp > float(line)) == over:
             facts.append(f"Por lo que anotan y reciben, el partido proyecta unos {exp:.0f} puntos (la línea es {float(line):g}).")
-        facts.append(f"{H['name']} anota {fh['pf']:.0f} y recibe {fh['pa']:.0f} puntos por partido.")
-        facts.append(f"{A['name']} anota {fa['pf']:.0f} y recibe {fa['pa']:.0f}.")
+        facts.append(f"{_nick(H)} anota {fh['pf']:.0f} y recibe {fh['pa']:.0f} puntos por partido.")
+        facts.append(f"{_nick(A)} anota {fa['pf']:.0f} y recibe {fa['pa']:.0f}.")
     elif side:
         me, op = (H, A) if side == "home" else (A, H)
         fm, fo = (fh, fa) if side == "home" else (fa, fh)
         if fm["n"] and fm["w"] * 2 > fm["n"]:
-            facts.append(f"{me['name']} ganó {fm['w']} de sus últimos {fm['n']} partidos"
+            facts.append(f"{_nick(me)} ganó {fm['w']} de sus últimos {fm['n']} partidos"
                          + (f" ({fm['streak']})." if fm["streak"] and "victorias" in fm["streak"] else "."))
         if fo["n"] and fo["w"] * 2 < fo["n"]:
-            facts.append(f"{op['name']} perdió {fo['n'] - fo['w']} de sus últimos {fo['n']}.")
+            facts.append(f"{_nick(op)} perdió {fo['n'] - fo['w']} de sus últimos {fo['n']}.")
         if fm["margin"] > fo["margin"]:
-            facts.append(f"{me['name']} gana sus partidos por {abs(fm['margin']):.0f} puntos de media"
+            facts.append(f"{_nick(me)} gana sus partidos por {abs(fm['margin']):.0f} puntos de media"
                          if fm["margin"] > 0 else
-                         f"{me['name']} viene compitiendo mejor que {op['name']} en los últimos partidos")
+                         f"{_nick(me)} viene compitiendo mejor que {_nick(op)} en los últimos partidos")
             facts[-1] += "."
         outs = [i["name"] for i in op.get("injuries") or [] if (i.get("status") or "").lower() in ("out", "doubtful")]
         if outs:
-            facts.append(f"{op['name']} no tendrá a {', '.join(outs[:3])}.")
+            facts.append(f"{_nick(op)} no tendrá a {', '.join(outs[:3])}.")
         rd = op.get("rest_days")
         if rd is not None and rd < 1.6:
-            facts.append(f"{op['name']} jugó ayer: llega con menos descanso.")
+            facts.append(f"{_nick(op)} jugó ayer: llega con menos descanso.")
         if me.get("espn_prob") and me["espn_prob"] >= 0.5:
             facts.append(f"El pronóstico de ESPN le da {prob_text(me['espn_prob'])} de ganar.")
     return facts

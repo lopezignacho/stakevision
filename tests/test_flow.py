@@ -1256,7 +1256,7 @@ pU = {"id": "880", "kind": "simple", "price": 1.70, "prob": 0.578, "edge": -0.01
       "channel_msgs": {"free": 501, "vip": 601}, "ig_pre_status": "posted", "free": True}
 txt = formatting.channel_post(pU, "free")
 assert "Pick: Gana Universidad de Chile @ 1.70" in txt and "hándicap" not in txt.lower() and "Viña" in txt
-assert "Por qué" in txt and "cara a cara" in txt and "Le damos un" in txt and "$2.000" in txt
+assert "Por qué" in txt and "cara a cara" in txt and "Le damos un" in txt and "Stake 4/10" in txt and "bankroll" not in txt
 assert "Cuota justa" not in txt and "alcanza con" not in txt and "mercado de referencia" not in txt
 st = store.load()
 st["picks"]["880"] = pU
