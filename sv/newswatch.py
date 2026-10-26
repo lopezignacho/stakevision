@@ -32,8 +32,10 @@ def BUTTONS(nid: str) -> list:
     return [[("✅ Sí, prepárala", f"nq:{nid}"), ("✖️ No", f"nx:{nid}")]]
 
 
-def PUBLISH_BUTTONS(nid: str) -> list:
-    return [[("📸 Publicar en Instagram", f"np:{nid}"), ("✖️ No publicar", f"nn:{nid}")]]
+def PUBLISH_BUTTONS(nid: str, reel: bool = True) -> list:
+    if reel:
+        return [[("🎬 Publicar Reel", f"np:{nid}"), ("🖼 Solo imagen", f"ni:{nid}")], [("✖️ No publicar", f"nn:{nid}")]]
+    return [[("📸 Publicar en Instagram", f"ni:{nid}"), ("✖️ No publicar", f"nn:{nid}")]]
 
 
 def _load(path: str) -> list:
@@ -173,7 +175,7 @@ def request(state: dict, nid: str) -> bool:
 
 
 # ---------------------------------------------------------------- 3) listas para publicar
-def _render(item: dict) -> tuple[bytes, str | None]:
+def _render(item: dict) -> tuple[bytes, str | None, dict]:
     from . import commons, newsimage
     photo, credit = None, None
     try:
@@ -193,7 +195,7 @@ def _render(item: dict) -> tuple[bytes, str | None]:
     n["source"] = "Fuentes: " + item.get("sources", "ESPN")
     if photo:
         n["photo"], n["credit"] = photo, credit
-    return newsimage.render_news(n), credit
+    return newsimage.render_news(n), credit, n
 
 
 def ready(state: dict) -> None:
@@ -210,7 +212,7 @@ def ready(state: dict) -> None:
             continue
         done.append(nid)
         try:
-            img, _credit = _render(item)
+            img, _credit, nd = _render(item)
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
             telegram.send(owner, f"⚠️ No pude armar la noticia {formatting.escape(nid)}: {formatting.escape(str(e))}")
@@ -218,16 +220,32 @@ def ready(state: dict) -> None:
         key = f"news-{nid}"
         instagram.save_image(key, img)
         job = {"key": key, "caption": item["caption"], "status": "draft", "title": item.get("headline", "")}
+        reel_mp4 = None
+        try:   # Reel (video vertical con animación): es lo que más alcance da en Instagram
+            from . import reel
+            reel_mp4, cover = reel.news(dict(nd, credit=(nd.get("credit") or "").replace("Foto de referencia:", "Foto:")))
+            instagram.save_video(key, reel_mp4, cover)
+            job["reel"] = key
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
         state.setdefault("ig_jobs", {})[nid] = job
         if item.get("approved"):
             job["status"] = "queued"
-            msg = telegram.send_photo(owner, img, caption="📰 <b>Noticia para Instagram</b> (aprobada en el chat): "
-                                      "se publica en unos minutos.")
+            job["mode"] = "reel" if job.get("reel") else "image"
+            what = "Reel" if job.get("reel") else "imagen"
+            msg = (telegram.send_video(owner, reel_mp4, caption=f"📰 <b>Noticia para Instagram</b> (aprobada en el chat): "
+                                       f"el {what} se publica en unos minutos.") if reel_mp4 else
+                   telegram.send_photo(owner, img, caption="📰 <b>Noticia para Instagram</b> (aprobada en el chat): "
+                                       "se publica en unos minutos."))
         else:
-            msg = telegram.send_photo(owner, img, caption="📰 <b>Noticia lista para Instagram</b>\n"
-                                      "Abajo va el texto. ¿La publicamos? (solo Instagram)")
+            cap = ("📰 <b>Noticia lista para Instagram</b>\nAbajo va el texto. ¿La publicamos como Reel? "
+                   "(solo Instagram; también puede ir solo como imagen)")
+            try:
+                msg = telegram.send_video(owner, reel_mp4, caption=cap) if reel_mp4 else telegram.send_photo(owner, img, caption=cap)
+            except Exception:  # noqa: BLE001
+                msg = telegram.send_photo(owner, img, caption=cap)
             telegram.send(owner, "<pre>" + formatting.escape(item["caption"]) + "</pre>")
-            telegram.set_buttons(owner, msg["message_id"], PUBLISH_BUTTONS(nid))
+            telegram.set_buttons(owner, msg["message_id"], PUBLISH_BUTTONS(nid, bool(reel_mp4)))
     del done[:-200]
 
 
@@ -242,14 +260,15 @@ def callback(state: dict, cb: dict, action: str, nid: str) -> None:
         (state.get("news_pending") or {}).pop(nid, None)
         telegram.edit_buttons_off(owner, mid, "✖️ Descartada")
         telegram.answer(cb["id"], "Descartada")
-    elif action in ("np", "nn"):
+    elif action in ("np", "ni", "nn"):
         job = (state.get("ig_jobs") or {}).get(nid)
         if not job or job["status"] != "draft":
             telegram.answer(cb["id"], "Ya estaba procesada")
             return
-        job["status"] = "queued" if action == "np" else "skipped"
-        telegram.edit_buttons_off(owner, mid, "⏳ Se publica en Instagram en unos minutos" if action == "np"
-                                  else "✖️ No se publica")
+        job["status"] = "skipped" if action == "nn" else "queued"
+        job["mode"] = "reel" if action == "np" and job.get("reel") else "image"
+        telegram.edit_buttons_off(owner, mid, "✖️ No se publica" if action == "nn" else
+                                  f"⏳ Se publica en Instagram ({'Reel' if job['mode'] == 'reel' else 'imagen'}) en unos minutos")
         telegram.answer(cb["id"], "Listo")
 
 
@@ -258,13 +277,19 @@ def publish_jobs(state: dict) -> None:
     from . import instagram
     owner = state.get("owner_chat")
     for nid, job in (state.get("ig_jobs") or {}).items():
-        if job.get("status") != "queued" or not instagram.image_live(job["key"]):
+        if job.get("status") != "queued":
+            continue
+        reel_mode = job.get("mode") == "reel" and job.get("reel")
+        if not (instagram.video_live(job["reel"]) if reel_mode else instagram.image_live(job["key"])):
             continue
         try:
-            link = instagram.publish(state, job["key"], job["caption"])
+            link = instagram.reel_step(state, job, job["caption"]) if reel_mode else instagram.publish(state, job["key"], job["caption"])
+            if reel_mode and link is None:
+                continue   # Instagram aún procesa el video: se revisa en la próxima vuelta
             job["status"] = "posted"
             if owner:
-                telegram.send(owner, "✅ Noticia publicada en Instagram" + (f"\n{link}" if link else ""))
+                telegram.send(owner, f"✅ Noticia publicada en Instagram ({'Reel' if reel_mode else 'imagen'})"
+                              + (f"\n{link}" if link else ""))
         except instagram.InstagramError as e:
             job["tries"] = job.get("tries", 0) + 1
             if job["tries"] >= 3:

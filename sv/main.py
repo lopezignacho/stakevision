@@ -1768,10 +1768,16 @@ def _instagram_queue(state: dict, now) -> None:
         if p.get("ig_story_status") == "queued":
             jobs.append((p, "ig_story_status", f"story-{p['id']}", None))
     for p, field, key, caption in jobs:
-        if not instagram.image_live(key):
+        rk = (p.get("recap") or {}).get("reel") if field == "ig_res_status" else None
+        if not (instagram.video_live(rk) if rk else instagram.image_live(key)):
             continue   # la web aún no la publica; se reintenta en la próxima revisión
         try:
-            if field == "ig_story_status":
+            if rk:   # postpartido como Reel (en dos pasos: Instagram procesa el video)
+                job = p.setdefault("ig_res_job", {"reel": rk})
+                link = instagram.reel_step(state, job, caption)
+                if link is None:
+                    continue
+            elif field == "ig_story_status":
                 instagram.publish_story(state, instagram.image_url(key))
                 link = ""
             else:
@@ -1864,9 +1870,18 @@ def _recap_panel(state: dict, p: dict) -> None:
         hhmm = store.parse_ts(r["auto_at"]).astimezone(ZoneInfo(config.TIMEZONE)).strftime("%H:%M")
         cap += (f"\n🤖 Pick gratis automático: se comparte sola a las {hhmm} en los canales del pick"
                 + (" y en Instagram" if p.get("result") == "W" else "") + ".")
+    if r.get("reel"):
+        cap += "\n🎬 En Instagram sale como Reel (el video de abajo)."
     with open(_recap_file(p), "rb") as f:
         msg = telegram.send_photo(owner, f.read(), caption=cap)
     r["panel"] = msg["message_id"]
+    if r.pop("reel_new", None):
+        try:
+            from . import instagram
+            with open(instagram.video_path(r["reel"]), "rb") as f:
+                telegram.send_video(owner, f.read(), caption=f"🎬 Reel del postpartido · pick #{p['id']}")
+        except Exception:
+            traceback.print_exc()
     telegram.set_buttons(owner, r["panel"], RECAP_BUTTONS(p))
 
 
@@ -1925,6 +1940,17 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
             p["recap"][k] = old[k]
     if p.get("auto_free") and not p["recap"].get("auto_at"):
         p["recap"]["auto_at"] = _iso(store.now_utc() + timedelta(minutes=config.AUTO_FREE_RECAP_DELAY_MIN))
+    if old.get("reel"):
+        p["recap"]["reel"] = old["reel"]
+    elif config.IG_REELS:
+        try:   # Reel del postpartido (marcador que sube, goles y nuestro pick): va a Instagram en vez de la imagen
+            from . import instagram, reel
+            mp4, cover = reel.from_report(p, rep, photo if photo and old.get("photo_src") != "user" else None)
+            instagram.save_video(f"res-{p['id']}", mp4, cover)
+            p["recap"]["reel"] = f"res-{p['id']}"
+            p["recap"]["reel_new"] = True
+        except Exception:
+            traceback.print_exc()
     p.pop("recap_pending", None)
     p["ig_kit_sent"] = True   # el post partido reemplaza a la imagen de celebración
     _recap_panel(state, p)
@@ -2863,7 +2889,7 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.answer(cb["id"], "No autorizado")
         return
     action, _, pid = (cb.get("data") or "").partition(":")
-    if action in ("nq", "nx", "np", "nn"):   # noticias para Instagram
+    if action in ("nq", "nx", "np", "ni", "nn"):   # noticias para Instagram
         from . import newswatch
         newswatch.callback(state, cb, action, pid)
         return

@@ -59,6 +59,24 @@ def send_photo(chat_id, photo: bytes, caption: str | None = None, reply_to: int 
     return res["result"]
 
 
+def send_video(chat_id, video: bytes, caption: str | None = None, cover: bytes | None = None) -> dict:
+    """Video (Reel) en el chat. Vista previa para que lo apruebes."""
+    if not config.TELEGRAM_TOKEN:
+        raise TelegramError("Falta TELEGRAM_TOKEN")
+    data = {"chat_id": chat_id, "supports_streaming": "true", "width": 1080, "height": 1920}
+    if caption:
+        data.update(caption=caption, parse_mode="HTML")
+    files = {"video": ("reel.mp4", video, "video/mp4")}
+    if cover:
+        files["thumbnail"] = ("cover.jpg", cover, "image/jpeg")
+        data["thumbnail"] = "attach://thumbnail"
+    r = requests.post(f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/sendVideo", data=data, files=files, timeout=120)
+    res = r.json()
+    if not res.get("ok"):
+        raise TelegramError(f"sendVideo: {res.get('description')}")
+    return res["result"]
+
+
 def set_buttons(chat_id, message_id: int, buttons: list[list[tuple[str, str]]]) -> None:
     try:
         _call("editMessageReplyMarkup", chat_id=chat_id, message_id=message_id,

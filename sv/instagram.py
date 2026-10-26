@@ -193,3 +193,49 @@ def publish_story(state: dict, url: str) -> str:
     c = _call("POST", f"{uid}/media", state, image_url=url, media_type="STORIES")
     _wait(state, c["id"])
     return _publish_container(state, uid, c["id"])
+
+
+# ---------------------------------------------------------------- Reels
+def video_path(key: str) -> str:
+    return os.path.join(config.ROOT, "docs", "ig", f"reel-{key}.mp4")
+
+
+def video_url(key: str) -> str:
+    return f"{config.PUBLIC_SITE}/ig/reel-{key}.mp4"
+
+
+def save_video(key: str, mp4: bytes, cover: bytes | None = None) -> None:
+    os.makedirs(os.path.dirname(video_path(key)), exist_ok=True)
+    with open(video_path(key), "wb") as f:
+        f.write(mp4)
+    if cover:
+        save_image(f"reel-{key}", cover)
+
+
+def video_live(key: str) -> bool:
+    try:
+        return requests.head(video_url(key), timeout=20, allow_redirects=True).status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def reel_step(state: dict, job: dict, caption: str) -> str | None:
+    """Publica un Reel en dos pasos (Instagram tarda en procesar el video): la primera vez crea el contenedor
+    y guarda su id en job['cid']; las siguientes revisan si quedó listo y lo publican.
+    Devuelve el enlace cuando se publicó; None si aún está procesando."""
+    uid = _uid(state)
+    if not job.get("cid"):
+        params = {"media_type": "REELS", "video_url": video_url(job["reel"]), "caption": caption, "share_to_feed": "true"}
+        if image_live(f"reel-{job['reel']}"):
+            params["cover_url"] = image_url(f"reel-{job['reel']}")
+        job["cid"] = _call("POST", f"{uid}/media", state, **params)["id"]
+        return None
+    st = _call("GET", job["cid"], state, fields="status_code").get("status_code") or ""
+    if st in ("ERROR", "EXPIRED"):
+        job.pop("cid", None)
+        raise InstagramError(f"Instagram no pudo procesar el video ({st})")
+    if st != "FINISHED":
+        return None
+    link = _publish_container(state, uid, job["cid"])
+    job.pop("cid", None)
+    return link

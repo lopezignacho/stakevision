@@ -87,6 +87,7 @@ AUTO_FREE_DELAY_MIN = 30         # minutos para cancelarlo o cambiarlo antes de 
 AUTO_FREE_MIN_LEAD_MIN = 90      # el partido debe empezar al menos 90 min después de publicarlo
 AUTO_FREE_MIN_EDGE = -0.02       # cuota disponible como mucho un 2 % por debajo de la justa
 AUTO_FREE_VIP_TOO = True         # también sale en VIP (cuenta dentro de los 2-4 del día)
+IG_REELS = True                  # postpartidos y noticias: Reel (video) en Instagram en vez de imagen
 AUTO_FREE_INSTAGRAM = True       # y en el feed de Instagram, si está conectado
 AUTO_FREE_RECAP_DELAY_MIN = 20
 DAILY_TOP = 3                    # 00:05: los 3 mejores picks de fútbol del día (de ahí sale el gratis)

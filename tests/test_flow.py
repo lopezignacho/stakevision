@@ -16,6 +16,9 @@ config.STATE_FILE = os.path.join(tmp, "state.enc")
 config.PUBLIC_HISTORY = os.path.join(tmp, "historial.json")
 config.STATE_KEY = os.environ["STATE_KEY"]
 config.LINK_CODE = "codigo123"
+config.IG_REELS = False   # los Reels se prueban aparte (codificar video es lento)
+from sv import newswatch as _nw0  # noqa: E402
+_nw0.REQ, _nw0.READY = os.path.join(tmp, "news_requests.json"), os.path.join(tmp, "news_ready.json")
 
 sent, updates_q = [], []
 
@@ -1350,12 +1353,78 @@ _nw._save(_nw.READY, [{"id": "jw1", "approved": True, "tag": "LESIÓN", "kicker"
 _saved = {}
 _ig.save_image = lambda k, b: _saved.setdefault(k, b)
 main.telegram.send_photo = lambda chat, img, caption=None, reply_to=None: (photos.append((chat, caption)), {"message_id": 70})[1]
+main.telegram.send_video = lambda chat, v, caption=None, cover=None: (photos.append((chat, caption)), {"message_id": 70})[1]
+import sv.reel as _rl0  # noqa: E402
+_rl0.news = lambda n_, duration=11.0: (b"mp4", b"jpg")
+_ig.save_video = lambda k, m, c=None: _saved.setdefault("v-" + k, m)
 _nw.ready(st)
+assert st["ig_jobs"]["jw1"].get("mode") == "reel" and st["ig_jobs"]["w2"].get("reel")
 assert st["ig_jobs"]["jw1"]["status"] == "queued" and st["ig_jobs"]["w2"]["status"] == "draft" and "news-jw1" in _saved
-_nw.callback(st, {"id": "c", "message": {"message_id": 70}}, "np", "w2")
-assert st["ig_jobs"]["w2"]["status"] == "queued"
+_nw.callback(st, {"id": "c", "message": {"message_id": 70}}, "ni", "w2")   # solo imagen
+assert st["ig_jobs"]["w2"]["status"] == "queued" and st["ig_jobs"]["w2"]["mode"] == "image"
 _ig.image_live = lambda k: True
+_ig.video_live = lambda k: True
 _ig.publish = lambda state, key, cap: "https://instagram.com/p/x"
+_steps = iter([None, "https://instagram.com/reel/y"])
+_ig.reel_step = lambda state, job, cap: next(_steps)
+_nw.publish_jobs(st)                    # el Reel queda procesando; la imagen sale
+assert st["ig_jobs"]["jw1"]["status"] == "queued" and st["ig_jobs"]["w2"]["status"] == "posted"
 _nw.publish_jobs(st)
 assert st["ig_jobs"]["jw1"]["status"] == "posted" and st["ig_jobs"]["w2"]["status"] == "posted"
 print("OK noticias → Instagram")
+
+
+# 42) Reels: video real (corto) + publicación en dos pasos + postpartido como Reel
+import importlib  # noqa: E402
+from sv import reel as _reel  # noqa: E402
+importlib.reload(_reel)   # la prueba anterior reemplazó reel.news por uno falso
+importlib.reload(_ig)     # y también funciones de instagram
+_ig.save_image = lambda k, b: _saved.setdefault(k, b)
+mp4, cov = _reel.news({"tag": "LESIÓN", "kicker": "THUNDER · NBA", "headline": "JALEN WILLIAMS SALIÓ EN CAMILLA", "sub": "x",
+                       "facts": ["uno", "dos"], "status": "PENDIENTE", "colors": [[0, 122, 193], [239, 59, 36]], "source": "AP"},
+                      duration=1.0)
+assert mp4[4:8] == b"ftyp" and len(mp4) > 10000 and cov[:2] == b"\xff\xd8"
+calls_ig = []
+_ig._uid = lambda st_: "u1"
+def _fake_call(method, path, st_, **kw):
+    calls_ig.append((method, path, kw.get("media_type")))
+    if method == "POST" and path.endswith("/media"):
+        return {"id": "c1"}
+    return {"status_code": "FINISHED"}
+_ig._call = _fake_call
+_ig._publish_container = lambda st_, uid, cid: "https://instagram.com/reel/x"
+_ig.image_live = lambda k: True
+job = {"reel": "news-x"}
+assert _ig.reel_step(st, job, "cap") is None and job["cid"] == "c1" and calls_ig[0][2] == "REELS"
+assert _ig.reel_step(st, job, "cap") == "https://instagram.com/reel/x" and "cid" not in job
+# postpartido: con IG_REELS, el recap guarda su Reel y el envío a Instagram usa el Reel
+config.IG_REELS = True
+_reel.from_report = lambda p_, rep_, photo=None: (b"\x00\x00\x00\x18ftypmp42" + b"0" * 20000, b"\xff\xd8x")
+_ig.save_video = lambda k, m, c=None: _saved.setdefault("v-" + k, m)
+pr = {"id": "996", "status": "settled", "result": "W", "kind": "simple", "price": 1.8, "stake": 3, "kickoff": main._iso(store.now_utc()),
+      "legs": [{"home": "Arsenal", "away": "Chelsea", "kickoff": main._iso(store.now_utc()), "sport": "soccer", "league": "Inglaterra · Premier League",
+                "mtype": "1x2", "outcome": "1", "label": "Gana Arsenal"}]}
+st["picks"]["996"] = pr
+espn.match_report = lambda *a, **k: {"id": "e", "home": {"name": "Arsenal", "short": "Arsenal", "score": 2, "color": (200, 0, 0), "alt": (255, 255, 255), "id": "1", "side": "home", "winner": True, "agg": None, "stats": {}},
+                                     "away": {"name": "Chelsea", "short": "Chelsea", "score": 0, "color": (0, 0, 150), "alt": (255, 255, 255), "id": "2", "side": "away", "winner": False, "agg": None, "stats": {}},
+                                     "goals": [], "reds": [], "state": "post", "venue": "Emirates", "series": None, "stage": ""}
+vids = []
+main.telegram.send_video = lambda chat, v, caption=None, cover=None: vids.append(caption) or {"message_id": 80}
+import sv.matchphoto as _mph  # noqa: E402
+_mph.for_scorer = lambda *a, **k: None
+commons.team_photo = lambda *a, **k: None
+commons.photo = lambda *a, **k: None
+_orig_v = main.instagram.video_path if hasattr(main, "instagram") else None
+_ig.video_path = lambda k: os.path.join(tmp, f"reel-{k}.mp4")
+open(_ig.video_path("res-996"), "wb").write(b"0" * 100)
+main._recap(st, pr)
+assert pr["recap"].get("reel") == "res-996" and any("Reel del postpartido" in (c or "") for c in vids), (pr["recap"].get("reel"), vids)
+pr["ig_res_status"], pr["ig_res_caption"] = "queued", "Texto"
+_ig.video_live = lambda k: True
+calls_ig.clear()
+main._instagram_queue(st, store.now_utc())
+assert pr["ig_res_status"] == "queued" and pr["ig_res_job"]["cid"] == "c1"     # paso 1: contenedor creado
+main._instagram_queue(st, store.now_utc())
+assert pr["ig_res_status"] == "posted"                                       # paso 2: publicado
+config.IG_REELS = False
+print("OK Reels")
