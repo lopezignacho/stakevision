@@ -1112,11 +1112,22 @@ def NBA_BUTTONS(pid: str, has_b: bool) -> list:
 
 
 def _nba_option_block(d: dict, role: str) -> str:
-    from . import nba
+    from . import argument
     l = d["legs"][0]
     sign = "+" if d["edge"] >= 0 else ""
+    ev = l.get("nba_ev")
+    pp = argument.shown_prob(d)
+    data = ""
+    if ev:
+        tag = {"ok": "✅ los datos acompañan", "debil": "🟡 los datos acompañan a medias",
+               "contra": "⚠️ los datos lo contradicen"}[ev["verdict"]]
+        who = (("del local", "del visitante") if l.get("mtype") == "totals" else ("del equipo elegido", "del rival"))
+        data = (f"📚 Datos: se habría cumplido en {ev['me'][0]}/{ev['me'][1]} partidos {who[0]} y "
+                f"{ev['op'][0]}/{ev['op'][1]} {who[1]} → {tag}\n")
+    margin = ("⚖️ <b>Sin margen:</b> le damos " + argument.prob_text(pp) + " y la cuota pide "
+              + argument.prob_text(1 / d["price"]) + ". Decide tú.\n") if pp < 1 / d["price"] else ""
     return (f"<b>Opción {role}</b> · 🎯 <b>{formatting.escape(l['label'])}</b> @ {formatting.odds(d['price'])} "
-            f"· valor {sign}{formatting.pct(d['edge'])} · stake {d['stake']}/10\n"
+            f"· valor {sign}{formatting.pct(d['edge'])} · stake {d['stake']}/10\n" + margin + data +
             f"🗣 En el canal: <b>{formatting.escape(formatting.public_label(l))}</b>\n"
             f"<i>{formatting.escape(d.get('why', ''))}</i>\n{_args_html(l)}")
 
@@ -1218,6 +1229,7 @@ def scan_nba(top: int | None = None, manual: bool = False, live: bool = False) -
         state["seq"] += 1
         pid = str(state["seq"])
         d.update(id=pid, status="candidate", created_at=_iso(now), stake_v=2, sport="basketball")
+        _nba_enrich(d, ctx)
         if live:
             d["live"] = True
             found = nba.find_event(a.home, a.away, a.kickoff)
@@ -1328,6 +1340,8 @@ def scan_match(query: str, sport: str | None = None) -> None:
     state["seq"] += 1
     pid = str(state["seq"])
     d.update(id=pid, status="candidate", created_at=_iso(now), stake_v=2, sport=sp)
+    if sp == "basketball":
+        _nba_enrich(d, ctx)
     if live:
         d["live"] = True
         if sp == "basketball":
@@ -2140,6 +2154,20 @@ def _nba_pick_dict(fx, a, b, tier) -> dict:
     return d
 
 
+def _nba_enrich(d: dict, ctx: dict | None) -> None:
+    """Contexto, bajas que pesan y contraste con datos para la opción A y la B."""
+    from . import nbadata
+    try:
+        nbadata.key_absences(ctx, d["legs"][0]["kickoff"])
+    except Exception:
+        traceback.print_exc()
+    for x in (d, d.get("alt")):
+        if x:
+            x["legs"][0]["nba_ctx"] = ctx
+            x["legs"][0]["nba_ev"] = nbadata.check(x["legs"][0], ctx)
+            x["analysis"] = formatting.analysis(x)
+
+
 def _nba_send_candidate(state: dict, d: dict, now) -> None:
     from . import nba
     l = d["legs"][0]
@@ -2148,10 +2176,21 @@ def _nba_send_candidate(state: dict, d: dict, now) -> None:
         ctx = nba.context(l["home"], l["away"], l["kickoff"])   # bajas confirmadas a esta hora
     except Exception:
         traceback.print_exc()
-    for x in (d, d.get("alt")):
-        if x:
-            x["legs"][0]["nba_ctx"] = ctx
-            x["analysis"] = formatting.analysis(x)
+    _nba_enrich(d, ctx)
+    contra = lambda x: (x["legs"][0].get("nba_ev") or {}).get("verdict") == "contra"  # noqa: E731
+    if contra(d) and d.get("alt") and not contra(d["alt"]):
+        alt = d.pop("alt")            # la B pasa a ser la sugerencia: la A va contra los datos
+        alt["sport"] = "basketball"
+        d.clear()
+        d.update(alt)
+    elif contra(d):
+        ev = d["legs"][0]["nba_ev"]
+        telegram.send(state["owner_chat"],
+                      f"🏀 <b>{formatting.escape(formatting.team(l['home']))} vs {formatting.escape(formatting.team(l['away']))}</b>: "
+                      f"sin pronóstico sugerido. La mejor opción ({formatting.escape(formatting.public_label(l))}) se habría "
+                      f"cumplido solo en {ev['me'][0] + ev['op'][0]} de {ev['me'][1] + ev['op'][1]} partidos recientes. "
+                      "El Bet Builder sí te llega.")
+        return
     state["seq"] += 1
     pid = str(state["seq"])
     d.update(id=pid, status="candidate", created_at=_iso(now), stake_v=2, sport="basketball", pregame_pick=True)

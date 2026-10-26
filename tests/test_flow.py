@@ -1280,3 +1280,27 @@ if _had:
 else:
     os.remove(_rf)
 print("OK formato simple + corrección del gratis")
+
+# 40) NBA: contraste con datos, bajas que pesan y «sin margen»
+from sv import nbadata  # noqa: E402
+_g = lambda pf, pa, home=True: {"pf": pf, "pa": pa, "home": home, "season": 2027, "date": "2026-10-20"}  # noqa: E731
+ctxN = {"home": {"name": "Denver Nuggets", "games": [_g(120, 100)] * 9 + [_g(100, 110)], "injuries": [], "key_out": [], "home_rec": "", "road_rec": "", "record": ""},
+        "away": {"name": "Golden State Warriors", "games": [_g(100, 115, False)] * 9 + [_g(110, 100, False)], "injuries": [],
+                 "key_out": [{"name": "Draymond Green", "pts": 9.0, "min": 30}], "rest_days": 1.0,
+                 "home_rec": "", "road_rec": "", "record": ""}}
+legW = {"home": "Denver Nuggets", "away": "Golden State Warriors", "sport": "basketball", "mtype": "spreads",
+        "outcome": "2", "handicap": -9.5, "price": 1.78, "kickoff": "2026-10-27T02:00:00Z", "nba_ctx": ctxN,
+        "fair_odds": 1.79, "edge": -0.003}
+evW = nbadata.check(legW, ctxN)
+assert evW["verdict"] == "contra", evW          # Warriors pierde por 15 casi siempre: +9.5 no se cumple
+legD = dict(legW, outcome="1", handicap=-9.5)   # Nuggets -9.5
+evD = nbadata.check(legD, ctxN)
+assert evD["verdict"] == "ok", evD
+legD["nba_ev"] = evD
+fD = _arg._nba(legD)
+assert any("Nuggets ganó por 10 o más en 9 de sus últimos 10" in f for f in fD), fD
+assert any("Draymond Green" in f for f in fD) and any("jugó anoche" in f for f in fD)
+pW = {"id": "990", "kind": "simple", "price": 1.78, "prob": 0.56, "edge": -0.003, "stake": 3, "tier": "justa",
+      "legs": [dict(legW, nba_ev=evW, label="Golden State Warriors +9.5")], "kickoff": legW["kickoff"]}
+assert "Sin margen" in main._nba_option_block(pW, "A")
+print("OK NBA datos + bajas + sin margen")

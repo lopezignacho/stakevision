@@ -93,9 +93,9 @@ def _selection_parts(l: dict) -> tuple[str, str]:
 
 
 def _when(iso: str) -> tuple[str, str]:
-    t = formatting.local_time(iso)          # "19/10 15:45 p. m." → ("19/10", "15:45")
-    day, _, hour = t.partition(" ")
-    return day, hour.split(" ")[0]
+    t = formatting.local_time(iso)          # "19/10, 15:45" → ("19/10", "15:45")
+    day, _, hour = t.partition(", ")
+    return day, hour
 
 
 def _leg_height(l: dict) -> int:
@@ -616,7 +616,7 @@ def render_story(pick: dict, theme: str = "dark") -> bytes:
             t, ft = _fit(d, team, "Bold", 54, W - 260)
             d.text((130, yy), t, font=ft, fill=INK)
             yy += 70
-        day, _, hour = formatting.local_time(l["kickoff"]).partition(" ")
+        day, _, hour = formatting.local_time(l["kickoff"]).partition(", ")
         d.text((130, yy + 4), f"🕒 {hour}".replace("🕒 ", ""), font=_font("Medium", 34), fill=GREEN)
         yy += 70
         sel = formatting.public_label(l)

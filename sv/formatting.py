@@ -11,8 +11,9 @@ TZ = ZoneInfo(config.TIMEZONE)
 
 
 def local_time(iso: str) -> str:
+    """«26/10, 23:00» (hora de Chile, 24 h)."""
     dt = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(TZ)
-    return dt.strftime("%d/%m %H:%M") + (" a. m." if dt.hour < 12 else " p. m.")
+    return dt.strftime("%d/%m, %H:%M")
 
 
 def pct(x: float) -> str:

@@ -195,48 +195,61 @@ def _nick(t: dict) -> str:
 
 
 def _nba(l: dict) -> list[str]:
-    from . import nba
+    """Hechos que respaldan el pick NBA: cuántas veces se habría cumplido, localía, bajas que pesan, descanso."""
+    from . import nbadata
     ctx = l.get("nba_ctx")
     if not ctx:
         return []
-    H, A = ctx["home"], ctx["away"]
-    fh, fa = nba._form(H), nba._form(A)
     t, o, line = l.get("mtype", ""), str(l.get("outcome", "")).lower(), l.get("handicap")
-    side = {"1": "home", "2": "away"}.get(o)
-    if t == "teamtotals-team1":
-        side = "home"
-    if t == "teamtotals-team2":
-        side = "away"
-    facts = []
-    if t == "totals" and line is not None and fh["n"] >= 5 and fa["n"] >= 5:
-        over = o.startswith(("más", "mas", "over"))
-        exp = (fh["pf"] + fa["pa"]) / 2 + (fa["pf"] + fh["pa"]) / 2
-        if (exp > float(line)) == over:
-            facts.append(f"Por lo que anotan y reciben, el partido proyecta unos {exp:.0f} puntos (la línea es {float(line):g}).")
-        facts.append(f"{_nick(H)} anota {fh['pf']:.0f} y recibe {fh['pa']:.0f} puntos por partido.")
-        facts.append(f"{_nick(A)} anota {fa['pf']:.0f} y recibe {fa['pa']:.0f}.")
-    elif side:
-        me, op = (H, A) if side == "home" else (A, H)
-        fm, fo = (fh, fa) if side == "home" else (fa, fh)
-        if fm["n"] and fm["w"] * 2 > fm["n"]:
-            facts.append(f"{_nick(me)} ganó {fm['w']} de sus últimos {fm['n']} partidos"
-                         + (f" ({fm['streak']})." if fm["streak"] and "victorias" in fm["streak"] else "."))
-        if fo["n"] and fo["w"] * 2 < fo["n"]:
-            facts.append(f"{_nick(op)} perdió {fo['n'] - fo['w']} de sus últimos {fo['n']}.")
-        if fm["margin"] > fo["margin"]:
-            facts.append(f"{_nick(me)} gana sus partidos por {abs(fm['margin']):.0f} puntos de media"
-                         if fm["margin"] > 0 else
-                         f"{_nick(me)} viene compitiendo mejor que {_nick(op)} en los últimos partidos")
-            facts[-1] += "."
-        outs = [i["name"] for i in op.get("injuries") or [] if (i.get("status") or "").lower() in ("out", "doubtful")]
-        if outs:
-            facts.append(f"{_nick(op)} no tendrá a {', '.join(outs[:3])}.")
-        rd = op.get("rest_days")
-        if rd is not None and rd < 1.6:
-            facts.append(f"{_nick(op)} jugó ayer: llega con menos descanso.")
-        if me.get("espn_prob") and me["espn_prob"] >= 0.5:
-            facts.append(f"El pronóstico de ESPN le da {prob_text(me['espn_prob'])} de ganar.")
-    return facts
+    fns = nbadata.hit_fns(l)
+    side = nbadata._side(l) or "home"
+    me, op = (ctx["home"], ctx["away"]) if side == "home" else (ctx["away"], ctx["home"])
+    mn, on = _nick(me), _nick(op)
+    gm, go = (me.get("games") or [])[:10], (op.get("games") or [])[:10]
+    facts: list[tuple[int, str]] = []
+    if fns and len(gm) >= 5 and len(go) >= 5:
+        km, ko = sum(map(fns[0], gm)), sum(map(fns[1], go))
+        if t == "spreads" and line is not None:
+            hh = nbadata._line_for_team(l)
+            k = nbadata.need_txt(hh)
+            if hh > 0:   # puede perder por menos de k
+                m_txt = f"{mn} no perdió por {k} o más en {km} de sus últimos {len(gm)} partidos."
+                o_txt = f"{on} ganó por {k} o más solo en {len(go) - ko} de sus últimos {len(go)}."
+            else:
+                m_txt = f"{mn} ganó por {k} o más en {km} de sus últimos {len(gm)} partidos."
+                o_txt = f"{on} perdió por {k} o más en {ko} de sus últimos {len(go)}."
+        elif t == "moneyline":
+            m_txt = f"{mn} ganó {km} de sus últimos {len(gm)} partidos."
+            o_txt = f"{on} perdió {ko} de sus últimos {len(go)}."
+        elif t == "totals":
+            word = f"{'más' if o.startswith(('más', 'mas', 'over')) else 'menos'} de {float(line):g} puntos"
+            m_txt = f"Hubo {word} en {km} de los últimos {len(gm)} partidos de {mn}."
+            o_txt = f"Y en {ko} de los últimos {len(go)} de {on}."
+        else:
+            word = f"{'más' if o.startswith(('más', 'mas', 'over')) else 'menos'} de {float(line):g} puntos"
+            m_txt = f"{mn} anotó {word} en {km} de sus últimos {len(gm)} partidos."
+            o_txt = f"{on} recibió {word} en {ko} de sus últimos {len(go)}."
+        if km * 2 > len(gm):
+            facts.append((0, m_txt))
+        if ko * 2 > len(go):
+            facts.append((1, o_txt))
+        venue = [g for g in gm if g.get("home") is (side == "home")]
+        if t != "totals" and len(venue) >= 3:
+            kv = sum(map(fns[0], venue))
+            if kv * 2 > len(venue) and kv != km:
+                where = "de local" if side == "home" else "de visita"
+                facts.append((3, f"{where.capitalize()}, se cumplió en {kv} de sus últimos {len(venue)}."))
+    outs = op.get("key_out") or []
+    if outs and t != "totals":
+        names = ", ".join(f"{x['name']} ({x['pts']:g} pts por partido)".replace(".", ",") for x in outs[:2])
+        facts.append((2, f"{on} no tendrá a {names}."))
+    rd = op.get("rest_days")
+    if rd is not None and rd < 1.6 and t != "totals":
+        facts.append((4, f"{on} jugó anoche: llega con menos descanso."))
+    if t == "moneyline" and me.get("espn_prob") and me["espn_prob"] >= 0.5:
+        facts.append((5, f"El pronóstico de ESPN le da {prob_text(me['espn_prob'])} de ganar."))
+    facts.sort(key=lambda x: x[0])
+    return [f for _p, f in facts]
 
 
 def _market_fallback(pick: dict, l: dict) -> list[str]:
@@ -261,6 +274,9 @@ def facts(pick: dict, l: dict) -> list[str]:
 
 def shown_prob(pick: dict) -> float:
     """Probabilidad que se publica: mercado + datos (la misma que usa el bot para elegir)."""
+    if len(pick["legs"]) == 1 and pick["legs"][0].get("sport") == "basketball":
+        from . import nbadata
+        return nbadata.blend(pick["prob"], pick["legs"][0].get("nba_ev"))
     if len(pick["legs"]) == 1 and (pick["legs"][0].get("sport") or "soccer") == "soccer":
         from . import evidence
         return evidence.blend(pick["prob"], pick["legs"][0].get("evidence"))

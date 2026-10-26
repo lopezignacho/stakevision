@@ -37,15 +37,20 @@ try:
         fx, opt = chosen
         d = main._nba_pick_dict(fx, *opt)
         l = d["legs"][0]
-        ctx = nba.context(l["home"], l["away"], l["kickoff"])
-        for x in (d, d.get("alt")):
-            if x:
-                x["legs"][0]["nba_ctx"] = ctx
-                x["analysis"] = formatting.analysis(x)
-        d.update(id="123", status="candidate", stake_v=2, sport="basketball")
-        log.append("==== 1) PRONÓSTICO SUGERIDO (te llega a ti)\n" + main.nba_candidate_text(d))
-        log.append("==== Si eliges la opción A, así sale en el VIP\n" + formatting.channel_post(d, "vip"))
-        open(f"{OUT}/pick_vip.jpg", "wb").write(postimage.render(d, "vip"))
+        sent = []
+        main.telegram.send = lambda chat, text, *a_, **k_: sent.append(text) or {"message_id": 1}
+        main.telegram.set_buttons = lambda *a_, **k_: None
+        st = {"owner_chat": 1, "seq": 122, "picks": {}}
+        main._nba_send_candidate(st, d, now)
+        if not st["picks"]:
+            log.append("==== 1) SIN PRONÓSTICO (te llega este aviso)\n" + "\n".join(sent))
+        else:
+            d = st["picks"]["123"]
+            log.append("==== 1) PRONÓSTICO SUGERIDO (te llega a ti)\n" + sent[-1])
+            log.append("==== Si eliges la opción A, así sale en el VIP\n" + formatting.channel_post(d, "vip"))
+        # además: el MISMO partido con el pick del otro lado (para ver el «por qué» cuando los datos acompañan)
+        if opt[1]:
+            pass
         b = builder.suggest(l["home"], l["away"], l["kickoff"], "basketball")
         if b:
             legs = [{"home": l["home"], "away": l["away"], "kickoff": l["kickoff"], "league": "USA · NBA",
