@@ -60,23 +60,29 @@ def _fit(draw, text, weight, size, max_w, min_size=22):
     return text, f
 
 
-MARKET_NAME = {"1x2": "Resultado final", "totals": "Total de goles", "bothteamsscore": "Ambos marcan",
-               "spreads": "Hándicap asiático", "drawnobet": "Empate no apuesta"}
+MARKET_NAME = {"1x2": "Resultado del partido", "totals": "Total de goles", "bothteamsscore": "Goles de los dos equipos",
+               "spreads": "Resultado del partido", "drawnobet": "Resultado del partido", "moneyline": "Resultado del partido"}
 
 
 def _market(l: dict) -> str:
+    """Tipo de apuesta en palabras simples (sin «hándicap asiático» ni jerga)."""
     t = l.get("mtype") or ""
+    if l.get("sport") == "basketball":
+        if t == "totals":
+            return "Total de puntos"
+        if t.startswith("teamtotals"):
+            return f"Puntos de {formatting.team(l['home'] if t.endswith('1') else l['away'])}"
     if t in MARKET_NAME:
         return MARKET_NAME[t]
     if t.startswith("teamtotals"):
-        return f"Goles de {l['home'] if t.endswith('1') else l['away']}"
+        return f"Goles de {formatting.team(l['home'] if t.endswith('1') else l['away'])}"
     if t.startswith("toscore"):
-        return f"Marca {l['home'] if t.endswith('1') else l['away']}"
+        return f"Marca {formatting.team(l['home'] if t.endswith('1') else l['away'])}"
     return l.get("market") or ""
 
 
 def _selection_parts(l: dict) -> tuple[str, str]:
-    sel = formatting.outcome_label(l)
+    sel = formatting.public_label(l)
     if " (" in sel and sel.endswith(")"):
         i = sel.index(" (")
         note = sel[i + 2:-1]
@@ -87,9 +93,9 @@ def _selection_parts(l: dict) -> tuple[str, str]:
 
 
 def _when(iso: str) -> tuple[str, str]:
-    t = formatting.local_time(iso)          # "19/10 15:45 p. m."
+    t = formatting.local_time(iso)          # "19/10 15:45 p. m." → ("19/10", "15:45")
     day, _, hour = t.partition(" ")
-    return day, hour
+    return day, hour.split(" ")[0]
 
 
 def _leg_height(l: dict) -> int:
@@ -173,7 +179,7 @@ def _render_coupon(pick: dict, tier: str | None) -> bytes:
         day, hour = _when(l["kickoff"])
         fr = _font("Medium", 28)
         right_w = max(d.textlength(day, font=fr), d.textlength(hour, font=fr))
-        for j, team in enumerate((l["home"], l["away"])):
+        for j, team in enumerate((formatting.team(l["home"]), formatting.team(l["away"]))):
             t, ft = _fit(d, team, "Regular", 33, x1 - x0 - right_w - 30)
             d.text((x0, y + j * 44), t, font=ft, fill=SOFT)
         d.text((x1 - d.textlength(day, font=fr), y + 2), day, font=fr, fill=GREEN)
@@ -341,7 +347,7 @@ def render_win(pick: dict, streak: int = 1, result: str = "W") -> bytes:
             m, fm = _fit(d, f"{l['home']} vs {l['away']}", "Bold", 36, x1 - x0)
             d.text((x0, cy + 6), m, font=fm, fill=INK)
         cy += 92
-        sel = formatting.outcome_label(l)
+        sel = formatting.public_label(l)
         if " (" in sel:
             sel = sel[:sel.index(" (")]
         sel, fsel = _fit(d, sel, "Bold", 36, x1 - x0 - 230)
@@ -606,14 +612,14 @@ def render_story(pick: dict, theme: str = "dark") -> bytes:
         d = ImageDraw.Draw(im)
         d.text((190, yy + 2), league, font=fl, fill=MUTED)
         yy += 70
-        for team in (l["home"], l["away"]):
+        for team in (formatting.team(l["home"]), formatting.team(l["away"])):
             t, ft = _fit(d, team, "Bold", 54, W - 260)
             d.text((130, yy), t, font=ft, fill=INK)
             yy += 70
         day, _, hour = formatting.local_time(l["kickoff"]).partition(" ")
         d.text((130, yy + 4), f"🕒 {hour}".replace("🕒 ", ""), font=_font("Medium", 34), fill=GREEN)
         yy += 70
-        sel = formatting.outcome_label(l)
+        sel = formatting.public_label(l)
         sel = sel[:sel.index(" (")] if " (" in sel else sel
         d.rounded_rectangle((120, yy, W - 120, yy + 96), 24, fill=(236, 249, 234))
         s2, fs = _fit(d, sel, "Bold", 44, W - 460)

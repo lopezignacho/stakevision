@@ -287,7 +287,7 @@ def half_caption(p: dict, rep: dict, st: tuple[str, str]) -> str:
     lines.append("")
     for label, hv, av, unit in stat_rows(rep):
         lines.append(f"📊 {label}: {hv:.0f}{unit} - {av:.0f}{unit}")
-    lines += ["", f"🎯 Nuestro pick: <b>{esc(formatting.outcome_label(leg))}</b> @ {formatting.odds(p['price'])}",
+    lines += ["", f"🎯 Nuestro pick: <b>{esc(formatting.public_label(leg))}</b> @ {formatting.odds(p['price'])}",
               esc(st[1]), "", "Se vienen el 3º y el 4º cuarto 👀", "Exclusivo VIP 👑 · 🔞 +18 · Juega con responsabilidad."]
     return "\n".join(lines)
 
@@ -307,7 +307,7 @@ def final_caption(p: dict, rep: dict, head: str, credit: dict | None, ig: bool =
         lines.append(f"⭐ Figura: {esc(fig[0]['name'])} · {fig[0]['pts']} pts"
                      + (f", {fig[0]['reb']} reb" if fig[0]['reb'] >= 5 else "")
                      + (f", {fig[0]['ast']} ast" if fig[0]['ast'] >= 5 else ""))
-    lines += ["", f"🎯 Nuestro pick: {b(esc(formatting.outcome_label(leg)))} @ {formatting.odds(p['price'])} "
+    lines += ["", f"🎯 Nuestro pick: {b(esc(formatting.public_label(leg)))} @ {formatting.odds(p['price'])} "
               + {"W": "✅", "L": "❌", "V": "↩️"}.get(res, "")]
     if ig:
         lines += ["", "Los picks de NBA son exclusivos de nuestro VIP en Telegram 👑",

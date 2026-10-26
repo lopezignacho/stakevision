@@ -97,7 +97,7 @@ def message(p: dict, rep: dict | None = None) -> str:
     if p.get("kind") == "builder":
         pick = "nuestro Bet Builder @ " + formatting.odds(p["price"])
     else:
-        pick = esc(" + ".join(formatting.outcome_label(l) for l in p["legs"])) + f" @ {formatting.odds(p['price'])}"
+        pick = esc(" + ".join(formatting.public_label(l) for l in p["legs"])) + f" @ {formatting.odds(p['price'])}"
     head = []
     for l in p["legs"]:
         sc = l.get("score")

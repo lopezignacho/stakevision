@@ -121,7 +121,7 @@ def subline(rep: dict, kickoff_iso: str) -> tuple[str, str]:
 def pick_label(p: dict) -> str:
     if len(p["legs"]) > 1:
         return f"Combinada x{len(p['legs'])}"
-    sel = formatting.outcome_label(p["legs"][0])
+    sel = formatting.public_label(p["legs"][0])
     return sel[:sel.index(" (")] if " (" in sel else sel
 
 

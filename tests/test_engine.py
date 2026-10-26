@@ -135,7 +135,10 @@ def test_messages_render():
     p["analysis"] = formatting.analysis(p)
     txt = formatting.channel_post(p)
     assert "Gana Colo-Colo" in txt and "Betano" not in txt and "23/10" not in txt
-    assert "20/10 20:00" in txt  # hora de Chile (UTC-3)
+    assert "20/10, 20:00" in txt  # hora de Chile (UTC-3)
+    P = formatting.public_label
+    assert P({"outcome": "2", "mtype": "spreads", "handicap": -0.5, "home": "A", "away": "B"}) == "B gana o empata"
+    assert P({"outcome": "1", "mtype": "spreads", "handicap": -0.5, "home": "A", "away": "B"}) == "Gana A"
     assert "Candidato #7" in formatting.owner_candidate(p)
     L = formatting.outcome_label
     assert L({"outcome": "Más", "mtype": "totals", "handicap": 2.5, "home": "A", "away": "B"}) == "Más de 2.5 goles"

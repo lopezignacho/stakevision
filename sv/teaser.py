@@ -115,7 +115,7 @@ def pick_photo_data(p: dict, teams: dict | None, photo: tuple[bytes, dict | None
             lines.append(ml)
     if not lines:
         lines = [f"Cuota justa estimada {formatting.odds(l['fair_odds'])} contra {formatting.odds(l['price'])} disponible."]
-    sel = formatting.outcome_label(l)
+    sel = formatting.public_label(l)
     if tier is None:
         tier = "vip" if (l.get("sport") or "soccer") == "basketball" else ("free" if p.get("free") else None)
     return {"eyebrow": eyebrow, "headline": {"vip": "PICK VIP", "free": "PICK GRATIS"}.get(tier, "PICK DEL DÍA"),

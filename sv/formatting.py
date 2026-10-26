@@ -28,6 +28,105 @@ def _line(x) -> str:
     return f"{x:g}" if x != int(x) else f"{int(x)}"
 
 
+TEAM_FIX = {"Vina del Mar": "Viña del Mar", "Nunoa": "Ñuñoa", "Nuble": "Ñublense", "Espanol": "Español",
+            "Penarol": "Peñarol", "Atletico": "Atlético", "Gremio": "Grêmio", "Sao Paulo": "São Paulo",
+            "Union Espanola": "Unión Española", "Cobresal": "Cobresal", "Nublense": "Ñublense",
+            "Alaves": "Alavés", "Cadiz": "Cádiz", "Leganes": "Leganés", "Almeria": "Almería"}
+
+
+def team(name: str) -> str:
+    """Nombre del equipo con tildes y eñes cuando la fuente de cuotas las pierde («Vina del Mar» → «Viña del Mar»)."""
+    out = name or ""
+    for pre in ("CD ", "CF ", "FC ", "CA ", "SC ", "AC "):
+        if out.startswith(pre) and len(out) > len(pre) + 3:
+            out = out[len(pre):]
+    for a, b in TEAM_FIX.items():
+        out = out.replace(a, b)
+    return out
+
+
+def league_name(l: dict) -> str:
+    """«Chile · Primera División» → «Primera División de Chile»; la NBA queda como «NBA»."""
+    lg = (l.get("league") or "").strip()
+    if l.get("sport") == "basketball" or lg.endswith("NBA"):
+        return "NBA"
+    if " · " in lg:
+        country, comp = lg.split(" · ", 1)
+        return f"{comp} de {country}" if country not in ("Europa", "Mundo", "Internacional") else comp
+    return lg
+
+
+def when(iso: str) -> str:
+    """«Hoy, 18:00» · «Mañana, 21:30» · «28/10, 18:00» (hora de Chile)."""
+    dt = datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(TZ)
+    today = datetime.now(TZ).date()
+    day = ("Hoy" if dt.date() == today else "Mañana" if (dt.date() - today).days == 1 else dt.strftime("%d/%m"))
+    return f"{day}, {dt.strftime('%H:%M')}"
+
+
+def _goals(n: float, unit: str = "goles") -> str:
+    n = int(n)
+    one = {"goles": "gol", "puntos": "punto"}[unit]
+    return f"{n} {one if n == 1 else unit}"
+
+
+def public_label(l: dict) -> str:
+    """El pick en palabras simples para el público (una sola forma de decirlo, sin jerga):
+    «Gana Universidad de Chile», «Colo-Colo gana o empata», «Más de 2.5 goles»."""
+    o = str(l.get("outcome", "")).strip()
+    t = l.get("mtype", "")
+    h = l.get("handicap")
+    names = {"1": team(l.get("home", "")), "2": team(l.get("away", ""))}
+    over = o.lower().startswith(("más", "mas", "over"))
+    unit = "puntos" if l.get("sport") == "basketball" else "goles"
+    if t in ("1x2", "moneyline") and o in names:
+        return f"Gana {names[o]}"
+    if t == "1x2" and o.upper() == "X":
+        return "Empate"
+    if t == "drawnobet" and o in names:
+        return f"Gana {names[o]} (si empatan, se devuelve)"
+    if t == "spreads" and h is not None and o in names:
+        hh = float(h) if o == "1" else -float(h)   # la línea viene expresada para el local
+        who = names[o]
+        if hh % 0.5:                                # líneas de cuarto (x.25 / x.75): se deja la forma técnica
+            return outcome_label(l)
+        if hh == 0:
+            return f"Gana {who} (si empatan, se devuelve)"
+        if hh == -0.5:
+            return f"Gana {who}"
+        if hh == 0.5:
+            return f"{who} gana o empata"
+        if hh < 0:
+            need = int(-hh) + 1 if hh % 1 else int(-hh)
+            if hh % 1:   # -1.5 → gana por 2 o más
+                return f"{who} gana por {_goals(need, unit)} o más"
+            return f"{who} gana por {_goals(need + 1, unit)} o más (si gana por {need}, se devuelve)"
+        lim = int(hh) if hh % 1 else int(hh) - 1   # +1.5 → no pierde por más de 1
+        if hh % 1:
+            return f"{who} gana, empata o pierde por {_goals(lim, unit)} como máximo" if unit == "goles" \
+                else f"{who} gana o pierde por {_goals(lim, unit)} como máximo"
+        if int(hh) == 1:
+            return f"{who} gana o empata (si pierde por {_goals(1, unit)}, se devuelve)"
+        return f"{who} no pierde por más de {_goals(lim, unit)} (si pierde por {int(hh)}, se devuelve)"
+    if t == "totals" and h is not None:
+        txt = f"{'Más' if over else 'Menos'} de {_line(h)} {unit}"
+        if float(h) == int(float(h)):
+            txt += f" (si hay {_line(h)} justos, se devuelve)"
+        return txt
+    if t in ("teamtotals-team1", "teamtotals-team2") and h is not None:
+        who = names["1" if t.endswith("1") else "2"]
+        txt = f"{who} marca {'más' if over else 'menos'} de {_line(h)} {unit}"
+        if float(h) == int(float(h)):
+            txt += f" (si marca {_line(h)} justos, se devuelve)"
+        return txt
+    if t in ("toscore-team1", "toscore-team2"):
+        who = names["1" if t.endswith("1") else "2"]
+        return f"{who} {'marca al menos un gol' if o.lower().startswith(('s', 'y')) else 'no marca'}"
+    if t == "bothteamsscore":
+        return "Los dos equipos marcan" if o.lower().startswith(("s", "y")) else "Al menos un equipo no marca"
+    return outcome_label(l)
+
+
 def outcome_label(l: dict) -> str:
     """Texto claro de la selección, por ejemplo 'Más de 2.5 goles' o 'Colo-Colo -0.5 (hándicap asiático)'."""
     if l.get("label"):
@@ -233,26 +332,36 @@ def _bank(stake: int) -> str:
     return f"{stake * 0.5:g}%".replace(".", ",")
 
 
+def public_legs(pick: dict, html: bool = True) -> str:
+    """Partido, liga, hora y el pick en palabras simples (lo que ve el público)."""
+    b = (lambda x: f"<b>{x}</b>") if html else (lambda x: x)
+    e = escape if html else (lambda x: x)
+    rows = []
+    for l in pick["legs"]:
+        emoji = "🏀" if l.get("sport") == "basketball" else "⚽"
+        rows.append(f"{emoji} {b(e(team(l['home'])) + ' vs ' + e(team(l['away'])))}\n"
+                    f"🏆 {e(league_name(l))} · 🕒 {when(l['kickoff'])}")
+    if len(pick["legs"]) == 1:
+        rows.append("🎯 " + b(f"Pick: {e(public_label(pick['legs'][0]))} @ {odds(pick['price'])}"))
+    else:
+        picks = "\n".join(f"{i + 1}. {e(public_label(l))}" for i, l in enumerate(pick["legs"]))
+        rows.append("🎯 " + b(f"Pick combinado @ {odds(pick['price'])}") + f" (tienen que cumplirse los {len(pick['legs'])}):\n{picks}")
+    return "\n\n".join(rows)
+
+
 def channel_post(pick: dict, tier: str | None = None) -> str:
-    """Texto del pick en los canales: partido, cuota y stake + argumento (resumen, 3 datos y probabilidad).
+    """Texto del pick en los canales, en lenguaje simple: partido, el pick, por qué, probabilidad y stake.
     tier «free» / «vip» cambia el título y el cierre."""
     if pick.get("kind") == "builder":
         return builder_post(pick, "vip")
     from . import argument
     if any(l.get("sport") == "basketball" for l in pick["legs"]):
         tier = "vip"
-    if pick["kind"] == "doble":
-        title = "COMBINADA DOBLE" + (" · VIP" if tier == "vip" else " · GRATIS" if tier == "free" else "")
-    else:
-        title = {"vip": "PICK VIP 👑", "free": "PICK GRATIS 🎁"}.get(tier, "PICK DEL DÍA")
+    title = {"vip": "PICK VIP 👑", "free": "PICK GRATIS 🎁"}.get(tier, "PICK DEL DÍA")
     close = ("👑 Exclusivo VIP · 🔞 +18 · Apuesta con responsabilidad" if tier == "vip" else
              "Más pronósticos en nuestro VIP 👑\n🔞 +18 · Apuesta con responsabilidad" if tier == "free" else
              "🔞 +18 · Apuesta con responsabilidad")
-    return (f"👁 <b>STAKEVISION · {title}</b>\n\n"
-            f"{_legs_block(pick)}\n\n"
-            + (f"📈 Cuota total: <b>{odds(pick['price'])}</b> · " if len(pick["legs"]) > 1 else "")
-            + f"💰 Stake: <b>{pick['stake']}/10</b> ({_bank(pick['stake'])} del bankroll)\n\n"
-            + f"{argument.body(pick)}\n\n{close}")
+    return (f"👁 <b>STAKEVISION · {title}</b>\n\n{public_legs(pick)}\n\n{argument.body(pick)}\n\n{close}")
 
 
 def owner_candidate(pick: dict) -> str:
@@ -265,8 +374,16 @@ def owner_candidate(pick: dict) -> str:
                 + f"\n⏱ Vence en {config.LIVE_CANDIDATE_MIN} min: las cuotas en vivo cambian rápido.\n")
     from . import evidence
     evl = "\n".join(evidence.line(l.get("evidence")) for l in pick["legs"] if (l.get("sport") or "soccer") == "soccer")
-    return (f"🆕 <b>Candidato #{pick['id']}</b> ({pick['kind']})\n{live}{tag}\n\n"
-            f"{_legs_block(pick)}\n\n" + (f"{evl}\n\n" if evl else "") +
+    margin = ""
+    if pick["kind"] != "builder":
+        from . import argument
+        pp = argument.shown_prob(pick)
+        if pp < 1 / pick["price"]:
+            margin = (f"\n⚖️ <b>Sin margen:</b> le damos {argument.prob_text(pp)} y la cuota pide "
+                      f"{argument.prob_text(1 / pick['price'])}. No sale como gratis automático; decide tú.")
+    pub = "\n".join(public_label(l) for l in pick["legs"])
+    return (f"🆕 <b>Candidato #{pick['id']}</b> ({pick['kind']})\n{live}{tag}{margin}\n\n"
+            f"{_legs_block(pick)}\n🗣 En el canal se publica como: <b>{escape(pub)}</b>\n\n" + (f"{evl}\n\n" if evl else "") +
             f"📈 Cuota: <b>{odds(pick['price'])}</b> · Valor: <b>{sign}{pct(pick['edge'])}</b> · "
             f"Stake sugerido: {pick['stake']}/10\n\n"
             f"<i>{pick['analysis']}</i>\n\n"
@@ -379,22 +496,14 @@ def instagram_caption(pick: dict, streak: int = 1) -> str:
 
 
 def instagram_pick_caption(pick: dict) -> str:
-    """Texto para Instagram de un pick antes del partido (texto plano), con el mismo argumento que Telegram:
-    resumen, 3 datos con emoji y probabilidad estimada."""
+    """Texto para Instagram de un pick antes del partido (texto plano), igual de simple que en Telegram."""
     import html as _h
     import re as _re
     from . import argument
-    emoji = {"soccer": "⚽", "tennis": "🎾", "basketball": "🏀"}
-    lines = ["👁 STAKEVISION · PICK GRATIS 🎁" + (" · 🔴 EN VIVO" if pick.get("live") else ""), ""]
-    for l in pick["legs"]:
-        lines.append(f"{emoji.get(l.get('sport') or 'soccer', '🏟')} {l['home']} vs {l['away']}")
-        lines.append(f"🏆 {l['league']} · 🕒 {local_time(l['kickoff'])}")
-        lines.append(f"🎯 {outcome_label(l)} @ {odds(l['price'])}")
-    lines.append(("" if len(pick["legs"]) == 1 else f"📈 Cuota total {odds(pick['price'])} · ")
-                 + f"💰 Stake {pick['stake']}/10")
-    body = _h.unescape(_re.sub(r"<[^>]+>", "", argument.body(pick)))
-    lines += ["", body, "", "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio) "
-              "· más pronósticos en el VIP 👑"]
+    lines = ["👁 STAKEVISION · PICK GRATIS 🎁" + (" · 🔴 EN VIVO" if pick.get("live") else ""), "",
+             public_legs(pick, html=False), "",
+             _h.unescape(_re.sub(r"<[^>]+>", "", argument.body(pick))), "",
+             "📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio) · más pronósticos en el VIP 👑"]
     cr = pick.get("pick_photo_credit") if pick.get("pick_style") == "photo" else None
     if cr and cr.get("author"):
         lines += ["", f"📸 Foto: {cr['author']} / Wikimedia Commons ({cr['license']}), modificada. "

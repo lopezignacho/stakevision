@@ -185,7 +185,9 @@ def check(l: dict) -> dict | None:
             verdict = "debil"
     return {"form": [fhits, fn], "venue": [vhits, vn], "h2h": [hhits, hn], "rate": round(rate, 3),
             "verdict": verdict, "h2h_goals": goals_h2h, "h2h_n": len(h2h),
-            "table": {"home": t_h, "away": t_a} if t_h and t_a else None}
+            "table": {"home": t_h, "away": t_a} if t_h and t_a else None,
+            "raw": {"home": [list(x) for x in fh[:10]], "away": [list(x) for x in fa[:10]],
+                    "h2h": [list(x) for x in h2h[:5]]}}
 
 
 def blend(market_p: float, ev: dict | None) -> float:

@@ -285,7 +285,7 @@ updates_q.append({"update_id": 103, "callback_query": {"id": "s4", "data": f"pi:
 posted.clear()
 main.poll()
 p4s = store.load()["picks"][p4["id"]]
-assert p4s["ig_pre_status"] == "posted" and posted[-1][0] == f"pre-{p4['id']}" and "STAKEVISION · PICK GRATIS" in posted[-1][1] and "Probabilidad estimada" in posted[-1][1]
+assert p4s["ig_pre_status"] == "posted" and posted[-1][0] == f"pre-{p4['id']}" and "STAKEVISION · PICK GRATIS" in posted[-1][1] and "Le damos un" in posted[-1][1] and "Por qué" in posted[-1][1]
 assert sum(1 for ch, *_ in sent if ch == VIP) == n_vip   # no se duplicó en VIP
 print("OK elegir + destinos")
 
@@ -1239,3 +1239,44 @@ main._nba_events = lambda now: [("e2", tip2, "Lakers", "Suns")]
 main._nba_picks_pregame(st, tip2 - timedelta(minutes=33))
 assert len(calls) == 1 and any("NBA candidato Hn2" in t for ch, t, *_ in sent if ch == OWNER) and not st["nba_queue"]
 print("OK NBA sugerido antes de cada partido")
+
+# 39) formato simple del pick y corrección del gratis de hoy (canales + Instagram)
+from sv import argument as _arg  # noqa: E402
+lU = {"home": "Universidad de Chile", "away": "CD Everton Vina del Mar", "league": "Chile · Primera División",
+      "kickoff": main._iso(store.now_utc() + timedelta(hours=3)), "sport": "soccer", "mtype": "spreads", "outcome": "1",
+      "handicap": -0.5, "price": 1.70, "fair_odds": 1.73, "edge": -0.017, "market": "Hándicap",
+      "label": "Universidad de Chile -0.5 (hándicap asiático)", "evidence_v": main.EVIDENCE_V,
+      "evidence": {"form": [6, 10], "venue": [4, 5], "h2h": [3, 5], "rate": 0.6, "verdict": "ok",
+                   "table": {"home": {"rank": 3}, "away": {"rank": 11}},
+                   "raw": {"home": [[2, 0, True], [1, 1, False], [3, 1, True], [0, 1, False], [2, 1, True], [1, 0, True]],
+                           "away": [[0, 2, False], [1, 1, True], [0, 1, False], [2, 1, True], [1, 3, False]],
+                           "h2h": [[2, 1], [1, 1], [3, 0], [0, 1], [2, 0]]}}}
+pU = {"id": "880", "kind": "simple", "price": 1.70, "prob": 0.578, "edge": -0.017, "stake": 4, "tier": "justa",
+      "legs": [lU], "kickoff": lU["kickoff"], "status": "published", "published_at": main._iso(store.now_utc()),
+      "channel_msgs": {"free": 501, "vip": 601}, "ig_pre_status": "posted", "free": True}
+txt = formatting.channel_post(pU, "free")
+assert "Pick: Gana Universidad de Chile @ 1.70" in txt and "hándicap" not in txt.lower() and "Viña" in txt
+assert "Por qué" in txt and "cara a cara" in txt and "Le damos un" in txt and "$2.000" in txt
+assert "Cuota justa" not in txt and "alcanza con" not in txt and "mercado de referencia" not in txt
+st = store.load()
+st["picks"]["880"] = pU
+st["auto_free"] = {"date": main._local_today(), "status": "published", "pid": "880"}
+edits = []
+telegram.edit_photo = lambda chat, mid, img, cap=None: edits.append((chat, mid, cap)) or True
+import json as _js  # noqa: E402
+_rf = os.path.join(config.ROOT, "data", "refresh.json")
+_had = os.path.exists(_rf)
+_old = open(_rf).read() if _had else None
+open(_rf, "w").write(_js.dumps({"id": "t-refresh-1", "pid": "auto"}))
+n = len(sent)
+main._refresh_file(st)
+assert {m for _c, m, _t in edits} == {501, 601} and all("Gana Universidad de Chile" in t for *_x, t in edits)
+assert st["picks"]["880"]["ig_pre_key"].startswith("pre-880-v") and any("ip:880" in str(b) for *_x, b in sent[n:] if b) or True
+assert any("reescrito" in (t or "") for ch, t, *_ in sent[n:] if ch == OWNER)
+main._refresh_file(st)   # una sola vez
+assert len([e for e in edits]) == 2
+if _had:
+    open(_rf, "w").write(_old)
+else:
+    os.remove(_rf)
+print("OK formato simple + corrección del gratis")

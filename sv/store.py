@@ -19,6 +19,14 @@ from cryptography.fernet import Fernet
 from . import config
 
 
+def _public_label(l: dict) -> str | None:
+    try:
+        from . import formatting
+        return formatting.public_label(l)
+    except Exception:  # noqa: BLE001
+        return l.get("label")
+
+
 def _fernet() -> Fernet:
     """La clave se deriva de STATE_KEY, que puede ser cualquier contraseña larga."""
     if not config.STATE_KEY:
@@ -79,7 +87,7 @@ def export_public(state: dict) -> None:
             "result": p.get("result"),          # "W" | "L" | "V" | None
             "legs": [{"home": l["home"], "away": l["away"], "league": l["league"],
                       "market": l["market"], "outcome": l["outcome"], "price": l["price"],
-                      "label": l.get("label"), "mtype": l.get("mtype"), "handicap": l.get("handicap"),
+                      "label": _public_label(l), "mtype": l.get("mtype"), "handicap": l.get("handicap"),
                       "sport": l.get("sport") or "soccer", "score": l.get("score")}
                      for l in p["legs"]],
             "analysis": html.unescape(p.get("analysis") or "") if p.get("free") else None,

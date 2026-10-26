@@ -215,6 +215,11 @@ def _auto_reject(p: dict, d: dict | None, lead) -> str | None:
     ev = _leg_evidence(d["legs"][0])
     if ev and ev["verdict"] == "contra":
         return "los datos (forma y cara a cara) lo contradicen"
+    from . import evidence
+    pp = evidence.blend(d["prob"], ev)
+    if pp < 1 / d["price"]:
+        return (f"sin margen: le damos {round(pp * 100)}% y la cuota {formatting.odds(d['price'])} "
+                f"pide {round(100 / d['price'])}%")
     return None
 
 
@@ -291,7 +296,7 @@ def _auto_free_reason(state: dict, p: dict, opt: str, publish_at) -> str:
     return "\n".join(out)
 
 
-EVIDENCE_V = 3   # versión del contraste: si cambia la forma de calcularlo, se recalcula
+EVIDENCE_V = 4   # versión del contraste: si cambia la forma de calcularlo, se recalcula
 
 
 def _evidence_note(l: dict) -> str:
@@ -676,6 +681,101 @@ def _repair_pick(state: dict, pid: str) -> str:
     return ""
 
 
+def _fresh_evidence(p: dict) -> None:
+    """Datos del partido al día (forma, localía, cara a cara, tabla) para el «por qué» del texto público."""
+    for l in p.get("legs") or []:
+        if (l.get("sport") or "soccer") == "soccer" and p.get("kind") != "builder":
+            _leg_evidence(l)
+
+
+def _refresh_post(state: dict, p: dict) -> list[str]:
+    """Reescribe un pick ya publicado con el formato simple: mismo mensaje en Gratis y VIP (imagen + texto)
+    y, para Instagram, la versión nueva lista para publicar (Instagram no deja al bot editar ni borrar)."""
+    notes = []
+    _fresh_evidence(p)
+    p["pick_style"] = "coupon"
+    for where, mid in (p.get("channel_msgs") or {}).items():
+        chat = state.get("vip_chat") if where == "vip" else config.FREE_CHANNEL
+        if not chat:
+            continue
+        tier = "vip" if where == "vip" else "free"
+        text = formatting.channel_post(p, tier)
+        image = _pick_image(p, tier)
+        name = "VIP" if where == "vip" else "Gratis"
+        fits = formatting.caption_fits(text)
+        if image and fits and telegram.edit_photo(chat, mid, image, text):
+            notes.append(f"{name}: imagen y texto nuevos (mismo mensaje)")
+            continue
+        try:   # el texto iba aparte (no cabía como pie de foto): texto en mid, foto justo antes
+            telegram.edit_text(chat, mid, text)
+            if image:
+                telegram.edit_photo(chat, mid - 1, image)
+            notes.append(f"{name}: texto nuevo" + (" e imagen nueva" if image else ""))
+        except telegram.TelegramError as e:
+            notes.append(f"⚠️ {name}: no pude editarlo ({e})")
+    from . import instagram, postimage
+    owner = state.get("owner_chat")
+    if p.get("ig_pre_status") in ("queued", "posted") and not _vip_only(p):
+        image = _pick_image(p, "free")
+        cap = formatting.instagram_pick_caption(p)
+        key = f"pre-{p['id']}-v{int(store.now_utc().timestamp())}"
+        if image:
+            instagram.save_image(key, postimage.fit_instagram(image))
+        p["ig_pre_key"], p["ig_pre_caption"] = key, cap
+        if p["ig_pre_status"] == "queued":
+            notes.append("Instagram: aún no salía; saldrá con la versión nueva")
+        elif owner and image:
+            msg = telegram.send_photo(owner, image, caption="📸 <b>Instagram · versión nueva del pick #" + p["id"] + "</b>\n"
+                                      "Instagram no deja al bot editar ni borrar publicaciones. Borra la publicación "
+                                      "antigua desde la app y toca «Publicar versión nueva».")
+            telegram.send(owner, "<pre>" + formatting.escape(cap) + "</pre>")
+            telegram.set_buttons(owner, msg["message_id"], [[("📸 Publicar versión nueva", f"ip:{p['id']}")],
+                                                            [("Dejar Instagram como está", f"ipn:{p['id']}")]])
+            notes.append("Instagram: te mandé la versión nueva con el botón para publicarla")
+    return notes
+
+
+def _refresh_file(state: dict) -> None:
+    """data/refresh.json ({"id": "...", "pid": "auto" | "80"}): reescribe un pick publicado con el formato simple."""
+    import json
+    path = os.path.join(config.ROOT, "data", "refresh.json")
+    owner = state.get("owner_chat")
+    if not os.path.exists(path) or not owner:
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("refresh_done") or []):
+        return
+    state.setdefault("refresh_done", []).append(req["id"])
+    pid = str(req.get("pid") or "").lstrip("#")
+    if pid == "auto":   # el gratis de hoy (automático o elegido a mano)
+        af = state.get("auto_free") or {}
+        pid = af.get("pid") if af.get("date") == _local_today() and af.get("status") == "published" else ""
+        if not pid:
+            todays = [x for x in state["picks"].values() if "free" in (x.get("channel_msgs") or {})
+                      and x.get("published_at") and _is_today(x["published_at"]) and x.get("status") != "cancelled"]
+            pid = max(todays, key=lambda x: x["published_at"])["id"] if todays else ""
+    p = state["picks"].get(pid)
+    if not p:
+        telegram.send(owner, "⚠️ No encontré el pick gratis de hoy para corregirlo.")
+        return
+    try:
+        notes = _refresh_post(state, p)
+    except Exception as e:  # noqa: BLE001
+        traceback.print_exc()
+        notes = [f"⚠️ falló la corrección: {e}"]
+    from . import argument
+    pp = argument.shown_prob(p)
+    if p.get("kind") != "builder" and pp < 1 / p["price"]:
+        notes.append(f"Ojo: con la regla nueva este pick quedaría «sin margen» ({argument.prob_text(pp)} contra "
+                     f"{argument.prob_text(1 / p['price'])} que pide la cuota); no lo cambié, solo su texto.")
+    telegram.send(owner, f"🔧 <b>Pick #{p['id']} reescrito en formato simple</b>\n"
+                  + "\n".join(f"• {formatting.escape(n)}" for n in notes))
+
+
 def _delete_pick_posts(state: dict, p: dict) -> list[str]:
     """Borra de los canales los mensajes del pick (el pick, su imagen si fue aparte y el adelanto)."""
     done = []
@@ -1017,6 +1117,7 @@ def _nba_option_block(d: dict, role: str) -> str:
     sign = "+" if d["edge"] >= 0 else ""
     return (f"<b>Opción {role}</b> · 🎯 <b>{formatting.escape(l['label'])}</b> @ {formatting.odds(d['price'])} "
             f"· valor {sign}{formatting.pct(d['edge'])} · stake {d['stake']}/10\n"
+            f"🗣 En el canal: <b>{formatting.escape(formatting.public_label(l))}</b>\n"
             f"<i>{formatting.escape(d.get('why', ''))}</i>\n{_args_html(l)}")
 
 
@@ -1432,6 +1533,7 @@ def _publish(state: dict, p: dict, free: bool, vip_too: bool = True) -> None:
     msgs = p.setdefault("channel_msgs", {})
     vip = state.get("vip_chat")
     image = None
+    _fresh_evidence(p)
     if vip_too and vip and "vip" not in msgs:
         image = _pick_image(p, "vip")   # dorado «PICK VIP»
         msgs["vip"] = _post(vip, formatting.channel_post(p, "vip"), image)
@@ -1646,7 +1748,7 @@ def _instagram_queue(state: dict, now) -> None:
         if p.get("ig_status") == "queued":
             jobs.append((p, "ig_status", p["id"], p.get("ig_caption") or ""))
         if p.get("ig_pre_status") == "queued":
-            jobs.append((p, "ig_pre_status", f"pre-{p['id']}", p.get("ig_pre_caption") or ""))
+            jobs.append((p, "ig_pre_status", p.get("ig_pre_key") or f"pre-{p['id']}", p.get("ig_pre_caption") or ""))
         if p.get("ig_res_status") == "queued":
             jobs.append((p, "ig_res_status", f"res-{p['id']}", p.get("ig_res_caption") or ""))
         if p.get("ig_story_status") == "queued":
@@ -2978,6 +3080,18 @@ def _handle_update(state: dict, u: dict) -> None:
             telegram.answer(cb["id"], "Se publica en Instagram en unos minutos")
         telegram.set_buttons(owner, cb["message"]["message_id"], RECAP_BUTTONS(p))
 
+    elif action in ("ip", "ipn"):   # versión nueva del pick en Instagram (tras borrar la antigua)
+        if action == "ipn":
+            telegram.edit_buttons_off(owner, cb["message"]["message_id"], "Instagram queda como está")
+            telegram.answer(cb["id"], "Listo")
+        elif p.get("ig_pre_status") == "queued":
+            telegram.answer(cb["id"], "Ya está en cola")
+        else:
+            p["ig_pre_status"] = "queued"
+            p.pop("ig_pre_tries", None)
+            telegram.edit_buttons_off(owner, cb["message"]["message_id"], "⏳ Se publica en Instagram en unos minutos")
+            telegram.answer(cb["id"], "Se publica en unos minutos")
+
     elif action in ("ig", "ign"):  # publicar (o no) la celebración en Instagram
         if p.get("ig_status") in ("queued", "posted"):
             telegram.answer(cb["id"], "Ya estaba en proceso")
@@ -3326,6 +3440,7 @@ def poll() -> None:
     try:
         _cancel_file(state)
         _repair_file(state)
+        _refresh_file(state)
         _force_free_file(state)
         _auto_free_tick(state, now)
     except Exception:
