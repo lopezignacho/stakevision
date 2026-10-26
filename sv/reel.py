@@ -298,7 +298,10 @@ def postgame(g: dict, duration: float = 11.0) -> tuple[bytes, bytes]:
         pk = g["pick"]
         fill = (46, 170, 70) if pk["result"] == "W" else (150, 156, 166)
         chip = _chip_layer(pk["text"], fill, WHITE, 26, 22)
-        layers.append(Layer(chip, W - 60 - chip.width, 178, last_t + 0.3, 0.4, -30))
+        if chip.width <= W - 60 - 440:   # cabe a la derecha sin tapar el logo
+            layers.append(Layer(chip, W - 60 - chip.width, 178, last_t + 0.3, 0.4, -30))
+        else:                            # si es largo, va bajo los goles
+            layers.append(Layer(chip, 60, min(y, SAFE_BOTTOM - 150), last_t + 0.3))
     layers += _footer_layers(g.get("credit"), g.get("source", ""))
     sf = NI._bebas(190)
     end_at = duration - 2.4
