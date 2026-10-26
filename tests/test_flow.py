@@ -1317,3 +1317,45 @@ pW = {"id": "990", "kind": "simple", "price": 1.78, "prob": 0.56, "edge": -0.003
       "legs": [dict(legW, nba_ev=evW, label="Golden State Warriors +9.5")], "kickoff": legW["kickoff"]}
 assert "Sin margen" in main._nba_option_block(pW, "A")
 print("OK NBA datos + bajas + sin margen")
+
+# 41) noticias: vigía → «Sí, prepárala» → lista → publicar solo en Instagram
+from sv import newswatch as _nw, instagram as _ig  # noqa: E402
+_nw.REQ = os.path.join(tmp, "news_requests.json")
+_nw.READY = os.path.join(tmp, "news_ready.json")
+st = store.load()
+st.pop("news_next", None)
+st["news_seen"], st["news_pending"], st["news_done"], st["ig_jobs"] = [], {}, [], {}
+ko_n = main._iso(store.now_utc() + timedelta(hours=5))
+st["picks"]["995"] = {"id": "995", "status": "published", "kind": "simple", "kickoff": ko_n, "price": 1.8, "stake": 3,
+                      "legs": [{"home": "Denver Nuggets", "away": "Golden State Warriors", "kickoff": ko_n, "sport": "basketball"}]}
+pubd = main._iso(store.now_utc() - timedelta(hours=2))
+_nw._articles = lambda g: [{"id": 1, "headline": "Warriors' Curry questionable vs. Nuggets", "description": "Ankle.",
+                            "published": pubd, "links": {"web": {"href": "https://espn.com/x"}}},
+                           {"id": 2, "headline": "Lakers trade rumor", "published": pubd}]
+n = len(sent)
+assert _nw.check(st) == 1
+msg = [(t, b) for ch, t, b, *_ in sent[n:] if ch == OWNER]
+assert "Curry questionable" in msg[0][0] and "nq:" in str(msg[0][1]), msg
+assert _nw.check(st) == 0                       # no repite (y espera 2 h)
+nid = next(iter(st["news_pending"]))
+_nw.callback(st, {"id": "c", "message": {"message_id": 7}}, "nq", nid)
+reqs = _nw._load(_nw.REQ)
+assert reqs and reqs[0]["status"] == "pending" and reqs[0]["headline"].startswith("Warriors")
+# Claude la redacta → lista; la que ya aprobaste en el chat sale directo
+_nw._save(_nw.READY, [{"id": "jw1", "approved": True, "tag": "LESIÓN", "kicker": "THUNDER · NBA", "headline": "JALEN WILLIAMS SALIÓ EN CAMILLA",
+                       "sub": "x", "facts": ["a", "b"], "status": "PENDIENTE", "colors": [[0, 122, 193], [239, 59, 36]],
+                       "sources": "AP", "caption": "Texto IG"},
+                      {"id": "w2", "tag": "DUDA", "kicker": "WARRIORS · NBA", "headline": "CURRY EN DUDA", "facts": ["a"],
+                       "colors": [[29, 66, 138], [255, 199, 44]], "caption": "Texto 2"}])
+_saved = {}
+_ig.save_image = lambda k, b: _saved.setdefault(k, b)
+main.telegram.send_photo = lambda chat, img, caption=None, reply_to=None: (photos.append((chat, caption)), {"message_id": 70})[1]
+_nw.ready(st)
+assert st["ig_jobs"]["jw1"]["status"] == "queued" and st["ig_jobs"]["w2"]["status"] == "draft" and "news-jw1" in _saved
+_nw.callback(st, {"id": "c", "message": {"message_id": 70}}, "np", "w2")
+assert st["ig_jobs"]["w2"]["status"] == "queued"
+_ig.image_live = lambda k: True
+_ig.publish = lambda state, key, cap: "https://instagram.com/p/x"
+_nw.publish_jobs(st)
+assert st["ig_jobs"]["jw1"]["status"] == "posted" and st["ig_jobs"]["w2"]["status"] == "posted"
+print("OK noticias → Instagram")

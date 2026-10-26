@@ -2863,6 +2863,10 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.answer(cb["id"], "No autorizado")
         return
     action, _, pid = (cb.get("data") or "").partition(":")
+    if action in ("nq", "nx", "np", "nn"):   # noticias para Instagram
+        from . import newswatch
+        newswatch.callback(state, cb, action, pid)
+        return
     p = state["picks"].get(pid)
     if not p:
         telegram.answer(cb["id"])
@@ -3531,7 +3535,11 @@ def poll() -> None:
     _migrate_stakes(state, now)
     _refresh_recap_texts(state)
     _nba_daily(state)
-    for fn in (_nba_owner_flow, lambda st, _now: _live_builders(st)):
+    def _news(st, _now):
+        from . import newswatch
+        newswatch.ready(st)
+        newswatch.check(st)
+    for fn in (_nba_owner_flow, lambda st, _now: _live_builders(st), _news):
         try:
             fn(state, now)
         except Exception:
@@ -3606,6 +3614,8 @@ def poll() -> None:
                 ig["checked"] = fp
             instagram.refresh_token(state)
             _instagram_queue(state, now)
+            from . import newswatch
+            newswatch.publish_jobs(state)
             from . import ig_inbox
             ig_inbox.run(state)   # responde comentarios y mensajes directos
     except Exception:
