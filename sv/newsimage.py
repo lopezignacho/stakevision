@@ -22,6 +22,7 @@ def _bebas(size: int):
 def _backdrop(c1, c2) -> Image.Image:
     """Diagonal con los dos colores del equipo, oscurecida, con textura y viñeta."""
     w = P.W
+    c1, c2 = tuple(c1), tuple(c2)
     grad = Image.linear_gradient("L").rotate(35, expand=True).resize((w, H))
     a = Image.new("RGB", (w, H), c1)
     b = Image.new("RGB", (w, H), c2)
