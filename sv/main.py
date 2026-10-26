@@ -2646,7 +2646,7 @@ def _recap_fix(state: dict, p: dict) -> list[str]:
         else:
             notes.append(f"⚠️ {name}: no pude editar la imagen; bórrala y compártela de nuevo desde el panel")
     from . import instagram
-    if r.get("reel") and old_reel and r["reel"] == old_reel:   # nombre nuevo: que Instagram no use la versión vieja
+    if r.get("reel") and old_reel:   # siempre un nombre nuevo: que Instagram no reciba la versión vieja en caché
         new_key = f"{old_reel}-v{int(store.now_utc().timestamp())}"
         os.replace(instagram.video_path(old_reel), instagram.video_path(new_key))
         r["reel"] = new_key
