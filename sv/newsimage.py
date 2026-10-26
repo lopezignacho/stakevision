@@ -53,7 +53,7 @@ def _wrap(d, text, font, max_w) -> list[str]:
 def _chip(d, x, y, text, fill, ink, size=30, pad=22):
     f = P._font("Bold", size)
     w = d.textlength(text, font=f) + pad * 2
-    d.rounded_rectangle((x, y, x + w, y + size + 26), 999, fill=fill)
+    d.rounded_rectangle((x, y, x + w, y + size + 26), (size + 26) // 2, fill=fill)
     d.text((x + pad, y + 13 + size / 2), text, font=f, fill=ink, anchor="lm")
     return w
 
