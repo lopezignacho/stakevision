@@ -864,19 +864,47 @@ def _manual_free_file(state: dict) -> None:
     if not req.get("id") or req["id"] in (state.get("manual_free_done") or []):
         return
     state.setdefault("manual_free_done", []).append(req["id"])
+    try:
+        _manual_free(state, req)
+    except Exception as e:  # noqa: BLE001
+        traceback.print_exc()
+        telegram.send(owner, f"⚠️ No pude publicar el gratis manual: {formatting.escape(str(e))[:300]}")
+
+
+def _manual_free(state: dict, req: dict) -> None:
     from .value import Pick
+    owner = state["owner_chat"]
     now = store.now_utc()
-    fxs = oddspapi.upcoming_fixtures(_iso(now - timedelta(minutes=10)), _iso(now + timedelta(hours=12)))
-    fx = next((f for f in fxs if _name_hit(req["team"], f.get("participant1Name") or "")
-               or _name_hit(req["team"], f.get("participant2Name") or "")), None)
+    fx = None
+    try:
+        fxs = oddspapi.upcoming_fixtures(_iso(now - timedelta(hours=2)), _iso(now + timedelta(hours=12)))
+        fx = next((f for f in fxs if _name_hit(req["team"], f.get("participant1Name") or "")
+                   or _name_hit(req["team"], f.get("participant2Name") or "")), None)
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+    if not fx:   # respaldo: el partido desde el calendario de ESPN (sin cuota de referencia)
+        from . import espn
+        from zoneinfo import ZoneInfo
+        day = now.astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+        for e in espn._scoreboard(day, "soccer"):
+            c = (e.get("competitions") or [{}])[0]
+            comp = c.get("competitors") or []
+            h = next((x for x in comp if x.get("homeAway") == "home"), None)
+            a_ = next((x for x in comp if x.get("homeAway") == "away"), None)
+            if h and a_ and (_name_hit(req["team"], h["team"].get("displayName", "")) or _name_hit(req["team"], a_["team"].get("displayName", ""))):
+                ko = e["date"].replace("Z", ":00Z") if len(e["date"]) == 17 else e["date"]
+                fx = {"fixtureId": f"espn-{e.get('id')}", "participant1Name": h["team"]["displayName"],
+                      "participant2Name": a_["team"]["displayName"], "startTime": ko, "tournamentId": None,
+                      "league": req.get("league") or ""}
+                break
     if not fx:
-        telegram.send(owner, f"⚠️ No encontré el partido de {formatting.escape(req['team'])} con cuotas.")
+        telegram.send(owner, f"⚠️ No encontré el partido de {formatting.escape(req['team'])} de hoy.")
         return
     side = "1" if _name_hit(req["team"], fx.get("participant1Name") or "") else "2"
     mtype = f"teamtotals-team{side}" if req["mtype"] == "teamtotals" else req["mtype"]
     sel = None
     try:
-        rows = oddspapi.odds_by_tournaments([fx["tournamentId"]])
+        rows = oddspapi.odds_by_tournaments([fx["tournamentId"]]) if fx.get("tournamentId") else []
         row = next((r for r in rows if r.get("fixtureId") == fx["fixtureId"]), None)
         if row:
             for x in selections_for_fixture(fx, row, oddspapi.markets()):
@@ -892,7 +920,8 @@ def _manual_free_file(state: dict) -> None:
         d = Pick("simple", [sel], tier="valor" if sel.fair_prob * price - 1 >= config.MIN_EDGE else "justa").to_dict()
     else:   # sin cuota de referencia: la probabilidad parte de la cuota de tu app
         leg = {"fixture_id": fx["fixtureId"], "home": fx.get("participant1Name"), "away": fx.get("participant2Name"),
-               "league": config.TOURNAMENTS.get(fx["tournamentId"], ""), "kickoff": fx["startTime"], "market": "Goles del equipo",
+               "league": fx.get("league") or config.TOURNAMENTS.get(fx.get("tournamentId"), "") or req.get("league", ""),
+               "kickoff": fx["startTime"], "market": "Goles del equipo",
                "mtype": mtype, "outcome": req["outcome"], "handicap": float(req["handicap"]), "price": price,
                "fair_odds": price, "edge": 0.0, "sport": "soccer"}
         d = {"kind": "simple", "tier": "justa", "price": price, "prob": round(1 / price, 4), "edge": 0.0, "stake": 3,
