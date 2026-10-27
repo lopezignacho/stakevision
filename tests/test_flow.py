@@ -1455,3 +1455,24 @@ assert "terminara" not in _cap and "disfrutar" in _cap
 assert _ht.status(dict(_l, mtype="totals", outcome="Más", handicap=2.5), 1, 1, main.grade_leg)[0] == "?"
 assert _ht.status(dict(_l, mtype="totals", outcome="Menos", handicap=2.5), 2, 1, main.grade_leg)[0] == "L"
 print("OK entretiempo con pick ya decidido")
+
+# 45) aviso en vivo apenas el pick queda ganado (una sola vez)
+config.LIVE_LOCK_SINCE = "2000-01-01T00:00:00Z"
+_ko = main._iso(store.now_utc() - timedelta(minutes=60))
+_pl = {"id": "997", "status": "published", "kind": "simple", "price": 1.82, "stake": 3, "kickoff": _ko, "channel_msgs": {"free": 9, "vip": 10},
+       "legs": [{"home": "Sassuolo", "away": "Lazio", "kickoff": _ko, "sport": "soccer", "mtype": "teamtotals-team2", "outcome": "Más", "handicap": 1.5}]}
+st = store.load()
+_live = {"score": (1, 1)}
+espn.live_report = lambda *a, **k: {"state": "in", "clock": "61'", "home": {"score": _live["score"][0]}, "away": {"score": _live["score"][1]}}
+n = len(sent)
+main._lock_check(st, _pl, store.now_utc())
+assert len(sent) == n and not _pl.get("lock_sent")          # 1 gol de Lazio: todavía no
+_live["score"] = (1, 2)
+main._lock_check(st, _pl, store.now_utc())
+msgs = [t for ch, t, *_ in sent[n:] if ch in (VIP, config.FREE_CHANNEL)]
+assert len(msgs) == 2 and "ASEGURADO" in msgs[0] or "COBRADA" in msgs[0] or "VERDAZO" in msgs[0], msgs
+assert "Lazio ya marcó 2" in msgs[0] and "⏱ 61" in msgs[0] and _pl["lock_sent"]
+n = len(sent)
+main._lock_check(st, _pl, store.now_utc())
+assert len(sent) == n                                         # no repite
+print("OK aviso en vivo de pick asegurado")

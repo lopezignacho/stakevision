@@ -2664,6 +2664,72 @@ def _recap_nba(state: dict, p: dict, reuse: bool = False) -> bool:
     return True
 
 
+def _lock_check(state: dict, p: dict, now) -> None:
+    """En vivo: apenas el pick queda ganado (un «más de» ya superado, ambos ya marcaron…), aviso en sus canales.
+    Revisa cada pasada mientras se juega (fútbol: goles; NBA: totales de puntos)."""
+    if (p["status"] != "published" or p.get("lock_sent") or p.get("kind") == "builder" or len(p["legs"]) != 1
+            or not p.get("channel_msgs") or not config.LIVE_LOCK_ALERTS):
+        return
+    l = p["legs"][0]
+    t = l.get("mtype", "")
+    if not (t.startswith(("totals", "teamtotals", "toscore")) or t == "bothteamsscore"):
+        return   # «gana X», hándicap…: se decide recién al final
+    kick = store.parse_ts(p["kickoff"])
+    if kick < store.parse_ts(config.LIVE_LOCK_SINCE):
+        return   # solo para los partidos que empiezan desde que existe el aviso
+    sport = l.get("sport") or "soccer"
+    if not (kick + timedelta(minutes=3) <= now <= kick + timedelta(hours=3 if sport == "basketball" else 2, minutes=10)):
+        return
+    from . import halftime
+    esc = formatting.escape
+    if sport == "basketball":
+        if not t.startswith(("totals", "teamtotals")) or l.get("handicap") is None:
+            return
+        from . import nba
+        found = nba.find_event(l["home"], l["away"], l["kickoff"])
+        if not found:
+            return
+        e, inv = found
+        st = (e.get("status") or {}).get("type") or {}
+        if st.get("state") != "in":
+            return
+        comp = e["competitions"][0]["competitors"]
+        hs = int(float(next(x for x in comp if x["homeAway"] == "home").get("score") or 0))
+        as_ = int(float(next(x for x in comp if x["homeAway"] == "away").get("score") or 0))
+        h, a = (as_, hs) if inv else (hs, as_)
+        pts = h + a if t == "totals" else (h if t.endswith("1") else a)
+        if not (str(l.get("outcome", "")).lower().startswith(("más", "mas", "over")) and pts > float(l["handicap"])):
+            return
+        when = st.get("shortDetail") or ""
+        why = f"Ya van {pts} puntos y la línea era {float(l['handicap']):g}: pase lo que pase, este pick ya se cobró."
+        score = f"🏀 {esc(formatting.team(l['home']))} {h}-{a} {esc(formatting.team(l['away']))}"
+    else:
+        from . import espn
+        rep_ = espn.live_report(l["home"], l["away"], l["kickoff"])
+        if not rep_ or rep_.get("state") != "in":
+            return
+        h, a = rep_["home"]["score"], rep_["away"]["score"]
+        lk = halftime.locked(l, h, a)
+        if not lk or lk[0] != "W":
+            return
+        why = lk[1]
+        when = rep_.get("clock") or ""
+        score = f"⚽ {esc(formatting.team(l['home']))} {h}-{a} {esc(formatting.team(l['away']))}"
+    p["lock_sent"] = True
+    head = halftime.LOCKED_W[sum(map(ord, p["id"])) % len(halftime.LOCKED_W)].replace("AL DESCANSO", "EN VIVO")
+    text = (f"✅ <b>{esc(head)}</b>\n\n{score}" + (f" · ⏱ {esc(when)}" if when else "") + "\n"
+            f"🎯 {esc(formatting.public_label(l))} @ {formatting.odds(p['price'])}\n\n{esc(why)}\n\n"
+            "🔞 +18 · Juega con responsabilidad.")
+    for where, mid in (p.get("channel_msgs") or {}).items():
+        chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
+        try:
+            telegram.send(chat, text, reply_to=mid)
+        except telegram.TelegramError as e:
+            print(f"No se pudo avisar el verde asegurado en {where}: {e}")
+    if state.get("owner_chat"):
+        telegram.send(state["owner_chat"], f"🔒 Pick #{p['id']} asegurado en vivo ({h}-{a}): avisé en sus canales.")
+
+
 def _halftime_check(state: dict, p: dict, now) -> None:
     """Entretiempo: publica en los canales del pick el marcador al descanso, goles, estadísticas y cómo va."""
     if p.get("kind") == "builder":
@@ -2704,6 +2770,9 @@ def _halftime_check(state: dict, p: dict, now) -> None:
         traceback.print_exc()
         image = None
     text = halftime.caption(p, rep, st)
+    lk = halftime.locked(l, rep["home"]["score"], rep["away"]["score"])
+    if lk and lk[0] == "W":
+        p["lock_sent"] = True   # el entretiempo ya lo celebra: no repetir el aviso en vivo
     for where, mid in (p.get("channel_msgs") or {}).items():
         chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
         try:
@@ -3799,6 +3868,10 @@ def poll() -> None:
             traceback.print_exc()
         try:
             _halftime_check(state, p, now)
+        except Exception:
+            traceback.print_exc()
+        try:
+            _lock_check(state, p, now)
         except Exception:
             traceback.print_exc()
         if (p["status"] == "settled" and p.get("result") == "W" and p.get("settled_at")
