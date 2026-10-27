@@ -848,6 +848,87 @@ def _cancel_pick(state: dict, pid: str, refree: bool = False, delete_posts: bool
     return ""
 
 
+def _manual_free_file(state: dict) -> None:
+    """data/manual_free.json: pick gratis elegido por el dueño (mercado y cuota de su app), una sola vez.
+    {"id", "team", "mtype": "teamtotals", "outcome": "Más", "handicap": 1.5, "price": 1.82}"""
+    import json
+    path = os.path.join(config.ROOT, "data", "manual_free.json")
+    owner = state.get("owner_chat")
+    if not os.path.exists(path) or not owner:
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("manual_free_done") or []):
+        return
+    state.setdefault("manual_free_done", []).append(req["id"])
+    from .value import Pick
+    now = store.now_utc()
+    fxs = oddspapi.upcoming_fixtures(_iso(now - timedelta(minutes=10)), _iso(now + timedelta(hours=12)))
+    fx = next((f for f in fxs if _name_hit(req["team"], f.get("participant1Name") or "")
+               or _name_hit(req["team"], f.get("participant2Name") or "")), None)
+    if not fx:
+        telegram.send(owner, f"⚠️ No encontré el partido de {formatting.escape(req['team'])} con cuotas.")
+        return
+    side = "1" if _name_hit(req["team"], fx.get("participant1Name") or "") else "2"
+    mtype = f"teamtotals-team{side}" if req["mtype"] == "teamtotals" else req["mtype"]
+    sel = None
+    try:
+        rows = oddspapi.odds_by_tournaments([fx["tournamentId"]])
+        row = next((r for r in rows if r.get("fixtureId") == fx["fixtureId"]), None)
+        if row:
+            for x in selections_for_fixture(fx, row, oddspapi.markets()):
+                if (x.mtype == mtype and x.handicap is not None and abs(float(x.handicap) - float(req["handicap"])) < 1e-9
+                        and str(x.outcome).lower()[:3] == req["outcome"].lower()[:3]):
+                    sel = x
+                    break
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+    price = float(req["price"])
+    if sel:
+        sel.price = price
+        d = Pick("simple", [sel], tier="valor" if sel.fair_prob * price - 1 >= config.MIN_EDGE else "justa").to_dict()
+    else:   # sin cuota de referencia: la probabilidad parte de la cuota de tu app
+        leg = {"fixture_id": fx["fixtureId"], "home": fx.get("participant1Name"), "away": fx.get("participant2Name"),
+               "league": config.TOURNAMENTS.get(fx["tournamentId"], ""), "kickoff": fx["startTime"], "market": "Goles del equipo",
+               "mtype": mtype, "outcome": req["outcome"], "handicap": float(req["handicap"]), "price": price,
+               "fair_odds": price, "edge": 0.0, "sport": "soccer"}
+        d = {"kind": "simple", "tier": "justa", "price": price, "prob": round(1 / price, 4), "edge": 0.0, "stake": 3,
+             "kickoff": fx["startTime"], "legs": [leg]}
+    for l in d["legs"]:
+        l["label"] = formatting.outcome_label(l)
+        l["sport"] = "soccer"
+    d["analysis"] = formatting.analysis(d)
+    state["seq"] += 1
+    pid = str(state["seq"])
+    d.update(id=pid, status="selected", created_at=_iso(now), stake_v=2, pick_style="coupon", manual_free=True)
+    state["picks"][pid] = d
+    _fresh_evidence(d)
+    _publish(state, d, free=True, vip_too=bool(state.get("vip_chat")))
+    d["auto_free"] = True   # mismo trato que el gratis automático (postpartido)
+    state["auto_free"] = {"date": _local_today(), "status": "published", "pid": pid, "opt": "A"}
+    from . import evidence, instagram
+    note = ""
+    if config.AUTO_FREE_INSTAGRAM and instagram.enabled(state):
+        image = _pick_image(d, "free")
+        if image:
+            from . import postimage
+            instagram.save_image(f"pre-{pid}", postimage.fit_instagram(image))
+            d["ig_pre_status"] = "queued"
+            d["ig_pre_caption"] = formatting.instagram_pick_caption(d)
+            note = " · Instagram en cola"
+    from . import argument
+    pp = argument.shown_prob(d)
+    telegram.send(owner, f"✅ <b>Pick gratis #{pid} publicado</b> (Gratis + VIP{note})\n"
+                  f"⚽ {formatting.escape(d['legs'][0]['home'])} vs {formatting.escape(d['legs'][0]['away'])}\n"
+                  f"🎯 {formatting.escape(formatting.public_label(d['legs'][0]))} @ {formatting.odds(price)}\n"
+                  + evidence.line(d["legs"][0].get("evidence")) + "\n"
+                  + f"📈 Le damos {argument.prob_text(pp)}; la cuota pide {argument.prob_text(1 / price)}."
+                  + ("" if sel else "\n(No encontré la cuota de referencia: la probabilidad parte de tu cuota.)"))
+
+
 def _cancel_file(state: dict) -> None:
     """data/cancel.json ({"id": "...", "pid": "39", "refree": true}): cancelar un pick publicado, una sola vez."""
     import json
@@ -3656,6 +3737,7 @@ def poll() -> None:
         _repair_file(state)
         _refresh_file(state)
         _recap_fix_file(state)
+        _manual_free_file(state)
         _force_free_file(state)
         _auto_free_tick(state, now)
     except Exception:
