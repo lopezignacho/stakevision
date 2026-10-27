@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-27T17:05:35.573158+00:00",
+ "updated_at": "2026-10-27T17:10:38.692484+00:00",
  "summary": {
   "picks": 15,
   "wins": 11,
@@ -10,6 +10,33 @@
   "units": 19.2
  },
  "picks": [
+  {
+   "id": "138",
+   "published_at": "2026-10-27T17:10:31Z",
+   "kickoff": "2026-10-27T17:30:00Z",
+   "kind": "simple",
+   "price": 1.82,
+   "stake": 3,
+   "prob": 0.5495,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Sassuolo",
+     "away": "Lazio",
+     "league": "Italia · Serie A",
+     "market": "Goles del equipo",
+     "outcome": "Más",
+     "price": 1.82,
+     "label": "Lazio marca más de 1.5 goles",
+     "mtype": "teamtotals-team2",
+     "handicap": 1.5,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.82): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\nProbabilidad estimada: 54,9%. Para no perder a esta cuota se necesita 54,9%."
+  },
   {
    "id": "130",
    "published_at": "2026-10-26T23:15:56Z",
