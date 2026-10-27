@@ -1,15 +1,45 @@
 {
- "updated_at": "2026-10-27T02:35:24.521045+00:00",
+ "updated_at": "2026-10-27T02:40:31.042966+00:00",
  "summary": {
-  "picks": 15,
-  "wins": 10,
+  "picks": 16,
+  "wins": 11,
   "losses": 4,
-  "hit_rate": 0.7143,
-  "yield": 0.3033,
-  "avg_odds": 1.82,
-  "units": 14.56
+  "hit_rate": 0.7333,
+  "yield": 0.3373,
+  "avg_odds": 1.83,
+  "units": 17.2
  },
  "picks": [
+  {
+   "id": "130",
+   "published_at": "2026-10-26T23:15:56Z",
+   "kickoff": "2026-10-27T00:00:00.000Z",
+   "kind": "simple",
+   "price": 1.88,
+   "stake": 3,
+   "prob": null,
+   "free": false,
+   "result": "W",
+   "legs": [
+    {
+     "home": "Oklahoma City Thunder",
+     "away": "Phoenix Suns",
+     "league": "USA · NBA",
+     "market": "Más/Menos (incl. tiempo extra)",
+     "outcome": "Más",
+     "price": 1.88,
+     "label": "Más de 220.5 puntos",
+     "mtype": "totals",
+     "handicap": 220.5,
+     "sport": "basketball",
+     "score": [
+      125,
+      114
+     ]
+    }
+   ],
+   "analysis": null
+  },
   {
    "id": "124",
    "published_at": "2026-10-26T22:20:27Z",
