@@ -1,15 +1,68 @@
 {
- "updated_at": "2026-10-27T02:20:27.873989+00:00",
+ "updated_at": "2026-10-27T02:25:28.352791+00:00",
  "summary": {
-  "picks": 14,
+  "picks": 15,
   "wins": 10,
-  "losses": 3,
-  "hit_rate": 0.7692,
-  "yield": 0.36,
-  "avg_odds": 1.76,
-  "units": 16.56
+  "losses": 4,
+  "hit_rate": 0.7143,
+  "yield": 0.3033,
+  "avg_odds": 1.82,
+  "units": 14.56
  },
  "picks": [
+  {
+   "id": "124",
+   "published_at": "2026-10-26T22:20:27Z",
+   "kickoff": "2026-10-26T23:00:00Z",
+   "kind": "builder",
+   "price": 2.65,
+   "stake": 2,
+   "prob": null,
+   "free": false,
+   "result": "L",
+   "legs": [
+    {
+     "home": "Cleveland Cavaliers",
+     "away": "Minnesota Timberwolves",
+     "league": "USA · NBA",
+     "market": "Bet Builder",
+     "outcome": "Donovan Mitchell: 3+ asistencias",
+     "price": null,
+     "label": "Donovan Mitchell: 3+ asistencias",
+     "mtype": "prop",
+     "handicap": 3,
+     "sport": "basketball",
+     "score": null
+    },
+    {
+     "home": "Cleveland Cavaliers",
+     "away": "Minnesota Timberwolves",
+     "league": "USA · NBA",
+     "market": "Bet Builder",
+     "outcome": "James Harden: 12+ puntos",
+     "price": null,
+     "label": "James Harden: 12+ puntos",
+     "mtype": "prop",
+     "handicap": 12,
+     "sport": "basketball",
+     "score": null
+    },
+    {
+     "home": "Cleveland Cavaliers",
+     "away": "Minnesota Timberwolves",
+     "league": "USA · NBA",
+     "market": "Bet Builder",
+     "outcome": "Ayo Dosunmu: 12+ puntos",
+     "price": null,
+     "label": "Ayo Dosunmu: 12+ puntos",
+     "mtype": "prop",
+     "handicap": 12,
+     "sport": "basketball",
+     "score": null
+    }
+   ],
+   "analysis": null
+  },
   {
    "id": "117",
    "published_at": "2026-10-26T04:00:34Z",
