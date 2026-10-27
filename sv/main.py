@@ -2664,7 +2664,30 @@ def _recap_nba(state: dict, p: dict, reuse: bool = False) -> bool:
     return True
 
 
-def _lock_check(state: dict, p: dict, now) -> None:
+def _lock_now_file(state: dict, now) -> None:
+    """data/lock_now.json ({"id": "...", "pid": "138"}): manda ya el aviso de verde asegurado de un pick en juego."""
+    import json
+    path = os.path.join(config.ROOT, "data", "lock_now.json")
+    if not os.path.exists(path) or not state.get("owner_chat"):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("lock_now_done") or []):
+        return
+    state.setdefault("lock_now_done", []).append(req["id"])
+    p = state["picks"].get(str(req.get("pid", "")).lstrip("#"))
+    if not p:
+        return
+    p.pop("lock_sent", None)
+    _lock_check(state, p, now, force=True)
+    if not p.get("lock_sent"):
+        telegram.send(state["owner_chat"], f"ℹ️ Pick #{p['id']}: no mandé el aviso (el partido ya terminó o aún no está ganado).")
+
+
+def _lock_check(state: dict, p: dict, now, force: bool = False) -> None:
     """En vivo: apenas el pick queda ganado (un «más de» ya superado, ambos ya marcaron…), aviso en sus canales.
     Revisa cada pasada mientras se juega (fútbol: goles; NBA: totales de puntos)."""
     if (p["status"] != "published" or p.get("lock_sent") or p.get("kind") == "builder" or len(p["legs"]) != 1
@@ -2675,7 +2698,7 @@ def _lock_check(state: dict, p: dict, now) -> None:
     if not (t.startswith(("totals", "teamtotals", "toscore")) or t == "bothteamsscore"):
         return   # «gana X», hándicap…: se decide recién al final
     kick = store.parse_ts(p["kickoff"])
-    if kick < store.parse_ts(config.LIVE_LOCK_SINCE):
+    if kick < store.parse_ts(config.LIVE_LOCK_SINCE) and not force:
         return   # solo para los partidos que empiezan desde que existe el aviso
     sport = l.get("sport") or "soccer"
     if not (kick + timedelta(minutes=3) <= now <= kick + timedelta(hours=3 if sport == "basketball" else 2, minutes=10)):
@@ -3836,6 +3859,7 @@ def poll() -> None:
         _refresh_file(state)
         _recap_fix_file(state)
         _manual_free_file(state)
+        _lock_now_file(state, now)
         _force_free_file(state)
         _auto_free_tick(state, now)
     except Exception:
