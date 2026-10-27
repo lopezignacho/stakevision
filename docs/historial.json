@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-27T19:45:00.317485+00:00",
+ "updated_at": "2026-10-27T19:49:47.598955+00:00",
  "summary": {
-  "picks": 15,
-  "wins": 11,
+  "picks": 16,
+  "wins": 12,
   "losses": 3,
-  "hit_rate": 0.7857,
-  "yield": 0.3918,
+  "hit_rate": 0.8,
+  "yield": 0.4165,
   "avg_odds": 1.77,
-  "units": 19.2
+  "units": 21.66
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 3,
    "prob": 0.5495,
    "free": true,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Sassuolo",
@@ -32,7 +32,10 @@
      "mtype": "teamtotals-team2",
      "handicap": 1.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      2,
+      6
+     ]
     }
    ],
    "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.82): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\nProbabilidad estimada: 54,9%. Para no perder a esta cuota se necesita 54,9%."
