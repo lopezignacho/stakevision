@@ -35,8 +35,49 @@ def is_halftime(rep: dict) -> bool:
     return rep.get("state") == "in" and rep.get("period") == 2 and mins <= 52
 
 
-def status(l: dict, h: int, a: int, grade) -> tuple[str, str]:
-    """(estado W/L/V si terminara así, frase de cómo va el pick)."""
+LOCKED_W = ["¡VERDE ASEGURADO! 🔒", "¡VERDAZO AL DESCANSO! 💚", "¡YA ESTÁ COBRADA! ✅"]
+
+
+def locked(l: dict, h: int, a: int) -> tuple[str, str] | None:
+    """¿El pick ya quedó decidido, pase lo que pase en el 2º tiempo? Los goles no se borran:
+    un «más de» ya superado es verde seguro; un «menos de» ya superado es roja segura.
+    Devuelve (W|L, por qué) o None si todavía puede cambiar."""
+    t, o, line = l.get("mtype", ""), str(l.get("outcome", "")).lower(), l.get("handicap")
+    over, yes = o.startswith(("más", "mas", "over")), o.startswith(("s", "y"))
+    gl = lambda n: f"{n} gol{'es' if n != 1 else ''}"  # noqa: E731
+    if t in ("totals", "teamtotals-team1", "teamtotals-team2") and line is not None:
+        line = float(line)
+        if t == "totals":
+            g, who = h + a, None
+        else:
+            g, who = (h, l["home"]) if t.endswith("1") else (a, l["away"])
+        need = math.floor(line) + 1
+        if g > line:
+            if over:
+                return "W", ((f"{formatting.team(who)} ya marcó {g} y necesitábamos {need}" if who
+                              else f"Ya van {gl(g)} y necesitábamos {need}") + ": pase lo que pase, este pick ya se cobró.")
+            return "L", (f"{formatting.team(who)} ya marcó {g}" if who else f"Ya van {gl(g)}") + ": se pasó la línea."
+        return None
+    if t == "bothteamsscore" and h > 0 and a > 0:
+        return ("W", "Ya marcaron los dos: pase lo que pase, este pick ya se cobró.") if yes else \
+               ("L", "Ya marcaron los dos.")
+    if t in ("toscore-team1", "toscore-team2"):
+        g, who = (h, l["home"]) if t.endswith("1") else (a, l["away"])
+        if g > 0:
+            return ("W", f"{formatting.team(who)} ya marcó: pase lo que pase, este pick ya se cobró.") if yes else \
+                   ("L", f"{formatting.team(who)} ya marcó.")
+    return None
+
+
+def status(l: dict, h: int, a: int, grade, seed: str = "") -> tuple[str, str]:
+    """(estado W/L/V si terminara así, frase de cómo va el pick). Si ya está decidido, lo dice claro."""
+    lk = locked(l, h, a)
+    if lk:
+        res, why = lk
+        if res == "W":
+            head = LOCKED_W[sum(map(ord, seed or "x")) % len(LOCKED_W)]
+            return "W", f"✅ {head} · {why}"
+        return "L", f"❌ Esta ya no se da · {why}"
     res = grade(l, h, a) or "?"
     t, o, line = l.get("mtype", ""), str(l.get("outcome", "")).lower(), l.get("handicap")
     total = h + a
@@ -85,7 +126,13 @@ def caption(p: dict, rep: dict, st: tuple[str, str]) -> str:
         for label, hv, av, unit in sts:
             fmt = (lambda v: f"{v:.0f}{unit}")
             lines.append(f"📊 {label}: {fmt(hv)} - {fmt(av)}")
-    sel = formatting.outcome_label(p["legs"][0])
-    lines += ["", f"🎯 Nuestro pick: <b>{esc(sel)}</b> @ {formatting.odds(p['price'])}", esc(st[1]),
-              "", "Se viene el 2º tiempo 👀", "🔞 +18 · Juega con responsabilidad."]
+    sel = formatting.public_label(p["legs"][0])
+    lk = locked(p["legs"][0], h["score"], a["score"])
+    if lk and lk[0] == "W":   # ya ganado: se celebra, sin «si terminara así»
+        head, _, why = st[1].partition(" · ")
+        lines += ["", f"🎯 Nuestro pick: <b>{esc(sel)}</b> @ {formatting.odds(p['price'])}",
+                  f"<b>{esc(head)}</b>", esc(why), "", "Ahora, a disfrutar el 2º tiempo 🍿", "🔞 +18 · Juega con responsabilidad."]
+    else:
+        lines += ["", f"🎯 Nuestro pick: <b>{esc(sel)}</b> @ {formatting.odds(p['price'])}", esc(st[1]),
+                  "", "Se viene el 2º tiempo 👀", "🔞 +18 · Juega con responsabilidad."]
     return "\n".join(lines)

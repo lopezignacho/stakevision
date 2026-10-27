@@ -2690,10 +2690,10 @@ def _halftime_check(state: dict, p: dict, now) -> None:
     if not halftime.is_halftime(rep):
         return
     p["ht_done"] = "sent"
-    st = halftime.status(l, rep["home"]["score"], rep["away"]["score"], grade_leg)
+    st = halftime.status(l, rep["home"]["score"], rep["away"]["score"], grade_leg, p["id"])
     photo = None   # en el entretiempo, sin fotos: solo marcador y estadísticas (las fotos quedan para el final)
     league = (l.get("league") or "").split("·")[-1].strip()
-    sel = formatting.outcome_label(l)
+    sel = formatting.public_label(l)
     data = {"report": rep, "eyebrow": league or "Pick en juego", "photo": photo[0] if photo else None,
             "credit": photo[1]["text"] if photo and photo[1] else None, "stats": halftime.stats(rep),
             "pick_label": sel[:sel.index(" (")] if " (" in sel else sel, "odds": formatting.odds(p["price"]),

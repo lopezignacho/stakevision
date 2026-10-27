@@ -213,6 +213,9 @@ def pick_status(leg: dict, rep: dict, final: bool, grade) -> tuple[str, str]:
         pts = h + a if t == "totals" else (h if t.endswith("1") else a)
         proj = pts * 2
         over = o.startswith(("más", "mas", "over"))
+        if pts > float(line):   # los puntos no se borran: ya está decidido
+            return (("W", f"✅ ¡VERDE ASEGURADO! 🔒 · Ya van {pts} puntos y la línea era {float(line):g}.") if over else
+                    ("L", f"❌ Esta ya no se da · Ya van {pts} puntos (línea {float(line):g})."))
         good = (proj > float(line)) == over
         txt = f"Van {pts} puntos: al mismo ritmo terminarían cerca de {proj} (línea {float(line):g})."
         return ("W" if good else "L"), ("✅ Va bien encaminado · " if good else "⚠️ Por ahora no llega · ") + txt

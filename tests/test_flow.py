@@ -1443,3 +1443,15 @@ assert not _cm.sport_ok(bad, "soccer", True) and not _cm.sport_ok(fem, "soccer",
 assert _cm.sport_ok(okf, "soccer", True) and not _cm.sport_ok(nameonly, "soccer", True)
 assert _cm.sport_ok(nbaf, "basketball") and not _cm.sport_ok(nbaf, "soccer")
 print("OK fotos del deporte correcto")
+
+# 44) entretiempo: si el pick ya está decidido, se dice claro (sin «si terminara así»)
+from sv import halftime as _ht  # noqa: E402
+_l = {"home": "Sassuolo", "away": "Lazio", "mtype": "teamtotals-team2", "outcome": "Más", "handicap": 1.5}
+_st = _ht.status(_l, 2, 4, main.grade_leg, "138")
+assert _st[0] == "W" and "ASEGURADO" in _st[1] and "terminara" not in _st[1], _st
+_cap = _ht.caption({"id": "138", "price": 1.82, "legs": [_l]}, {"home": {"short": "Sassuolo", "score": 2},
+                   "away": {"short": "Lazio", "score": 4}, "goals": [], "reds": []}, _st)
+assert "terminara" not in _cap and "disfrutar" in _cap
+assert _ht.status(dict(_l, mtype="totals", outcome="Más", handicap=2.5), 1, 1, main.grade_leg)[0] == "?"
+assert _ht.status(dict(_l, mtype="totals", outcome="Menos", handicap=2.5), 2, 1, main.grade_leg)[0] == "L"
+print("OK entretiempo con pick ya decidido")
