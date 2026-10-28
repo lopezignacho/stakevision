@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-10-28T22:10:40.015085+00:00",
+ "updated_at": "2026-10-28T22:15:26.165914+00:00",
  "summary": {
-  "picks": 16,
+  "picks": 17,
   "wins": 12,
-  "losses": 3,
-  "hit_rate": 0.8,
-  "yield": 0.4165,
-  "avg_odds": 1.77,
-  "units": 21.66
+  "losses": 4,
+  "hit_rate": 0.75,
+  "yield": 0.3393,
+  "avg_odds": 1.8,
+  "units": 18.66
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 3,
    "prob": 0.4651,
    "free": true,
-   "result": null,
+   "result": "L",
    "legs": [
     {
      "home": "Liverpool",
@@ -32,7 +32,10 @@
      "mtype": "teamtotals-team1",
      "handicap": 1.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      1,
+      1
+     ]
     }
    ],
    "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (2.15): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\nProbabilidad estimada: 46,5%. Para no perder a esta cuota se necesita 46,5%."
