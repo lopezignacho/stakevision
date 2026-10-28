@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-10-28T19:25:40.573138+00:00",
+ "updated_at": "2026-10-28T19:30:38.799923+00:00",
  "summary": {
   "picks": 16,
   "wins": 12,
@@ -10,6 +10,33 @@
   "units": 21.66
  },
  "picks": [
+  {
+   "id": "145",
+   "published_at": "2026-10-28T19:30:31Z",
+   "kickoff": "2026-10-28T20:00:00Z",
+   "kind": "simple",
+   "price": 2.15,
+   "stake": 3,
+   "prob": 0.4651,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Liverpool",
+     "away": "Chelsea",
+     "league": "Inglaterra · Copa de la Liga",
+     "market": "Goles del equipo",
+     "outcome": "Más",
+     "price": 2.15,
+     "label": "Liverpool marca más de 1.5 goles",
+     "mtype": "teamtotals-team1",
+     "handicap": 1.5,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (2.15): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\nProbabilidad estimada: 46,5%. Para no perder a esta cuota se necesita 46,5%."
+  },
   {
    "id": "138",
    "published_at": "2026-10-27T17:10:31Z",
