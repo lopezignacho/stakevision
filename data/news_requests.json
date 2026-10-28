@@ -11,5 +11,18 @@
   "sport": "basketball",
   "status": "pending",
   "requested_at": "2026-10-26T22:21:46Z"
+ },
+ {
+  "id": "n17281645",
+  "headline": "Mussolini's great-grandson scores first goal for Lazio",
+  "description": "Romano Floriani Mussolini, the great-grandson of former Italian dictator Benito Mussolini, scored his first goal for Lazio on Tuesday.",
+  "link": "https://www.espn.com/soccer/story/_/id/50308537/mussolini-great-grandson-scores-first-goal-lazio-serie-a",
+  "published": "2026-10-28T15:21:00Z",
+  "pick": "138",
+  "home": "Sassuolo",
+  "away": "Lazio",
+  "sport": "soccer",
+  "status": "pending",
+  "requested_at": "2026-10-28T16:45:49Z"
  }
 ]
