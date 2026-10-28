@@ -914,6 +914,12 @@ def _manual_free(state: dict, req: dict) -> None:
                     break
     except Exception:  # noqa: BLE001
         traceback.print_exc()
+    if not req.get("price"):   # sin cuota tuya: la de Betano ahora
+        if not sel:
+            telegram.send(owner, f"⚠️ No encontré la cuota de {formatting.escape(req['team'])} más de {req['handicap']} "
+                                 "goles en Betano. Mándame la cuota de tu app y lo publico.")
+            return
+        req["price"] = sel.price
     price = float(req["price"])
     if sel:
         sel.price = price
