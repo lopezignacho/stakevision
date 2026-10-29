@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/runner/work/stakevision/stakevision/tools/match_probe.py", line 13, in <module>
+    fxs = oddspapi.upcoming_fixtures(iso(now - timedelta(hours=2)), iso(now + timedelta(hours=30)))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/stakevision/stakevision/sv/oddspapi.py", line 109, in upcoming_fixtures
+    return _get("/fixtures", sportId=sport_id, **{"from": frm, "to": to},
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/stakevision/stakevision/sv/oddspapi.py", line 32, in _get
+    raise OddsPapiError("Se agotó la cuota mensual de OddsPapi")
+sv.oddspapi.OddsPapiError: Se agotó la cuota mensual de OddsPapi
