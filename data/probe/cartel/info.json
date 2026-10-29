@@ -86,5 +86,13 @@
    "Jalen Johnson",
    "Donovan Mitchell"
   ]
+ },
+ "soccer_crests": {
+  "Colo-Colo": "",
+  "Universidad de Chile": "https://a.espncdn.com/i/teamlogos/soccer/500-dark/4139.png",
+  "Real Madrid": "https://a.espncdn.com/i/teamlogos/soccer/500-dark/86.png",
+  "Liverpool": "https://a.espncdn.com/i/teamlogos/soccer/500-dark/364.png",
+  "Lazio": "https://a.espncdn.com/i/teamlogos/soccer/500-dark/112.png",
+  "Boca Juniors": "https://a.espncdn.com/i/teamlogos/soccer/500-dark/5.png"
  }
 }
