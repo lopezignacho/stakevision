@@ -13,6 +13,16 @@ def _hex(x, d=(40, 50, 70)):
         return d
 
 
+def _main_color(t: dict):
+    """Color principal para fondo oscuro: si el color de ESPN es muy claro (amarillo, blanco), el alternativo."""
+    c = _hex(t.get("color"))
+    if sum(c) > 450 and t.get("alternateColor"):
+        alt = _hex(t["alternateColor"])
+        if sum(alt) < sum(c):
+            return alt
+    return c
+
+
 def _rec(c: dict) -> str:
     return next((r.get("summary") for r in c.get("records") or [] if r.get("type") == "total"), "")
 
@@ -20,7 +30,7 @@ def _rec(c: dict) -> str:
 def _side(c: dict) -> dict:
     t = c["team"]
     return {"name": t.get("displayName", ""), "short": t.get("name", ""), "abbr": t.get("abbreviation", ""),
-            "color": _hex(t.get("color")), "score": int(c.get("score") or 0), "record": _rec(c),
+            "color": _main_color(t), "score": int(c.get("score") or 0), "record": _rec(c),
             "logo": crest.get("", url=t.get("logo", ""))}
 
 

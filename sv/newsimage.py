@@ -560,8 +560,15 @@ def render_figura(g: dict) -> bytes:
     col = tuple(g.get("color") or (30, 50, 110))
     if g.get("photo"):
         im = P._enhance(P._cover(g["photo"], (w, h), side="right", face_w=0.24, face_y=0.25)).convert("RGBA")
-    else:
+    else:   # sin foto validada: fondo con el color del equipo y su escudo gigante como protagonista
         im = _backdrop(col, (10, 12, 18))
+        mine = g.get("home") or {}
+        if mine.get("logo"):
+            from . import crest
+            big = crest.fitted(mine["logo"], 720)
+            if big:
+                big.putalpha(big.getchannel("A").point(lambda x: int(x * 0.85)))
+                im.alpha_composite(big, (w - big.width + 150, 150))
     tint = Image.new("RGBA", (w, h), tuple(int(c * 0.5) for c in col) + (60,))
     im.alpha_composite(tint)
     left = Image.new("RGBA", (w, h), (6, 8, 14, 0))

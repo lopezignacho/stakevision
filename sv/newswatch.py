@@ -589,6 +589,8 @@ def _layouts_for(item: dict, has_photo: bool) -> list[str]:
         opts += (["hero"] if item.get("stat") else []) + ["impact"]
     opts.append("classic")
     fmt = item.get("format")
+    if fmt == "hero" and "figura" in opts:
+        fmt = "figura"   # gran actuación en un partido ya jugado: la planilla completa luce más que una sola cifra
     if fmt in opts:
         opts.remove(fmt)
         opts.insert(0, fmt)
