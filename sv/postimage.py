@@ -841,6 +841,39 @@ def _best_offset(energy: list, window: int, weights) -> int:
     return best_i
 
 
+def _face(im: Image.Image):
+    """(x, y, tamaño) de la cara más grande de la foto, o None (OpenCV, si está instalado)."""
+    try:
+        import cv2
+        import numpy as np
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        small = im.copy()
+        small.thumbnail((900, 900))
+        k = im.width / small.width
+        g = cv2.cvtColor(np.array(small.convert("RGB")), cv2.COLOR_RGB2GRAY)
+        g = cv2.equalizeHist(g)
+        found = []
+        for name in ("haarcascade_frontalface_default.xml", "haarcascade_profileface.xml"):
+            cas = cv2.CascadeClassifier(cv2.data.haarcascades + name)
+            for (x, y, w, h) in cas.detectMultiScale(g, scaleFactor=1.1, minNeighbors=6, minSize=(28, 28)):
+                found.append((w * h, x + w / 2, y + h / 2, w))
+        if not found:   # sin cara clara: la persona más grande (cuerpo completo)
+            hog = cv2.HOGDescriptor()
+            hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+            rects, weights = hog.detectMultiScale(g, winStride=(8, 8), padding=(8, 8), scale=1.05)
+            people = [(w * h, x, y, w, h) for (x, y, w, h), wt in zip(rects, weights) if float(wt) > 0.5]
+            if not people:
+                return None
+            _a, x, y, w, h = max(people)
+            return (x + w / 2) * k, (y + h * 0.18) * k, w * 0.4 * k   # «cara» aprox.: arriba del cuerpo
+        _a, cx, cy, w = max(found)
+        return cx * k, cy * k, w * k
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _cover(photo: bytes, size, focus=None, side: str = "right") -> Image.Image:
     """Llena el tamaño sin deformar. Sin focus, elige el recorte solo: deja al protagonista (la zona con
     más detalle) en la mitad derecha, que es la que no tapa el texto, y prioriza la parte de arriba (caras)."""
@@ -851,6 +884,13 @@ def _cover(photo: bytes, size, focus=None, side: str = "right") -> Image.Image:
     if focus:
         x = round((im.width - w) * focus[0])
         y = round((im.height - h) * focus[1])
+        return im.crop((x, y, x + w, y + h))
+    fc = _face(im)
+    if fc:   # hay una cara: el encuadre se arma alrededor de ella (nunca un brazo o el público)
+        cx, cy, fw = fc
+        tx = 0.5 if side == "center" else 0.66
+        x = round(min(max(cx - w * tx, 0), im.width - w))
+        y = round(min(max(cy - h * 0.30, 0), im.height - h))
         return im.crop((x, y, x + w, y + h))
     k = 8   # análisis en una versión chica
     small = im.convert("L").resize((max(1, im.width // k), max(1, im.height // k))).filter(ImageFilter.FIND_EDGES)

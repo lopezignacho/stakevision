@@ -7,6 +7,7 @@ os.makedirs(OUT, exist_ok=True)
 got = newswatch._photo_for({"player": "Stephen Curry", "teams": ["Golden State Warriors", "Warriors"], "sport": "basketball"})
 info = {"photo": bool(got), "credit": got[1] if got else None}
 if got:
+    open(f"{OUT}/original.jpg", "wb").write(got[0])
     cr = f"Foto: {got[1]['author']} / Wikimedia Commons ({got[1]['license']}), modificada"
     n = dict(photo=got[0], colors=[(29, 66, 138), (255, 199, 44)], tag="NBA", source="Fuente: ESPN", credit=cr,
              name="Stephen Curry", stat={"value": "44", "label": "puntos"}, line="Brilló en el triunfo de los Warriors.",
