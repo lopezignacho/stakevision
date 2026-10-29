@@ -3097,6 +3097,15 @@ def _handle_update(state: dict, u: dict) -> None:
         text = (msg.get("text") or "").strip()
         chat = msg["chat"]["id"]
         if chat == owner and (msg.get("photo") or msg.get("document")):
+            if state.get("news_photo"):
+                from . import newswatch   # «📷 Cambiar foto» de una noticia
+                try:
+                    if newswatch.receive_photo(state, msg):
+                        return
+                except Exception as e:  # noqa: BLE001
+                    traceback.print_exc()
+                    telegram.send(owner, f"⚠️ No pude usar la foto: {formatting.escape(str(e))}")
+                    return
             _receive_upload(state, msg)
             return
         if chat == owner and text and not text.startswith("/") and _builder_odds(state, text):
@@ -3175,7 +3184,7 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.answer(cb["id"], "No autorizado")
         return
     action, _, pid = (cb.get("data") or "").partition(":")
-    if action in ("nq", "nx", "np", "ni", "nn", "ne", "nt", "nh", "nd"):   # noticias para Instagram
+    if action in ("nq", "nx", "np", "ni", "nn", "ne", "nt", "nh", "nd", "nf", "nz"):   # noticias para Instagram
         from . import newswatch
         newswatch.callback(state, cb, action, pid)
         return

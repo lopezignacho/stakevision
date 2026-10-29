@@ -1529,3 +1529,28 @@ assert _nw2._layouts_for(it, False) == ["classic"]
 it = _nw2._clean({"headline": "x", "facts": ["a"], "format": "algo raro", "match": {"home": {}}})
 assert it["format"] is None and it["match"] is None
 print("OK formatos de noticia")
+
+# 48) «📷 Cambiar foto» y «🚫 Sin foto» en una noticia
+import io as _io
+from PIL import Image as _Img
+_buf = _io.BytesIO(); _Img.new("RGB", (900, 1200), (40, 90, 160)).save(_buf, "JPEG")
+_nw2.PHOTO_DIR = os.path.join(tempfile.mkdtemp(), "np")
+_prep = []
+_nw2._prepare = lambda state, item, approved=False: _prep.append(dict(item))
+_orig_dl = telegram.download
+telegram.download = lambda fid: _buf.getvalue()
+st = {"owner_chat": OWNER, "news_items": {"z1": {"id": "z1", "headline": "X", "layout": "impact", "player": "Curry"}},
+      "ig_jobs": {"z1": {"status": "draft"}}}
+_nw2.callback(st, {"id": "c", "message": {"message_id": 9}}, "nf", "z1")
+assert st["news_photo"]["nid"] == "z1"
+assert _nw2.receive_photo(st, {"photo": [{"file_id": "a"}]}) and "own_photos" not in st["news_items"]["z1"]  # sin crédito
+assert _nw2.receive_photo(st, {"photo": [{"file_id": "a"}], "caption": "@juanfotos"})
+it = st["news_items"]["z1"]
+assert it["own_photos"]["main"]["credit"] == "@juanfotos" and _prep and "news_photo" not in st
+got = _nw2._photo_for(it)
+assert got and got[1]["own"] and got[1]["author"] == "@juanfotos"
+st["ig_jobs"]["z1"] = {"status": "draft"}
+_nw2.callback(st, {"id": "c", "message": {"message_id": 10}}, "nz", "z1")
+assert it["no_photo"] and _nw2._photo_for(it) is None
+telegram.download = _orig_dl
+print("OK cambiar foto de noticia")

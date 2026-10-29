@@ -43,6 +43,7 @@ def PUBLISH_BUTTONS(nid: str, reel: bool = True) -> list:
     rows = ([[("🎬 Reel ahora", f"np:{nid}"), ("⏰ Reel en horario", f"nt:{nid}")]] if reel else
             [[("📸 Publicar ahora", f"ni:{nid}"), ("⏰ En horario", f"nh:{nid}")]])
     rows.append(([("🖼 Solo imagen", f"ni:{nid}")] if reel else []) + [("✏️ Modificar", f"ne:{nid}")])
+    rows.append([("📷 Cambiar foto", f"nf:{nid}"), ("🚫 Sin foto", f"nz:{nid}")])
     rows.append([("✖️ No publicar", f"nn:{nid}")])
     return rows
 
@@ -549,6 +550,11 @@ LAYOUT_NAME = {"hero": "Héroe (foto + cifra)", "versus": "Versus (cara a cara)"
 def _photo_for(item: dict):
     from . import commons
     sport = item.get("sport") or ("basketball" if "NBA" in item.get("kicker", "") else "soccer")
+    if item.get("no_photo"):
+        return None
+    own = _own_photo(item, "main")
+    if own:
+        return own
     if item.get("photo_file"):
         return commons.file_photo(item["photo_file"])
     if item.get("player"):
@@ -581,6 +587,10 @@ def _layouts_for(item: dict, has_photo: bool) -> list[str]:
 def _side_photo(t: dict, sport: str):
     """Foto de un lado del versus: su figura con la camiseta del equipo, o una del equipo."""
     from . import commons
+    if t.get("_no_photo"):
+        return None
+    if t.get("_own"):
+        return t["_own"]
     try:
         if t.get("player"):
             got = (commons.player_photo(t["player"], [t["name"], t["short"]], need_team=True, sport=sport)
@@ -602,16 +612,89 @@ def _versus_data(item: dict, n: dict) -> dict:
         t = dict(m[side])
         t["color"] = tuple(t["color"])
         t["logo"] = _crest(t, sport)
+        t["_no_photo"] = bool(item.get("no_photo"))
+        t["_own"] = _own_photo(item, side)
         got = _side_photo(t, sport)
         if got:
             t["photo"] = got[0]
             a = (got[1] or {}).get("author")
             if a and a not in authors:
                 authors.append(a)
+            if (got[1] or {}).get("own"):
+                v["_own_credit"] = True
         v[side] = t
     if authors:
-        v["credit"] = "Fotos: " + ", ".join(authors)[:60] + " / Wikimedia Commons, modificadas"
+        v["credit"] = ("Fotos: " + ", ".join(authors)[:70] + (" (con permiso)" if v.pop("_own_credit", False) else
+                                                              " / Wikimedia Commons, modificadas"))
     return v
+
+
+PHOTO_DIR = os.path.join(config.ROOT, "data", "news_photos")
+
+
+def _own_photo(item: dict, side: str):
+    """Foto que mandaste tú (con permiso del autor) para esta noticia: (jpeg, crédito) o None.
+    side: 'main' (la foto principal), 'home' o 'away' (cada lado del versus)."""
+    ph = (item.get("own_photos") or {}).get(side)
+    if not ph and side == "main":
+        ph = next(iter((item.get("own_photos") or {}).values()), None)
+    if not ph:
+        return None
+    try:
+        with open(os.path.join(PHOTO_DIR, ph["file"]), "rb") as f:
+            data = f.read()
+    except OSError:
+        return None
+    return data, {"author": ph["credit"], "license": "con permiso", "own": True}
+
+
+def receive_photo(state: dict, msg: dict) -> bool:
+    """Llegó la foto que pediste con «📷 Cambiar foto»: se guarda con su crédito y se rearma la noticia."""
+    wait = state.get("news_photo") or {}
+    owner = state["owner_chat"]
+    item = (state.get("news_items") or {}).get(wait.get("nid") or "")
+    if not item or store.now_utc() - store.parse_ts(wait["at"]) > timedelta(minutes=60):
+        state.pop("news_photo", None)
+        return False
+    if msg.get("photo"):
+        fid = msg["photo"][-1]["file_id"]
+    elif (msg.get("document") or {}).get("mime_type", "").startswith("image/"):
+        fid = msg["document"]["file_id"]
+    else:
+        telegram.send(owner, "📷 Eso no es una imagen. Mándame la foto (como foto o como archivo).")
+        return True
+    cap = (msg.get("caption") or "").strip()
+    side = "main"
+    low = cap.lower()
+    if (item.get("match") or {}) and low.split(" ", 1)[0] in ("local", "visita", "izq", "der", "izquierda", "derecha"):
+        side = "home" if low.split(" ", 1)[0] in ("local", "izq", "izquierda") else "away"
+        cap = cap.split(" ", 1)[1].strip() if " " in cap else ""
+    elif item.get("layout") == "versus":
+        side = "home" if not (item.get("own_photos") or {}).get("home") else "away"
+    credit = cap.removeprefix("Foto:").removeprefix("foto:").strip()
+    if not credit:
+        telegram.send(owner, "📷 Me falta el crédito del autor. Vuelve a mandar la foto con el nombre o @ del autor "
+                             "en el texto de la foto (ej. «@juanfotos»). Sin crédito no la uso.")
+        return True
+    os.makedirs(PHOTO_DIR, exist_ok=True)
+    name = f"{item['id']}-{side}-{store.now_utc().strftime('%H%M%S')}.jpg"
+    with open(os.path.join(PHOTO_DIR, name), "wb") as f:
+        f.write(telegram.download(fid))
+    item.setdefault("own_photos", {})[side] = {"file": name, "credit": credit[:60]}
+    item.pop("no_photo", None)
+    if side != "main":
+        item["layout"] = "versus"
+    elif item.get("layout") == "classic":
+        item.pop("layout", None)
+    state.pop("news_photo", None)
+    old = (state.get("ig_jobs") or {}).get(item["id"])
+    if old and old.get("status") == "draft":
+        old["status"] = "replaced"
+    item["rev"] = item.get("rev", 0) + 1
+    where = {"home": " (lado local)", "away": " (lado visita)"}.get(side, "")
+    telegram.send(owner, f"📷 Foto recibida{where}, crédito: {formatting.escape(credit[:60])}. Aquí va la versión nueva 👇")
+    _prepare(state, item)
+    return True
 
 
 def _crest(t: dict, sport: str):
@@ -646,7 +729,8 @@ def _render(item: dict) -> tuple[bytes, str | None, dict]:
         if got:
             photo = got[0]
             cr = got[1] or {}
-            credit = f"Foto de referencia: {cr.get('author')} / Wikimedia Commons ({cr.get('license')}), modificada"
+            credit = (f"Foto: {cr.get('author')} (con permiso)" if cr.get("own") else
+                      f"Foto de referencia: {cr.get('author')} / Wikimedia Commons ({cr.get('license')}), modificada")
     except Exception:  # noqa: BLE001
         traceback.print_exc()
     n = {k: item[k] for k in ("tag", "kicker", "headline", "sub", "facts", "status", "name", "line", "stat") if k in item}
@@ -680,7 +764,7 @@ def _prepare(state: dict, item: dict, approved: bool = False) -> None:
     key = f"news-{nid}" + (f"-r{item['rev']}" if item.get("rev") else "")
     instagram.save_image(key, img)
     caption = item["caption"]
-    if credit and "Wikimedia" not in caption:
+    if credit and "Wikimedia" in credit and "Wikimedia" not in caption:
         caption += "\n\n📸 Foto de referencia: Wikimedia Commons (licencia libre), modificada."
     job = {"key": key, "caption": caption, "status": "draft", "title": item.get("headline", "")}
     reel_mp4 = None
@@ -779,6 +863,28 @@ def callback(state: dict, cb: dict, action: str, nid: str) -> None:
         job["status"] = "replaced"
         telegram.edit_buttons_off(owner, mid, f"🎨 Probando diseño {LAYOUT_NAME[item['layout']]} 👇")
         telegram.answer(cb["id"], "Armando otro diseño")
+        _prepare(state, item)
+    elif action in ("nf", "nz"):   # cambiar foto (una tuya, con permiso) / sin foto
+        item = (state.get("news_items") or {}).get(nid)
+        job = (state.get("ig_jobs") or {}).get(nid)
+        if not item or not job or job.get("status") != "draft":
+            telegram.answer(cb["id"], "Ya estaba procesada")
+            return
+        if action == "nf":
+            state["news_photo"] = {"nid": nid, "at": store.now_utc().strftime("%Y-%m-%dT%H:%M:%SZ")}
+            telegram.answer(cb["id"], "Mándame la foto")
+            vs = " Si es un versus, empieza el texto con «local» o «visita» para decirme a qué lado va." if item.get("match") else ""
+            telegram.send(owner, "📷 Mándame la foto (mejor como archivo, para que no pierda calidad) y en el texto de la "
+                                 "foto escribe el crédito del autor (ej. «@juanfotos»)." + vs +
+                                 "\n\n⚠️ Usa solo fotos tuyas o con permiso del autor: las fotos de agencia (Getty, AP, "
+                                 "NBA) o copiadas de otras cuentas pueden traer denuncias en Instagram.")
+            return
+        item["no_photo"] = True
+        item.pop("own_photos", None)
+        item["rev"] = item.get("rev", 0) + 1
+        job["status"] = "replaced"
+        telegram.edit_buttons_off(owner, mid, "🚫 Sin foto: la armo con colores y escudos 👇")
+        telegram.answer(cb["id"], "Sin foto")
         _prepare(state, item)
     elif action == "ne":
         if nid not in (state.get("news_items") or {}):
