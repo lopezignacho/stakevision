@@ -1,13 +1,14 @@
-"""Noticias de los partidos que pronosticamos, como contenido extra para Instagram.
+"""Noticias deportivas para Instagram, siempre en español y siempre con tu aprobación.
 
-Flujo:
-1) Vigía (cada 2 h): titulares de ESPN de los equipos de nuestros picks (de ayer, hoy y mañana).
-   Cada titular nuevo te llega por Telegram con «✅ Sí, prepárala» / «✖️ No».
-2) Al tocar «Sí», queda en data/news_requests.json. Claude la redacta en español con datos verificados
-   (tarea programada) y la deja en data/news_ready.json.
-3) El bot arma la imagen (foto libre de Commons si hay; si no, colores del equipo) y te la manda con
-   «📸 Publicar en Instagram». Solo sale a Instagram (no a los canales de Telegram).
-Una entrada de news_ready con "approved": true (porque ya la aprobaste en el chat) se publica sin volver a preguntar.
+Flujo (con la clave de Gemini, GEMINI_API_KEY):
+1) Cada 2 h (9:00–23:00 de Chile) busca noticias importantes: titulares grandes de fútbol y NBA
+   (ESPN) y las de los equipos de nuestros picks. Un editor (Gemini) elige las que valen la pena.
+2) Te las manda traducidas y resumidas en español, con la fuente: «✅ Sí, prepárala» / «✖️ No».
+3) Al aprobar, la redacta al instante en español con los datos del artículo y arma imagen + Reel.
+4) Te llega para revisar: «🎬 Reel ahora», «⏰ En horario», «🖼 Solo imagen», «✏️ Modificar», «✖️ No».
+5) «Modificar»: le escribes qué cambiar y te llega la versión nueva.
+6) Se publica solo en Instagram (máx. 4 noticias al día; «En horario» = 13:00–15:00 o 20:00–23:00).
+Sin la clave, la redacción queda pedida en data/news_requests.json (la puede hacer Claude a mano).
 """
 from __future__ import annotations
 
@@ -25,6 +26,11 @@ REQ = os.path.join(config.ROOT, "data", "news_requests.json")
 READY = os.path.join(config.ROOT, "data", "news_ready.json")
 CHECK_EVERY_H = 2
 MAX_PER_CHECK = 3
+DAILY_MAX = 4                        # noticias publicadas por día, como máximo
+WINDOWS = ((13, 15), (20, 23))       # horarios de más movimiento (hora de Chile)
+TOP_SOURCES = [("soccer", "eng.1"), ("soccer", "esp.1"), ("soccer", "ita.1"), ("soccer", "uefa.champions"),
+               ("soccer", "conmebol.libertadores"), ("soccer", "chi.1"), ("soccer", "fifa.world"), ("basketball", "nba")]
+UA = {"User-Agent": "Mozilla/5.0 (StakevisionBot)"}
 SOCCER_SUMMARY = "https://site.api.espn.com/apis/site/v2/sports/soccer/all/summary"
 
 
@@ -33,9 +39,32 @@ def BUTTONS(nid: str) -> list:
 
 
 def PUBLISH_BUTTONS(nid: str, reel: bool = True) -> list:
-    if reel:
-        return [[("🎬 Publicar Reel", f"np:{nid}"), ("🖼 Solo imagen", f"ni:{nid}")], [("✖️ No publicar", f"nn:{nid}")]]
-    return [[("📸 Publicar en Instagram", f"ni:{nid}"), ("✖️ No publicar", f"nn:{nid}")]]
+    rows = ([[("🎬 Reel ahora", f"np:{nid}"), ("⏰ Reel en horario", f"nt:{nid}")]] if reel else
+            [[("📸 Publicar ahora", f"ni:{nid}"), ("⏰ En horario", f"nh:{nid}")]])
+    rows.append(([("🖼 Solo imagen", f"ni:{nid}")] if reel else []) + [("✏️ Modificar", f"ne:{nid}")])
+    rows.append([("✖️ No publicar", f"nn:{nid}")])
+    return rows
+
+
+EDITORIAL = """Eres el editor de Stakevision, una cuenta chilena de Instagram de fútbol y NBA (también da pronósticos
+deportivos). Escribes SIEMPRE en español neutro con toques chilenos suaves, claro y atractivo para el público general.
+Reglas: usa SOLO los datos del texto fuente (no inventes cifras, fechas, citas ni diagnósticos); si una cita está en
+inglés, tradúcela fiel y di que es traducida; nada de casas de apuestas ni cuotas; nombres propios bien escritos."""
+
+
+def _article_text(link: str, fallback: str = "") -> str:
+    """Texto del artículo (párrafos), para redactar con los datos reales."""
+    import re
+    if not link:
+        return fallback
+    try:
+        r = requests.get(link, headers=UA, timeout=25)
+        paras = re.findall(r"<p[^>]*>(.*?)</p>", r.text, re.S)
+        txt = "\n".join(html.unescape(re.sub(r"<[^>]+>", "", p_)).strip() for p_ in paras)
+        txt = "\n".join(x for x in txt.split("\n") if len(x) > 40)
+        return (txt[:7000] or fallback)
+    except Exception:  # noqa: BLE001
+        return fallback
 
 
 def _load(path: str) -> list:
@@ -162,6 +191,252 @@ def check(state: dict, force: bool = False) -> int:
     return sent
 
 
+def _top_articles() -> list[dict]:
+    """Titulares grandes de fútbol y NBA (ESPN)."""
+    out = []
+    for sport, lg in TOP_SOURCES:
+        try:
+            if sport == "basketball":
+                from . import nba
+                arts = nba._get("/news", limit=15).get("articles") or []
+            else:
+                arts = requests.get(f"https://site.api.espn.com/apis/site/v2/sports/soccer/{lg}/news",
+                                    params={"limit": 10}, timeout=25).json().get("articles") or []
+        except Exception:  # noqa: BLE001
+            continue
+        for a in arts:
+            a["_sport"] = sport
+            out.append(a)
+    return out
+
+
+def check_editor(state: dict, force: bool = False) -> int:
+    """Con Gemini: noticias importantes (generales + de nuestros picks), elegidas y resumidas en español."""
+    from . import llm
+    owner = state.get("owner_chat")
+    if not owner:
+        return 0
+    now = store.now_utc()
+    from zoneinfo import ZoneInfo
+    local = now.astimezone(ZoneInfo(config.TIMEZONE))
+    nx = state.get("news_next")
+    if not force and ((nx and now < store.parse_ts(nx)) or not (9 <= local.hour < 23)):
+        return 0
+    state["news_next"] = (now + timedelta(hours=CHECK_EVERY_H)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    seen = state.setdefault("news_seen", [])
+    since = now - timedelta(hours=18)
+    cands = []
+    ours = {}
+    for g in _our_games(state):
+        try:
+            for a in _articles(g):
+                a["_pick"] = g["pid"]
+                a["_sport"] = g["sport"]
+                cands.append(a)
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+    cands += _top_articles()
+    rows, ids = [], set()
+    for a in cands:
+        aid = str(a.get("id") or a.get("headline") or "")
+        head = html.unescape((a.get("headline") or "").strip())
+        if not aid or aid in seen or aid in ids or not head:
+            continue
+        try:
+            when = datetime.fromisoformat((a.get("published") or "").replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if when < since:
+            continue
+        ids.add(aid)
+        rows.append({"aid": aid, "headline": head, "description": html.unescape(a.get("description") or ""),
+                     "link": (((a.get("links") or {}).get("web") or {}).get("href")) or "",
+                     "sport": a.get("_sport") or "soccer", "pick": a.get("_pick")})
+        if a.get("_pick"):
+            ours[aid] = a["_pick"]
+    if not rows:
+        return 0
+    rows = rows[:40]
+    listing = "\n".join(f"{i}. [{'NBA' if r['sport'] == 'basketball' else 'Fútbol'}]"
+                         f"{' [de nuestro pick]' if r['pick'] else ''} {r['headline']} — {r['description'][:220]}"
+                         for i, r in enumerate(rows))
+    prompt = (EDITORIAL + "\n\nDe esta lista de titulares de hoy (en inglés), elige SOLO las noticias realmente "
+              "interesantes para nuestro público: resultados o hazañas importantes, títulos, premios (Balón de Oro, MVP), "
+              "fichajes grandes, lesiones de figuras, sorteos de copas, récords, clásicos o partidos muy atractivos. "
+              "Descarta previas genéricas, notas menores, columnas de opinión, rumores sin fuente y apuestas. "
+              f"Máximo {MAX_PER_CHECK}. Las marcadas [de nuestro pick] valen un poco más.\n\n{listing}\n\n"
+              'Responde en JSON: {"elegidas": [{"i": número, "titulo": "titular en español (máx. 90 caracteres)", '
+              '"resumen": "1 o 2 frases en español, fieles al texto", "categoria": "Lesión|Fichaje|Resultado|Premio|'
+              'Sorteo|Récord|Partido|Otra", "importancia": 1-5}]}')
+    try:
+        got = llm.ask_json(prompt, 0.2).get("elegidas") or []
+    except Exception as e:  # noqa: BLE001
+        print(f"Editor de noticias: {e}")
+        state["news_next"] = (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return 0
+    for r in rows:   # lo revisado no se vuelve a ofrecer
+        seen.append(r["aid"])
+    del seen[:-600]
+    sent = 0
+    esc = formatting.escape
+    for c in sorted(got, key=lambda x: -int(x.get("importancia") or 0)):
+        try:
+            r = rows[int(c["i"])]
+        except (KeyError, ValueError, IndexError, TypeError):
+            continue
+        if int(c.get("importancia") or 0) < (3 if r["pick"] else 4):
+            continue
+        nid = f"n{now.strftime('%d%H%M')}{sent}"
+        state.setdefault("news_pending", {})[nid] = dict(r, id=nid, titulo=c.get("titulo"), resumen=c.get("resumen"),
+                                                         categoria=c.get("categoria"))
+        tag = f" · pick #{r['pick']}" if r["pick"] else ""
+        telegram.send(owner, f"📰 <b>Noticia sugerida</b> · {esc(c.get('categoria') or 'Noticia')}{tag}\n\n"
+                             f"<b>{esc(c.get('titulo') or r['headline'])}</b>\n{esc(c.get('resumen') or '')}\n\n"
+                             + (f"🔗 Fuente (ESPN, en inglés): {esc(r['link'])}\n" if r["link"] else "")
+                             + "\n¿La preparamos para Instagram?", BUTTONS(nid))
+        sent += 1
+        if sent >= MAX_PER_CHECK:
+            break
+    return sent
+
+
+def test_file(state: dict) -> None:
+    """data/news_test.json ({"id": "..."}): prueba ahora la conexión con Gemini y busca noticias (una vez)."""
+    from . import llm
+    path = os.path.join(config.ROOT, "data", "news_test.json")
+    owner = state.get("owner_chat")
+    if not os.path.exists(path) or not owner:
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("news_test_done") or []):
+        return
+    state.setdefault("news_test_done", []).append(req["id"])
+    if not llm.enabled():
+        telegram.send(owner, "⚠️ El bot no ve la clave GEMINI_API_KEY. Revisa que el nombre del secreto en GitHub sea exacto.")
+        return
+    try:
+        hi = llm.ask_json('Responde en JSON {"ok": true, "saludo": "un saludo corto en español para el dueño de Stakevision"}', 0.3)
+        telegram.send(owner, f"🤖 Gemini conectado ({llm.LAST_MODEL}): {formatting.escape(str(hi.get('saludo', '')))}\n"
+                             "Ahora busco noticias importantes para proponerte…")
+    except Exception as e:  # noqa: BLE001
+        telegram.send(owner, f"⚠️ No pude conectar con Gemini: {formatting.escape(str(e))}")
+        return
+    try:
+        n = check_editor(state, force=True)
+    except Exception as e:  # noqa: BLE001
+        traceback.print_exc()
+        telegram.send(owner, f"⚠️ Falló la búsqueda de noticias: {formatting.escape(str(e))}")
+        return
+    if not n:
+        telegram.send(owner, "📰 Por ahora no encontré noticias nuevas que valgan la pena. Reviso de nuevo en 2 horas.")
+
+
+def _clean(item: dict) -> dict:
+    """Valida lo que devuelve el editor (largos y tipos), para que la imagen salga bien."""
+    out = dict(item)
+    out["headline"] = str(item.get("headline") or "").upper()[:60]
+    out["tag"] = str(item.get("tag") or "NOTICIA").upper()[:16]
+    out["kicker"] = str(item.get("kicker") or "").upper()[:48]
+    out["sub"] = str(item.get("sub") or "")[:90]
+    out["facts"] = [str(f)[:95] for f in (item.get("facts") or []) if str(f).strip()][:3] or ["(sin datos)"]
+    st = str(item.get("status") or "").upper()[:26]
+    if st:
+        out["status"] = st
+    else:
+        out.pop("status", None)
+    cols = item.get("colors") or []
+    try:
+        out["colors"] = [[max(0, min(255, int(v))) for v in c][:3] for c in cols][:2]
+        assert len(out["colors"]) == 2 and all(len(c) == 3 for c in out["colors"])
+    except Exception:  # noqa: BLE001
+        out["colors"] = [[30, 40, 60], [80, 90, 110]]
+    out["caption"] = str(item.get("caption") or "")[:2100]
+    return out
+
+
+FIELDS = ('{"tag": "LESIÓN|BAJA|FICHAJE|PREMIO|CAMPEÓN|RÉCORD|SORTEO|RESULTADO|NOTICIA", '
+          '"kicker": "EQUIPO O COMPETENCIA · LIGA (mayúsculas)", "headline": "titular de 4 a 7 palabras", '
+          '"sub": "1 frase de contexto (máx. 80 caracteres)", "facts": ["dato 1 (máx. 85 caracteres)", "dato 2", '
+          '"dato 3 opcional"], "status": "estado corto opcional (ej. DIAGNÓSTICO PENDIENTE) o vacío", '
+          '"colors": [[r,g,b],[r,g,b]] colores del equipo protagonista, "player": "jugador protagonista o vacío", '
+          '"teams": ["nombre completo del equipo", "apodo"], "sport": "soccer|basketball", '
+          '"caption": "texto para Instagram en español: 2-3 párrafos cortos con los hechos, una pregunta para '
+          'comentarios, la línea \'📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio)\', '
+          'la línea \'Fuentes: ...\' y 4-6 hashtags (#Stakevision + liga + equipo + jugador)"}')
+
+
+def draft(state: dict, nid: str) -> bool:
+    """«Sí, prepárala» (con Gemini): redacta al instante en español y te la manda para revisar."""
+    from . import llm
+    item = (state.get("news_pending") or {}).pop(nid, None)
+    if not item:
+        return False
+    src = _article_text(item.get("link"), item.get("description") or "")
+    prompt = (EDITORIAL + "\n\nRedacta esta noticia para una imagen y un Reel de Instagram.\n"
+              f"Titular original: {item['headline']}\nResumen: {item.get('description', '')}\n"
+              f"Texto fuente:\n{src}\n\nResponde en JSON con este formato: {FIELDS}")
+    data = _clean(llm.ask_json(prompt, 0.4))
+    data.update(id=nid, sources=data.get("sources") or "ESPN", link=item.get("link"), _source=src[:6000],
+                rev=0, orig=item.get("headline"))
+    state.setdefault("news_items", {})[nid] = data
+    _prepare(state, data)
+    return True
+
+
+def revise(state: dict, text: str) -> bool:
+    """«Modificar»: aplica lo que pediste y te manda la versión nueva."""
+    from . import llm
+    ed = state.pop("news_edit", None) or {}
+    item = (state.get("news_items") or {}).get(ed.get("nid") or "")
+    owner = state["owner_chat"]
+    if not item:
+        return False
+    cur = {k: item.get(k) for k in ("tag", "kicker", "headline", "sub", "facts", "status", "colors", "player", "teams",
+                                    "sport", "caption")}
+    prompt = (EDITORIAL + "\n\nEsta es la noticia actual (JSON):\n" + json.dumps(cur, ensure_ascii=False) +
+              f"\n\nEl dueño pide este cambio: «{text}»\nAplica el cambio sin inventar datos (texto fuente abajo) y "
+              f"devuelve el JSON completo con el mismo formato.\n\nTexto fuente:\n{item.get('_source', '')}")
+    try:
+        data = _clean(llm.ask_json(prompt, 0.4))
+    except Exception as e:  # noqa: BLE001
+        telegram.send(owner, f"⚠️ No pude aplicar el cambio: {formatting.escape(str(e))}")
+        return True
+    old = (state.get("ig_jobs") or {}).get(item["id"])
+    if old and old.get("status") == "draft":
+        old["status"] = "replaced"
+    item.update(data)
+    item["rev"] = item.get("rev", 0) + 1
+    telegram.send(owner, "✏️ Listo, aquí va la versión nueva 👇")
+    _prepare(state, item)
+    return True
+
+
+def _next_window(now):
+    """Inicio del próximo horario de publicación (o ahora, si estamos dentro de uno)."""
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo(config.TIMEZONE)
+    local = now.astimezone(tz)
+    for add in (0, 1):
+        day = (local + timedelta(days=add)).date()
+        for a, b in WINDOWS:
+            start = datetime(day.year, day.month, day.day, a, tzinfo=tz)
+            end = datetime(day.year, day.month, day.day, b, tzinfo=tz)
+            if local < end:
+                return max(start, local).astimezone(timezone.utc)
+    return now
+
+
+def _posted_today(state: dict) -> int:
+    from zoneinfo import ZoneInfo
+    today = store.now_utc().astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat()
+    return sum(1 for j in (state.get("ig_jobs") or {}).values() if (j.get("posted_at") or "")[:10] == today
+               or (j.get("day") == today and j.get("status") in ("queued", "scheduled")))
+
+
 def request(state: dict, nid: str) -> bool:
     """«Sí, prepárala»: queda pedida para que Claude la redacte en español con datos verificados."""
     item = (state.get("news_pending") or {}).pop(nid, None)
@@ -199,13 +474,54 @@ def _render(item: dict) -> tuple[bytes, str | None, dict]:
     return newsimage.render_news(n), credit, n
 
 
+def _prepare(state: dict, item: dict, approved: bool = False) -> None:
+    """Imagen + Reel de una noticia redactada; te la manda para revisar (o la deja en cola si ya la aprobaste)."""
+    from . import instagram
+    owner = state["owner_chat"]
+    nid = item["id"]
+    img, credit, nd = _render(item)
+    key = f"news-{nid}" + (f"-r{item['rev']}" if item.get("rev") else "")
+    instagram.save_image(key, img)
+    caption = item["caption"]
+    if credit and "Wikimedia" not in caption:
+        caption += "\n\n📸 Foto de referencia: Wikimedia Commons (licencia libre), modificada."
+    job = {"key": key, "caption": caption, "status": "draft", "title": item.get("headline", "")}
+    reel_mp4 = None
+    try:   # Reel (video vertical con animación): es lo que más alcance da en Instagram
+        from . import reel
+        reel_mp4, cover = reel.news(dict(nd, credit=(nd.get("credit") or "").replace("Foto de referencia:", "Foto:")))
+        instagram.save_video(key, reel_mp4, cover)
+        job["reel"] = key
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+    state.setdefault("ig_jobs", {})[nid] = job
+    if approved:
+        job["status"] = "queued"
+        job["mode"] = "reel" if job.get("reel") else "image"
+        what = "Reel" if job.get("reel") else "imagen"
+        if reel_mp4:
+            telegram.send_video(owner, reel_mp4, caption=f"📰 <b>Noticia para Instagram</b> (aprobada en el chat): "
+                                f"el {what} se publica en unos minutos.")
+        else:
+            telegram.send_photo(owner, img, caption="📰 <b>Noticia para Instagram</b> (aprobada en el chat): "
+                                "se publica en unos minutos.")
+        return
+    cap = ("📰 <b>Noticia lista para revisar</b>\nAbajo va el texto para Instagram. "
+           "Puedes publicarla, dejarla para el horario de más movimiento, pedirme cambios o descartarla.")
+    try:
+        msg = telegram.send_video(owner, reel_mp4, caption=cap) if reel_mp4 else telegram.send_photo(owner, img, caption=cap)
+    except Exception:  # noqa: BLE001
+        msg = telegram.send_photo(owner, img, caption=cap)
+    telegram.send(owner, "<pre>" + formatting.escape(caption) + "</pre>")
+    telegram.set_buttons(owner, msg["message_id"], PUBLISH_BUTTONS(nid, bool(reel_mp4)))
+
+
 def ready(state: dict) -> None:
-    """Noticias ya redactadas (data/news_ready.json): imagen + texto. Te llegan para aprobar o, si ya la
-    aprobaste en el chat (approved), se publican directo en Instagram."""
+    """Noticias ya redactadas a mano (data/news_ready.json): te llegan para revisar o, si ya la aprobaste
+    en el chat (approved), se publican directo en Instagram."""
     owner = state.get("owner_chat")
     if not owner:
         return
-    from . import instagram
     done = state.setdefault("news_done", [])
     for item in _load(READY):
         nid = item.get("id")
@@ -213,47 +529,29 @@ def ready(state: dict) -> None:
             continue
         done.append(nid)
         try:
-            img, _credit, nd = _render(item)
+            _prepare(state, item, bool(item.get("approved")))
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
             telegram.send(owner, f"⚠️ No pude armar la noticia {formatting.escape(nid)}: {formatting.escape(str(e))}")
-            continue
-        key = f"news-{nid}"
-        instagram.save_image(key, img)
-        job = {"key": key, "caption": item["caption"], "status": "draft", "title": item.get("headline", "")}
-        reel_mp4 = None
-        try:   # Reel (video vertical con animación): es lo que más alcance da en Instagram
-            from . import reel
-            reel_mp4, cover = reel.news(dict(nd, credit=(nd.get("credit") or "").replace("Foto de referencia:", "Foto:")))
-            instagram.save_video(key, reel_mp4, cover)
-            job["reel"] = key
-        except Exception:  # noqa: BLE001
-            traceback.print_exc()
-        state.setdefault("ig_jobs", {})[nid] = job
-        if item.get("approved"):
-            job["status"] = "queued"
-            job["mode"] = "reel" if job.get("reel") else "image"
-            what = "Reel" if job.get("reel") else "imagen"
-            msg = (telegram.send_video(owner, reel_mp4, caption=f"📰 <b>Noticia para Instagram</b> (aprobada en el chat): "
-                                       f"el {what} se publica en unos minutos.") if reel_mp4 else
-                   telegram.send_photo(owner, img, caption="📰 <b>Noticia para Instagram</b> (aprobada en el chat): "
-                                       "se publica en unos minutos."))
-        else:
-            cap = ("📰 <b>Noticia lista para Instagram</b>\nAbajo va el texto. ¿La publicamos como Reel? "
-                   "(solo Instagram; también puede ir solo como imagen)")
-            try:
-                msg = telegram.send_video(owner, reel_mp4, caption=cap) if reel_mp4 else telegram.send_photo(owner, img, caption=cap)
-            except Exception:  # noqa: BLE001
-                msg = telegram.send_photo(owner, img, caption=cap)
-            telegram.send(owner, "<pre>" + formatting.escape(item["caption"]) + "</pre>")
-            telegram.set_buttons(owner, msg["message_id"], PUBLISH_BUTTONS(nid, bool(reel_mp4)))
     del done[:-200]
 
 
 def callback(state: dict, cb: dict, action: str, nid: str) -> None:
+    from . import llm
     owner = state["owner_chat"]
     mid = cb["message"]["message_id"]
     if action == "nq":
+        if llm.enabled() and nid in (state.get("news_pending") or {}):
+            telegram.edit_buttons_off(owner, mid, "✅ Aprobada: la estoy redactando en español…")
+            telegram.answer(cb["id"], "La redacto")
+            try:
+                draft(state, nid)
+            except Exception as e:  # noqa: BLE001
+                traceback.print_exc()
+                telegram.send(owner, f"⚠️ No pude redactarla: {formatting.escape(str(e))}. "
+                                     "Vuelve a intentarlo en un rato desde el mismo mensaje.")
+                state.setdefault("news_pending", {})
+            return
         ok = request(state, nid)
         telegram.edit_buttons_off(owner, mid, "✅ Pedida. Para redactarla en español, pídele a Claude: «prepara las noticias "
                                   "pendientes»; luego te llega aquí lista para aprobar" if ok else "Ya estaba procesada")
@@ -262,15 +560,43 @@ def callback(state: dict, cb: dict, action: str, nid: str) -> None:
         (state.get("news_pending") or {}).pop(nid, None)
         telegram.edit_buttons_off(owner, mid, "✖️ Descartada")
         telegram.answer(cb["id"], "Descartada")
-    elif action in ("np", "ni", "nn"):
+    elif action == "ne":
+        if nid not in (state.get("news_items") or {}):
+            telegram.answer(cb["id"], "Esta noticia no se puede modificar aquí")
+            return
+        state["news_edit"] = {"nid": nid, "at": store.now_utc().strftime("%Y-%m-%dT%H:%M:%SZ")}
+        telegram.answer(cb["id"], "Escríbeme el cambio")
+        telegram.send(owner, "✏️ Escríbeme qué quieres cambiar. Ej.: «titular más corto», «quita el segundo dato», "
+                             "«más emoción en el texto», «agrega que es su segunda lesión».")
+    elif action in ("np", "ni", "nn", "nt", "nh"):
         job = (state.get("ig_jobs") or {}).get(nid)
         if not job or job["status"] != "draft":
             telegram.answer(cb["id"], "Ya estaba procesada")
             return
-        job["status"] = "skipped" if action == "nn" else "queued"
-        job["mode"] = "reel" if action == "np" and job.get("reel") else "image"
-        telegram.edit_buttons_off(owner, mid, "✖️ No se publica" if action == "nn" else
-                                  f"⏳ Se publica en Instagram ({'Reel' if job['mode'] == 'reel' else 'imagen'}) en unos minutos")
+        if action == "nn":
+            job["status"] = "skipped"
+            telegram.edit_buttons_off(owner, mid, "✖️ No se publica")
+            telegram.answer(cb["id"], "Listo")
+            return
+        from zoneinfo import ZoneInfo
+        job["mode"] = "reel" if action in ("np", "nt") and job.get("reel") else "image"
+        now = store.now_utc()
+        at = _next_window(now) if action in ("nt", "nh") else now
+        if _posted_today(state) >= DAILY_MAX and at.astimezone(ZoneInfo(config.TIMEZONE)).date() == \
+                now.astimezone(ZoneInfo(config.TIMEZONE)).date():
+            local = now.astimezone(ZoneInfo(config.TIMEZONE))
+            nxt = datetime(local.year, local.month, local.day, WINDOWS[0][0], tzinfo=ZoneInfo(config.TIMEZONE)) + timedelta(days=1)
+            at = nxt.astimezone(timezone.utc)
+        job["day"] = at.astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat()
+        what = "Reel" if job["mode"] == "reel" else "imagen"
+        if at <= now + timedelta(minutes=2):
+            job["status"] = "queued"
+            telegram.edit_buttons_off(owner, mid, f"⏳ Se publica en Instagram ({what}) en unos minutos")
+        else:
+            job["status"] = "scheduled"
+            job["at"] = at.strftime("%Y-%m-%dT%H:%M:%SZ")
+            hhmm = at.astimezone(ZoneInfo(config.TIMEZONE)).strftime("%d/%m %H:%M")
+            telegram.edit_buttons_off(owner, mid, f"⏰ Programada en Instagram ({what}) para el {hhmm}")
         telegram.answer(cb["id"], "Listo")
 
 
@@ -278,7 +604,10 @@ def publish_jobs(state: dict) -> None:
     """Publica en Instagram las noticias aprobadas (cuando la imagen ya está en la web)."""
     from . import instagram
     owner = state.get("owner_chat")
+    now = store.now_utc()
     for nid, job in (state.get("ig_jobs") or {}).items():
+        if job.get("status") == "scheduled" and now >= store.parse_ts(job["at"]):
+            job["status"] = "queued"
         if job.get("status") != "queued":
             continue
         reel_mode = job.get("mode") == "reel" and job.get("reel")
@@ -289,6 +618,8 @@ def publish_jobs(state: dict) -> None:
             if reel_mode and link is None:
                 continue   # Instagram aún procesa el video: se revisa en la próxima vuelta
             job["status"] = "posted"
+            from zoneinfo import ZoneInfo
+            job["posted_at"] = now.astimezone(ZoneInfo(config.TIMEZONE)).isoformat()
             if owner:
                 telegram.send(owner, f"✅ Noticia publicada en Instagram ({'Reel' if reel_mode else 'imagen'})"
                               + (f"\n{link}" if link else ""))

@@ -36,6 +36,7 @@ jobs:
           STATE_KEY: ${{ secrets.STATE_KEY }}
           LINK_CODE: ${{ secrets.LINK_CODE }}
           INSTAGRAM_TOKEN: ${{ secrets.INSTAGRAM_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GIT_CHECKPOINT: "1"
         run: python -m sv.main listen
       - name: Guardar estado

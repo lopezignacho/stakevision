@@ -3101,6 +3101,13 @@ def _handle_update(state: dict, u: dict) -> None:
             return
         if chat == owner and text and not text.startswith("/") and _builder_odds(state, text):
             return
+        if chat == owner and text and not text.startswith("/") and state.get("news_edit"):
+            from . import newswatch   # «Modificar» una noticia: este mensaje es el cambio pedido
+            ed = state["news_edit"]
+            if store.now_utc() - store.parse_ts(ed["at"]) < timedelta(minutes=60):
+                newswatch.revise(state, text)
+                return
+            state.pop("news_edit", None)
         if chat != owner and text.lower().startswith("/start"):
             from . import guests
             guests.handle_start(state, msg)
@@ -3168,7 +3175,7 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.answer(cb["id"], "No autorizado")
         return
     action, _, pid = (cb.get("data") or "").partition(":")
-    if action in ("nq", "nx", "np", "ni", "nn"):   # noticias para Instagram
+    if action in ("nq", "nx", "np", "ni", "nn", "ne", "nt", "nh"):   # noticias para Instagram
         from . import newswatch
         newswatch.callback(state, cb, action, pid)
         return
@@ -3851,9 +3858,13 @@ def poll() -> None:
     _refresh_recap_texts(state)
     _nba_daily(state)
     def _news(st, _now):
-        from . import newswatch
+        from . import llm, newswatch
         newswatch.ready(st)
-        newswatch.check(st)
+        newswatch.test_file(st)
+        if llm.enabled():
+            newswatch.check_editor(st)
+        else:
+            newswatch.check(st)
     for fn in (_nba_owner_flow, lambda st, _now: _live_builders(st), _news):
         try:
             fn(state, now)

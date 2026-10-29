@@ -1476,3 +1476,41 @@ n = len(sent)
 main._lock_check(st, _pl, store.now_utc())
 assert len(sent) == n                                         # no repite
 print("OK aviso en vivo de pick asegurado")
+
+# 46) editor de noticias con Gemini (simulado): aviso en español → redacción → modificar → horario
+from sv import llm as _llm, newswatch as _nw2  # noqa: E402
+config.GEMINI_API_KEY = "x"
+st = store.load()
+st.pop("news_next", None)
+st["news_seen"], st["news_pending"], st["news_items"], st["ig_jobs"] = [], {}, {}, {}
+_pub = main._iso(store.now_utc() - timedelta(hours=1))
+_nw2._our_games = lambda state: []
+_nw2._top_articles = lambda: [{"id": 77, "headline": "Dembele wins Ballon d'Or", "description": "PSG forward wins.",
+                               "published": _pub, "links": {"web": {"href": "https://espn.com/a"}}, "_sport": "soccer"},
+                              {"id": 78, "headline": "Preview: X vs Y", "description": "", "published": _pub, "_sport": "soccer"}]
+_answers = iter([
+    {"elegidas": [{"i": 0, "titulo": "Dembélé gana el Balón de Oro", "resumen": "El delantero del PSG se quedó con el premio.",
+                   "categoria": "Premio", "importancia": 5}]},
+    {"tag": "PREMIO", "kicker": "PSG · BALÓN DE ORO", "headline": "Dembélé, Balón de Oro", "sub": "El francés corona su mejor año.",
+     "facts": ["Ganó la Champions con el PSG.", "Superó a Yamal en la votación."], "status": "", "colors": [[0, 40, 90], [200, 0, 40]],
+     "player": "", "teams": ["Paris Saint-Germain", "PSG"], "sport": "soccer", "caption": "Texto IG en español"},
+    {"tag": "PREMIO", "kicker": "PSG · BALÓN DE ORO", "headline": "¡Dembélé, Balón de Oro!", "sub": "x",
+     "facts": ["a", "b"], "colors": [[0, 40, 90], [200, 0, 40]], "caption": "Texto IG v2"}])
+_llm.ask_json = lambda prompt, temperature=0.4: next(_answers)
+_nw2._article_text = lambda link, fb="": "texto fuente"
+n = len(sent)
+assert _nw2.check_editor(st, force=True) == 1
+m = [t for ch, t, *_ in sent[n:] if ch == OWNER][0]
+assert "Dembélé gana el Balón de Oro" in m and "Premio" in m, m
+nid = next(iter(st["news_pending"]))
+_nw2._prepare = lambda state, item, approved=False: state.setdefault("ig_jobs", {}).__setitem__(item["id"], {"key": "k", "caption": item["caption"], "status": "draft", "reel": "k"})
+_nw2.callback(st, {"id": "c", "message": {"message_id": 5}}, "nq", nid)
+assert st["news_items"][nid]["headline"] == "DEMBÉLÉ, BALÓN DE ORO" and st["ig_jobs"][nid]["status"] == "draft"
+_nw2.callback(st, {"id": "c", "message": {"message_id": 5}}, "ne", nid)
+assert st.get("news_edit", {}).get("nid") == nid
+_nw2.revise(st, "titular con más emoción")
+assert st["news_items"][nid]["rev"] == 1 and st["news_items"][nid]["caption"] == "Texto IG v2"
+_nw2.callback(st, {"id": "c", "message": {"message_id": 6}}, "nt", nid)
+assert st["ig_jobs"][nid]["status"] in ("queued", "scheduled") and st["ig_jobs"][nid]["mode"] == "reel"
+config.GEMINI_API_KEY = ""
+print("OK editor de noticias en español")
