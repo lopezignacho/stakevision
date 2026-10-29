@@ -1,0 +1,299 @@
+[
+ {
+  "game": "Cleveland Cavaliers at Atlanta Hawks",
+  "date": "2026-10-30T00:00Z",
+  "state": "pre",
+  "odds": [
+   {
+    "details": "ATL -1.5",
+    "overUnder": 237.5,
+    "spread": -1.5,
+    "provider": {
+     "id": "100",
+     "name": "DraftKings",
+     "priority": 1,
+     "logos": [
+      {
+       "href": "https://a.espncdn.com/i/betting/Draftkings_Light.svg",
+       "rel": [
+        "light"
+       ]
+      },
+      {
+       "href": "https://a.espncdn.com/i/betting/Draftkings_Dark.svg",
+       "rel": [
+        "dark"
+       ]
+      }
+     ],
+     "displayName": "DraftKings"
+    },
+    "home_ml": null,
+    "away_ml": null
+   }
+  ],
+  "ctx": {
+   "home": {
+    "name": "Atlanta Hawks",
+    "record": "2-3",
+    "home_rec": "0-2",
+    "road_rec": "2-1",
+    "injuries": [
+     {
+      "name": "Mouhamed Gueye",
+      "status": "Out",
+      "key": false,
+      "type": "Foot"
+     },
+     {
+      "name": "Henri Veesaar",
+      "status": "Out",
+      "key": false,
+      "type": "Knee"
+     }
+    ]
+   },
+   "away": {
+    "name": "Cleveland Cavaliers",
+    "record": "3-1",
+    "home_rec": "3-0",
+    "road_rec": "0-1",
+    "injuries": [
+     {
+      "name": "Meleek Thomas",
+      "status": "Day-To-Day",
+      "key": false,
+      "type": "Foot"
+     },
+     {
+      "name": "Jaylon Tyson",
+      "status": "Day-To-Day",
+      "key": false,
+      "type": "Neck"
+     }
+    ]
+   }
+  },
+  "predictor": null,
+  "key_out": null,
+  "hit_rates": {
+   "home_ml": {
+    "rate": 0.3
+   },
+   "away_ml": {
+    "rate": 0.7
+   },
+   "home_spread": {
+    "rate": 0.3
+   },
+   "away_spread": {
+    "rate": 0.7
+   },
+   "over": {
+    "rate": 0.5
+   },
+   "under": {
+    "rate": 0.5
+   }
+  }
+ },
+ {
+  "game": "Sacramento Kings at New Orleans Pelicans",
+  "date": "2026-10-30T00:00Z",
+  "state": "pre",
+  "odds": [
+   {
+    "details": "NO -6.5",
+    "overUnder": 235.5,
+    "spread": -6.5,
+    "provider": {
+     "id": "100",
+     "name": "DraftKings",
+     "priority": 1,
+     "logos": [
+      {
+       "href": "https://a.espncdn.com/i/betting/Draftkings_Light.svg",
+       "rel": [
+        "light"
+       ]
+      },
+      {
+       "href": "https://a.espncdn.com/i/betting/Draftkings_Dark.svg",
+       "rel": [
+        "dark"
+       ]
+      }
+     ]
+    },
+    "home_ml": null,
+    "away_ml": null
+   }
+  ],
+  "ctx": {
+   "home": {
+    "name": "New Orleans Pelicans",
+    "record": "0-4",
+    "home_rec": "0-2",
+    "road_rec": "0-2",
+    "injuries": [
+     {
+      "name": "Jordan Poole",
+      "status": "Day-To-Day",
+      "key": false,
+      "type": "Ankle"
+     },
+     {
+      "name": "Yves Missi",
+      "status": "Out",
+      "key": false,
+      "type": "Knee"
+     }
+    ]
+   },
+   "away": {
+    "name": "Sacramento Kings",
+    "record": "0-4",
+    "home_rec": "0-2",
+    "road_rec": "0-2",
+    "injuries": [
+     {
+      "name": "Dylan Cardwell",
+      "status": "Out",
+      "key": false,
+      "type": "Calf"
+     },
+     {
+      "name": "Maxime Raynaud",
+      "status": "Out",
+      "key": false,
+      "type": "Knee"
+     },
+     {
+      "name": "Keegan Murray",
+      "status": "Out",
+      "key": false,
+      "type": "Ankle"
+     },
+     {
+      "name": "Ben Simmons",
+      "status": "Out",
+      "key": false,
+      "type": "Achilles"
+     }
+    ]
+   }
+  },
+  "predictor": null,
+  "key_out": null,
+  "hit_rates": {
+   "home_ml": {
+    "rate": 0.4
+   },
+   "away_ml": {
+    "rate": 0.6
+   },
+   "home_spread": {
+    "rate": 0.35
+   },
+   "away_spread": {
+    "rate": 0.2
+   },
+   "over": {
+    "rate": 0.5
+   },
+   "under": {
+    "rate": 0.5
+   }
+  }
+ },
+ {
+  "game": "Memphis Grizzlies at Portland Trail Blazers",
+  "date": "2026-10-30T02:00Z",
+  "state": "pre",
+  "odds": [
+   {
+    "details": "POR -7.5",
+    "overUnder": 232.5,
+    "spread": -7.5,
+    "provider": {
+     "id": "100",
+     "name": "DraftKings",
+     "priority": 1,
+     "logos": [
+      {
+       "href": "https://a.espncdn.com/i/betting/Draftkings_Light.svg",
+       "rel": [
+        "light"
+       ]
+      },
+      {
+       "href": "https://a.espncdn.com/i/betting/Draftkings_Dark.svg",
+       "rel": [
+        "dark"
+       ]
+      }
+     ]
+    },
+    "home_ml": null,
+    "away_ml": null
+   }
+  ],
+  "ctx": {
+   "home": {
+    "name": "Portland Trail Blazers",
+    "record": "3-0",
+    "home_rec": "1-0",
+    "road_rec": "2-0",
+    "injuries": [
+     {
+      "name": "Robert Williams III",
+      "status": "Day-To-Day",
+      "key": false,
+      "type": "Knee"
+     },
+     {
+      "name": "Chris Youngblood",
+      "status": "Out",
+      "key": false,
+      "type": "Ankle"
+     },
+     {
+      "name": "Shaedon Sharpe",
+      "status": "Out",
+      "key": false,
+      "type": "Knee"
+     }
+    ]
+   },
+   "away": {
+    "name": "Memphis Grizzlies",
+    "record": "4-0",
+    "home_rec": "1-0",
+    "road_rec": "3-0",
+    "injuries": []
+   }
+  },
+  "predictor": null,
+  "key_out": null,
+  "hit_rates": {
+   "home_ml": {
+    "rate": 0.7
+   },
+   "away_ml": {
+    "rate": 0.3
+   },
+   "home_spread": {
+    "rate": 0.65
+   },
+   "away_spread": {
+    "rate": 0.15
+   },
+   "over": {
+    "rate": 0.45
+   },
+   "under": {
+    "rate": 0.55
+   }
+  }
+ }
+]
