@@ -1,4 +1,34 @@
 {
+ "faces": {
+  "Stephen Curry": {
+   "w": 900,
+   "faces": [
+    137,
+    64,
+    57,
+    49,
+    46,
+    41
+   ]
+  },
+  "Donovan Mitchell": {
+   "w": 582,
+   "faces": [
+    357,
+    238,
+    89,
+    69
+   ]
+  },
+  "Zion Williamson": {
+   "w": 513,
+   "faces": []
+  }
+ },
+ "rejected": [
+  "Stephen Curry",
+  "Zion Williamson"
+ ],
  "figura": {
   "player": "Stephen Curry",
   "stats": [
@@ -21,7 +51,7 @@
   ],
   "winner": "away",
   "score": "114-119",
-  "photo": true,
+  "photo": false,
   "game": "Golden State Warriors at Minnesota Timberwolves"
  },
  "tries": [
@@ -49,9 +79,6 @@
    ],
    "photos": 0
   }
- ],
- "rejected": [
-  "Zion Williamson"
  ],
  "cartel": {
   "game": "Cleveland Cavaliers at Atlanta Hawks",
