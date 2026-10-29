@@ -16,7 +16,8 @@ _IMG: dict[str, bytes | None] = {}
 
 
 def _plain(s: str) -> str:
-    return unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower().strip()
+    return " ".join(unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
+                    .replace("-", " ").replace(".", " ").split())
 
 
 def _logo_url(team: dict) -> str:

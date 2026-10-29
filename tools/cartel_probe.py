@@ -26,7 +26,7 @@ def photo(name, team):
     ok = postimage.portrait_ok(got[0]) if got else None
     if got:
         info.setdefault("faces", {})[name] = postimage.PORTRAIT_DEBUG[-1] if postimage.PORTRAIT_DEBUG else None
-    if got and ok is False:
+    if False and got and ok is False:   # el detector no es confiable: no filtra
         info.setdefault("rejected", []).append(name)
         return None
     return got

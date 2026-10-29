@@ -442,11 +442,19 @@ def render_cartel(v: dict) -> bytes:
             half = P._enhance(P._cover(t["photo"], (hw, ph_h), side="center", face_w=0.34)).convert("RGBA")
         else:   # sin foto confiable: el color del equipo con su sigla gigante de fondo
             half = _half(None, (hw, ph_h), t.get("color") or (40, 50, 70))
-            ab = str(t.get("abbr") or t.get("short") or "")[:4].upper()
-            wm = _tall(ab, 420, (255, 255, 255, 40), 1.2)
-            if wm.width > hw - 80:
-                wm = wm.resize((hw - 80, int(wm.height * (hw - 80) / wm.width)))
-            half.alpha_composite(wm, ((hw - wm.width) // 2 + (40 if side == "home" else -40), 200))
+            wm = None
+            if t.get("logo"):   # el escudo gigante y tenue de fondo
+                from . import crest
+                wm = crest.fitted(t["logo"], 400)
+                if wm:
+                    wm.putalpha(wm.getchannel("A").point(lambda x: int(x * 0.22)))
+            if wm is None:
+                ab = str(t.get("abbr") or t.get("short") or "")[:4].upper()
+                wm = _tall(ab, 300, (255, 255, 255, 40), 1.2)
+                if wm.width > w // 2 - 120:
+                    wm = wm.resize((w // 2 - 120, int(wm.height * (w // 2 - 120) / wm.width)))
+            cx = w // 4 if side == "home" else hw - w // 4   # centro de la parte visible de su mitad
+            half.alpha_composite(wm, (cx - wm.width // 2, 200))
         tint = Image.new("RGBA", half.size, tuple(t.get("color") or (20, 30, 50)) + (38,))
         half.alpha_composite(tint)
         mask = Image.new("L", (w, ph_h), 0)
