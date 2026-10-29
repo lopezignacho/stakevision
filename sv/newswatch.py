@@ -355,6 +355,11 @@ def _clean(item: dict) -> dict:
     except Exception:  # noqa: BLE001
         out["colors"] = [[30, 40, 60], [80, 90, 110]]
     out["caption"] = str(item.get("caption") or "")[:2100]
+    out["name"] = str(item.get("name") or item.get("player") or "")[:40]
+    out["line"] = str(item.get("line") or item.get("sub") or "")[:90]
+    stv = item.get("stat") if isinstance(item.get("stat"), dict) else {}
+    val = str((stv or {}).get("value") or "").strip()
+    out["stat"] = {"value": val[:6], "label": str(stv.get("label") or "")[:14]} if val and len(val) <= 6 else None
     return out
 
 
@@ -363,6 +368,10 @@ FIELDS = ('{"tag": "LESIÓN|BAJA|FICHAJE|PREMIO|CAMPEÓN|RÉCORD|SORTEO|RESULTAD
           '"sub": "1 frase de contexto (máx. 80 caracteres)", "facts": ["dato 1 (máx. 85 caracteres)", "dato 2", '
           '"dato 3 opcional"], "status": "estado corto opcional (ej. DIAGNÓSTICO PENDIENTE) o vacío", '
           '"colors": [[r,g,b],[r,g,b]] colores del equipo protagonista, "player": "jugador protagonista o vacío", '
+          '"name": "nombre corto del protagonista para la imagen (ej. Stephen Curry) o del equipo", '
+          '"stat": {"value": "la cifra clave si la hay, solo el número (ej. 44)", "label": "qué es (PUNTOS, GOLES, '
+          'AÑOS, TÍTULOS…)"} o null si no hay una cifra protagonista, '
+          '"line": "UNA frase corta para el diseño visual (máx. 70 caracteres)", '
           '"teams": ["nombre completo del equipo", "apodo"], "sport": "soccer|basketball", '
           '"caption": "texto para Instagram en español: 2-3 párrafos cortos con los hechos, una pregunta para '
           'comentarios, la línea \'📲 Pick gratis todos los días en nuestro canal de Telegram (link en la bio)\', '
@@ -450,28 +459,54 @@ def request(state: dict, nid: str) -> bool:
 
 
 # ---------------------------------------------------------------- 3) listas para publicar
+LAYOUTS = ("hero", "impact", "classic")
+LAYOUT_NAME = {"hero": "Héroe (foto + cifra)", "impact": "Impacto (foto + titular)", "classic": "Clásico (datos)"}
+
+
+def _photo_for(item: dict):
+    from . import commons
+    sport = item.get("sport") or ("basketball" if "NBA" in item.get("kicker", "") else "soccer")
+    if item.get("photo_file"):
+        return commons.file_photo(item["photo_file"])
+    if item.get("player"):
+        return (commons.player_photo(item["player"], item.get("teams") or [], need_team=True, sport=sport)
+                or commons.player_photo(item["player"], item.get("teams") or [], need_team=False, sport=sport))
+    if item.get("teams"):
+        return commons.team_photo(item["teams"][0], sport)
+    return None
+
+
+def _layouts_for(item: dict, has_photo: bool) -> list[str]:
+    if not has_photo:
+        return ["classic"]
+    return (["hero"] if item.get("stat") else []) + ["impact", "classic"]
+
+
 def _render(item: dict) -> tuple[bytes, str | None, dict]:
-    from . import commons, newsimage
+    """Imagen según la plantilla: «héroe» (foto + cifra), «impacto» (foto + titular) o «clásico» (datos)."""
+    from . import newsimage
     photo, credit = None, None
     try:
-        got = None
-        if item.get("photo_file"):
-            got = commons.file_photo(item["photo_file"])
-        elif item.get("player"):
-            got = commons.player_photo(item["player"], item.get("teams") or [], need_team=True,
-                                       sport=item.get("sport") or ("basketball" if "NBA" in item.get("kicker", "") else "soccer"))
+        got = _photo_for(item)
         if got:
             photo = got[0]
             cr = got[1] or {}
             credit = f"Foto de referencia: {cr.get('author')} / Wikimedia Commons ({cr.get('license')}), modificada"
     except Exception:  # noqa: BLE001
         traceback.print_exc()
-    n = {k: item[k] for k in ("tag", "kicker", "headline", "sub", "facts", "status") if k in item}
+    n = {k: item[k] for k in ("tag", "kicker", "headline", "sub", "facts", "status", "name", "line", "stat") if k in item}
     n["colors"] = [tuple(c) for c in item.get("colors") or [(30, 40, 60), (80, 90, 110)]]
     n["source"] = "Fuentes: " + item.get("sources", "ESPN")
+    options = _layouts_for(item, bool(photo))
+    layout = item.get("layout") if item.get("layout") in options else options[0]
+    item["layout"], item["_layouts"] = layout, options
     if photo:
         n["photo"], n["credit"] = photo, credit
-    return newsimage.render_news(n), credit, n
+    n["layout"] = layout
+    img = (newsimage.render_hero(dict(n, credit=(credit or "").replace("Foto de referencia:", "Foto:"))) if layout == "hero" else
+           newsimage.render_impact(dict(n, credit=(credit or "").replace("Foto de referencia:", "Foto:"))) if layout == "impact" else
+           newsimage.render_news(n))
+    return img, credit, n
 
 
 def _prepare(state: dict, item: dict, approved: bool = False) -> None:
@@ -489,11 +524,14 @@ def _prepare(state: dict, item: dict, approved: bool = False) -> None:
     reel_mp4 = None
     try:   # Reel (video vertical con animación): es lo que más alcance da en Instagram
         from . import reel
-        reel_mp4, cover = reel.news(dict(nd, credit=(nd.get("credit") or "").replace("Foto de referencia:", "Foto:")))
+        nr = dict(nd, credit=(nd.get("credit") or "").replace("Foto de referencia:", "Foto:"))
+        lay = nd.get("layout")
+        reel_mp4, cover = (reel.hero(nr) if lay == "hero" else reel.impact(nr) if lay == "impact" else reel.news(nr))
         instagram.save_video(key, reel_mp4, cover)
         job["reel"] = key
     except Exception:  # noqa: BLE001
         traceback.print_exc()
+    job["layout"] = nd.get("layout")
     state.setdefault("ig_jobs", {})[nid] = job
     if approved:
         job["status"] = "queued"
@@ -506,14 +544,18 @@ def _prepare(state: dict, item: dict, approved: bool = False) -> None:
             telegram.send_photo(owner, img, caption="📰 <b>Noticia para Instagram</b> (aprobada en el chat): "
                                 "se publica en unos minutos.")
         return
-    cap = ("📰 <b>Noticia lista para revisar</b>\nAbajo va el texto para Instagram. "
-           "Puedes publicarla, dejarla para el horario de más movimiento, pedirme cambios o descartarla.")
+    cap = (f"📰 <b>Noticia lista para revisar</b> · diseño {LAYOUT_NAME.get(nd.get('layout'), '')}\n"
+           "Abajo va el texto para Instagram. Puedes publicarla, dejarla para el horario de más movimiento, "
+           "pedirme cambios, probar otro diseño o descartarla.")
     try:
         msg = telegram.send_video(owner, reel_mp4, caption=cap) if reel_mp4 else telegram.send_photo(owner, img, caption=cap)
     except Exception:  # noqa: BLE001
         msg = telegram.send_photo(owner, img, caption=cap)
     telegram.send(owner, "<pre>" + formatting.escape(caption) + "</pre>")
-    telegram.set_buttons(owner, msg["message_id"], PUBLISH_BUTTONS(nid, bool(reel_mp4)))
+    btns = PUBLISH_BUTTONS(nid, bool(reel_mp4))
+    if len(item.get("_layouts") or []) > 1 and nid in (state.get("news_items") or {}):
+        btns.insert(-1, [("🎨 Otro diseño", f"nd:{nid}")])
+    telegram.set_buttons(owner, msg["message_id"], btns)
 
 
 def ready(state: dict) -> None:
@@ -560,6 +602,20 @@ def callback(state: dict, cb: dict, action: str, nid: str) -> None:
         (state.get("news_pending") or {}).pop(nid, None)
         telegram.edit_buttons_off(owner, mid, "✖️ Descartada")
         telegram.answer(cb["id"], "Descartada")
+    elif action == "nd":   # otro diseño: la siguiente plantilla disponible
+        item = (state.get("news_items") or {}).get(nid)
+        job = (state.get("ig_jobs") or {}).get(nid)
+        if not item or not job or job.get("status") != "draft":
+            telegram.answer(cb["id"], "Ya estaba procesada")
+            return
+        opts = item.get("_layouts") or ["classic"]
+        cur = item.get("layout") if item.get("layout") in opts else opts[0]
+        item["layout"] = opts[(opts.index(cur) + 1) % len(opts)]
+        item["rev"] = item.get("rev", 0) + 1
+        job["status"] = "replaced"
+        telegram.edit_buttons_off(owner, mid, f"🎨 Probando diseño {LAYOUT_NAME[item['layout']]} 👇")
+        telegram.answer(cb["id"], "Armando otro diseño")
+        _prepare(state, item)
     elif action == "ne":
         if nid not in (state.get("news_items") or {}):
             telegram.answer(cb["id"], "Esta noticia no se puede modificar aquí")

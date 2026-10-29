@@ -353,3 +353,109 @@ def from_report(p: dict, rep: dict, photo: tuple[bytes, dict] | None = None) -> 
         if cr.get("author"):
             g["credit"] = f"Foto: {cr['author']} / Wikimedia Commons ({cr.get('license')}), modificada"
     return postgame(g)
+
+
+# ---------------------------------------------------------------- Reels visuales: foto protagonista, poco texto
+def _photo_frame_maker(photo: bytes, colors, dark_from: float = 0.40):
+    """Fondo a pantalla completa con zoom lento y degradado abajo (con el color del equipo)."""
+    big = P._enhance(P._cover(photo, (int(W * 1.12), int(H * 1.12)), side="center")).convert("RGBA")
+    c = tuple(colors[0]) if colors else (10, 12, 18)
+    tint = tuple(int(v * 0.35) for v in c)
+    over = Image.new("RGBA", (W, H), tint + (0,))
+    over.putalpha(Image.linear_gradient("L").resize((W, H)).point(
+        lambda v: 0 if v < 255 * dark_from else int(min(235, (v - 255 * dark_from) / (255 * (1 - dark_from)) * 290))))
+    top = Image.new("RGBA", (W, 360), (0, 0, 0, 255))
+    top.putalpha(Image.linear_gradient("L").resize((W, 360)).point(lambda v: int((255 - v) * 0.6)))
+    over.alpha_composite(top, (0, 0))
+
+    def bg(t: float) -> Image.Image:
+        z = 1.12 - 0.12 * t
+        cw, chh = int(big.width / z), int(big.height / z)
+        cx, cy = (big.width - cw) // 2, int((big.height - chh) * 0.35)
+        im = big.crop((cx, cy, cx + cw, cy + chh)).resize((W, H))
+        im.alpha_composite(over)
+        return im
+    return bg
+
+
+def hero(n: dict, duration: float = 9.5) -> tuple[bytes, bytes]:
+    """Reel «héroe»: foto del protagonista, la cifra contando («0 → 44 PUNTOS») y su nombre."""
+    bg = _photo_frame_maker(n["photo"], n.get("colors"))
+    layers: list[Layer] = []
+    lg = P._logo_t(300, "dark")
+    layers.append(Layer(lg, 56 - lg.info.get("pad", 0), 70 - lg.info.get("pad", 0), 0.0, 0.5, 0))
+    tag = _chip_layer(n.get("tag", "NOTICIA"), (255, 77, 64), WHITE, 34)
+    layers.append(Layer(tag, W - 60 - tag.width, 92, 0.3, 0.4, -30))
+    d0 = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    lf = P._font("Medium", 40)
+    lines = NI._wrap(d0, n["line"], lf, W - 120)[:2] if n.get("line") else []
+    name = str(n.get("name") or n.get("headline") or "").upper()
+    nf = NI._fit_line(d0, name, NI._bebas, 160, W - 110)
+    bottom = SAFE_BOTTOM - 90
+    y_line = bottom - 54 * len(lines)
+    y_name = y_line - nf.size - 6
+    for i, ln in enumerate(lines):
+        layers.append(Layer(_text_layer(ln, lf, (232, 236, 242)), 58, y_line + 54 * i, 2.4 + 0.2 * i))
+    layers.append(Layer(_text_layer(name, nf, WHITE), 52, y_name, 1.7, 0.5, 70))
+    st = n.get("stat") or {}
+    val = str(st.get("value") or "")
+    num = int(val) if val.isdigit() else None
+    vf = NI._bebas(360)
+    y_stat = y_name - 330
+    label = _text_layer(str(st.get("label", "")).upper(), NI._bebas(120), WHITE) if val else None
+    layers += _footer_layers(n.get("credit"), n.get("source", ""))
+    end_at = duration - 2.3
+
+    def frame(tt: float) -> Image.Image:
+        im = bg(min(1.0, tt / duration))
+        if val:
+            k = _ease((tt - 0.6) / 1.1)
+            if k > 0:
+                txt = str(round(num * k)) if num is not None else val
+                d = ImageDraw.Draw(im)
+                d.text((52, y_stat), txt, font=vf, fill=GOLD)
+                vw = d.textlength(val, font=vf)
+                if k >= 1 and label:
+                    Layer(label, int(52 + vw + 26), y_stat + 190, 1.6, 0.4, 0).draw(im, tt)
+        for L in layers:
+            L.draw(im, tt)
+        _end_card(im, (tt - end_at) / 0.8)
+        return im
+
+    cover = frame(end_at - 0.05)
+    return _mp4(frame, duration), P._jpeg(cover)
+
+
+def impact(n: dict, duration: float = 9.0) -> tuple[bytes, bytes]:
+    """Reel «impacto»: foto grande y el titular entrando línea por línea."""
+    bg = _photo_frame_maker(n["photo"], n.get("colors"), 0.36)
+    layers: list[Layer] = []
+    lg = P._logo_t(300, "dark")
+    layers.append(Layer(lg, 56 - lg.info.get("pad", 0), 70 - lg.info.get("pad", 0), 0.0, 0.5, 0))
+    tag = _chip_layer(n.get("tag", "NOTICIA"), (255, 77, 64), WHITE, 34)
+    layers.append(Layer(tag, W - 60 - tag.width, 92, 0.3, 0.4, -30))
+    d0 = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    hf = NI._bebas(170)
+    lines = NI._wrap(d0, str(n.get("headline", "")).upper(), hf, W - 110)[:3]
+    lf = P._font("Medium", 38)
+    line2 = NI._wrap(d0, n["line"], lf, W - 120)[:1] if n.get("line") else []
+    y = SAFE_BOTTOM - 110 - 150 * len(lines) - (56 if line2 else 0)
+    if n.get("kicker"):
+        layers.append(Layer(_text_layer(n["kicker"], P._font("Bold", 32), GOLD), 56, y - 60, 0.6))
+    for i, ln in enumerate(lines):
+        layers.append(Layer(_text_layer(ln, hf, WHITE), 52, y, 0.9 + 0.35 * i, 0.5, 80))
+        y += 150
+    if line2:
+        layers.append(Layer(_text_layer(line2[0], lf, (232, 236, 242)), 58, y + 6, 2.2))
+    layers += _footer_layers(n.get("credit"), n.get("source", ""))
+    end_at = duration - 2.3
+
+    def frame(tt: float) -> Image.Image:
+        im = bg(min(1.0, tt / duration))
+        for L in layers:
+            L.draw(im, tt)
+        _end_card(im, (tt - end_at) / 0.8)
+        return im
+
+    cover = frame(end_at - 0.05)
+    return _mp4(frame, duration), P._jpeg(cover)
