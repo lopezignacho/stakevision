@@ -20,8 +20,12 @@ def rec(c):
 
 
 def photo(name, team):
+    from sv import postimage
     got = (commons.player_photo(name, [team["displayName"], team["name"]], need_team=True, sport="basketball")
            or commons.player_photo(name, [team["displayName"], team["name"]], need_team=True, sport="basketball", years=10))
+    if got and postimage.portrait_ok(got[0]) is False:
+        info.setdefault("rejected", []).append(name)
+        return None
     return got
 
 

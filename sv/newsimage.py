@@ -430,8 +430,13 @@ def render_cartel(v: dict) -> bytes:
         hw = w // 2 + 40
         if t.get("photo"):
             half = P._enhance(P._cover(t["photo"], (hw, ph_h), side="center", face_w=0.34)).convert("RGBA")
-        else:
+        else:   # sin foto confiable: el color del equipo con su sigla gigante de fondo
             half = _half(None, (hw, ph_h), t.get("color") or (40, 50, 70))
+            ab = str(t.get("abbr") or t.get("short") or "")[:4].upper()
+            wm = _tall(ab, 420, (255, 255, 255, 40), 1.2)
+            if wm.width > hw - 80:
+                wm = wm.resize((hw - 80, int(wm.height * (hw - 80) / wm.width)))
+            half.alpha_composite(wm, ((hw - wm.width) // 2 + (40 if side == "home" else -40), 200))
         tint = Image.new("RGBA", half.size, tuple(t.get("color") or (20, 30, 50)) + (38,))
         half.alpha_composite(tint)
         mask = Image.new("L", (w, ph_h), 0)

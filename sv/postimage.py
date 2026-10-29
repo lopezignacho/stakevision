@@ -876,6 +876,33 @@ def _face(im: Image.Image):
         return None
 
 
+def portrait_ok(photo: bytes) -> bool | None:
+    """¿La foto muestra a UNA persona protagonista? (una cara clara y ninguna otra de tamaño parecido).
+    En fotos de juego con varios jugadores no sabemos cuál es el nuestro: mejor no usarlas en carteles.
+    None si no hay detector de caras disponible."""
+    try:
+        import cv2
+        import numpy as np
+        if not hasattr(cv2, "CascadeClassifier"):
+            return None
+        im = Image.open(io.BytesIO(photo)).convert("RGB")
+        im.thumbnail((900, 900))
+        g = cv2.equalizeHist(cv2.cvtColor(np.array(im), cv2.COLOR_RGB2GRAY))
+        faces = []
+        for name in ("haarcascade_frontalface_default.xml", "haarcascade_profileface.xml"):
+            cas = cv2.CascadeClassifier(cv2.data.haarcascades + name)
+            faces += [int(w) for (_x, _y, w, _h) in cas.detectMultiScale(g, scaleFactor=1.1, minNeighbors=6,
+                                                                          minSize=(24, 24))]
+        if not faces:
+            return False
+        big = max(faces)
+        if big < im.width * 0.07:
+            return False   # la cara es muy chica: foto de lejos
+        return sum(1 for f in faces if f >= big * 0.6) <= 2   # la misma cara puede salir de frente y de perfil
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _cover(photo: bytes, size, focus=None, side: str = "right", face_w: float | None = None,
            face_y: float = 0.30) -> Image.Image:
     """Llena el tamaño sin deformar. Sin focus, elige el recorte solo: deja al protagonista (la zona con
