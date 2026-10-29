@@ -2,7 +2,7 @@
 import json, os, sys
 from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from sv import commons, nba, newsimage  # noqa: E402
+from sv import commons, crest, nba, newsimage  # noqa: E402
 OUT = "data/probe/cartel"
 os.makedirs(OUT, exist_ok=True)
 info = {}
@@ -66,9 +66,9 @@ if done:
         g = {"player": name, "stats": [(v.get("points"), "PTS"), (v.get("rebounds"), "REB"), (v.get("assists"), "AST"),
                                        (tpm, "T3")], "color": hexcol(cs[side]["team"].get("color")),
              "home": {"abbr": cs["home"]["team"]["abbreviation"], "color": hexcol(cs["home"]["team"].get("color")),
-                      "score": hs, "record": rec(cs["home"])},
+                      "score": hs, "record": rec(cs["home"]), "logo": crest.get("", url=cs["home"]["team"].get("logo", ""))},
              "away": {"abbr": cs["away"]["team"]["abbreviation"], "color": hexcol(cs["away"]["team"].get("color")),
-                      "score": as_, "record": rec(cs["away"])},
+                      "score": as_, "record": rec(cs["away"]), "logo": crest.get("", url=cs["away"]["team"].get("logo", ""))},
              "winner": "home" if hs > as_ else "away", "competition": "NBA", "focus": side}
         if got:
             g["photo"] = got[0]
@@ -106,7 +106,8 @@ for back in (0, 1):
                     break
             v[side] = {"name": c["team"]["displayName"], "short": c["team"]["name"],
                        "abbr": c["team"]["abbreviation"], "color": hexcol(c["team"].get("color")),
-                       "record": rec(c), "player": lead}
+                       "record": rec(c), "player": lead,
+                       "logo": crest.get(c["team"]["displayName"], "basketball", c["team"]["abbreviation"])}
             if got:
                 v[side]["photo"] = got[0]
                 authors.append(got[1]["author"])
@@ -122,8 +123,21 @@ for back in (0, 1):
             break
     if "cartel" in info:
         break
+if best_v:   # el mismo cartel sin fotos: escudos + color + sigla
+    nop = dict(best_v, home={k: x for k, x in best_v["home"].items() if k != "photo"},
+               away={k: x for k, x in best_v["away"].items() if k != "photo"}, credit=None)
+    open(f"{OUT}/cartel_sinfoto.jpg", "wb").write(newsimage.render_cartel(nop))
 if "cartel" not in info and best_v:
     open(f"{OUT}/cartel.jpg", "wb").write(newsimage.render_cartel(best_v))
     info["cartel"] = {"game": best_v["_game"], "players": [best_v["home"]["player"], best_v["away"]["player"]]}
 json.dump(info, open(f"{OUT}/info.json", "w"), ensure_ascii=False, indent=1, default=str)
 print(json.dumps(info, ensure_ascii=False, default=str))
+
+# 3) escudos de fútbol (búsqueda por nombre)
+for nm in ("Colo-Colo", "Universidad de Chile", "Real Madrid", "Liverpool", "Lazio", "Boca Juniors"):
+    u = crest.url_for(nm, "soccer")
+    info.setdefault("soccer_crests", {})[nm] = u
+    png = crest.image(u)
+    if png:
+        open(f"{OUT}/crest-{nm.replace(' ', '_')}.png", "wb").write(png)
+json.dump(info, open(f"{OUT}/info.json", "w"), ensure_ascii=False, indent=1, default=str)

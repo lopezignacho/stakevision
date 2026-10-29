@@ -601,6 +601,7 @@ def _versus_data(item: dict, n: dict) -> dict:
     for side in ("home", "away"):
         t = dict(m[side])
         t["color"] = tuple(t["color"])
+        t["logo"] = _crest(t, sport)
         got = _side_photo(t, sport)
         if got:
             t["photo"] = got[0]
@@ -613,9 +614,20 @@ def _versus_data(item: dict, n: dict) -> dict:
     return v
 
 
+def _crest(t: dict, sport: str):
+    from . import crest
+    try:
+        return crest.get(t["name"], sport) or crest.get(t.get("short") or "", sport)
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+        return None
+
+
 def _result_data(item: dict, n: dict) -> dict:
     m = item["match"]
-    h, a = m["home"], m["away"]
+    sport = item.get("sport") or ("basketball" if "NBA" in item.get("kicker", "") else "soccer")
+    h, a = dict(m["home"]), dict(m["away"])
+    h["logo"], a["logo"] = _crest(h, sport), _crest(a, sport)
     win = "home" if h["score"] > a["score"] else "away" if a["score"] > h["score"] else None
     g = {"colors": n["colors"], "kicker": n.get("kicker", ""), "winner": win, "when": m.get("when") or "Final",
          "notes": [f for f in n.get("facts") or [] if f != "(sin datos)"][:3], "source": n.get("source", ""),

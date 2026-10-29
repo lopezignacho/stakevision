@@ -365,6 +365,16 @@ def _tall(text: str, size: int, fill, stretch: float = 1.35) -> Image.Image:
     return im.resize((im.width, int(im.height * stretch)), Image.LANCZOS)
 
 
+def _badge(t: dict, size: int, fallback_abbr: str = "") -> Image.Image:
+    """Escudo oficial del equipo si lo tenemos (t['logo'] = png); si no, el círculo con la sigla."""
+    if t.get("logo"):
+        from . import crest
+        im = crest.fitted(t["logo"], size)
+        if im:
+            return im
+    return _monogram(t.get("abbr") or fallback_abbr, t.get("color") or (60, 60, 60), size)
+
+
 def _monogram(abbr: str, color, size: int = 150) -> Image.Image:
     """Distintivo propio (no el escudo oficial): círculo con el color del equipo y su sigla."""
     col = tuple(color)
@@ -474,8 +484,8 @@ def render_cartel(v: dict) -> bytes:
     y_mid = vs_y + 10
     for side, cx in (("home", 125), ("away", w - 125)):
         t = v[side]
-        b = _monogram(t.get("abbr") or names[0 if side == "home" else 1][:3], t.get("color") or (60, 60, 60), 150)
-        im.alpha_composite(b, (cx - 75, y_mid - 120))
+        b = _badge(t, 160, names[0 if side == "home" else 1][:3])
+        im.alpha_composite(b, (cx - b.width // 2, y_mid - 40 - b.height // 2))
         if t.get("record"):
             ImageDraw.Draw(im).text((cx, y_mid + 52), t["record"], font=P._font("Bold", 40), fill=WHITE, anchor="mt")
     d = ImageDraw.Draw(im)
@@ -558,8 +568,8 @@ def render_figura(g: dict) -> bytes:
     d.text((w / 2, ys + sh.height / 2), "vs", font=P._font("Bold", 38), fill=WHITE, anchor="mm")
     for side, cx in (("home", 130), ("away", w - 130)):
         t = g[side]
-        b = _monogram(t.get("abbr", ""), t.get("color") or (60, 60, 60), 140)
-        im.alpha_composite(b, (cx - 70, ys + sh.height // 2 - 100))
+        b = _badge(t, 150)
+        im.alpha_composite(b, (cx - b.width // 2, ys + sh.height // 2 - 30 - b.height // 2))
         if t.get("record"):
             ImageDraw.Draw(im).text((cx, ys + sh.height // 2 + 58), t["record"], font=P._font("Bold", 38), fill=WHITE,
                                     anchor="mt")
