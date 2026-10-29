@@ -25,10 +25,6 @@
    "faces": []
   }
  },
- "rejected": [
-  "Stephen Curry",
-  "Zion Williamson"
- ],
  "figura": {
   "player": "Stephen Curry",
   "stats": [
@@ -51,7 +47,7 @@
   ],
   "winner": "away",
   "score": "114-119",
-  "photo": false,
+  "photo": true,
   "game": "Golden State Warriors at Minnesota Timberwolves"
  },
  "tries": [
@@ -69,7 +65,7 @@
     "Zion Williamson",
     "Zach LaVine"
    ],
-   "photos": 0
+   "photos": 1
   },
   {
    "game": "Memphis Grizzlies at Portland Trail Blazers",
@@ -88,7 +84,7 @@
   ]
  },
  "soccer_crests": {
-  "Colo-Colo": "",
+  "Colo-Colo": "https://a.espncdn.com/i/teamlogos/soccer/500-dark/2688.png",
   "Universidad de Chile": "https://a.espncdn.com/i/teamlogos/soccer/500-dark/4139.png",
   "Real Madrid": "https://a.espncdn.com/i/teamlogos/soccer/500-dark/86.png",
   "Liverpool": "https://a.espncdn.com/i/teamlogos/soccer/500-dark/364.png",
