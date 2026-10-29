@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import html
 import json
+import re
 import os
 import traceback
 from datetime import datetime, timedelta, timezone
@@ -315,6 +316,10 @@ def test_file(state: dict) -> None:
     if not req.get("id") or req["id"] in (state.get("news_test_done") or []):
         return
     state.setdefault("news_test_done", []).append(req["id"])
+    if req.get("resend"):   # volver a proponer una noticia puntual (ej. «Curry 44»)
+        if not resend(state, str(req["resend"]), req.get("title")):
+            telegram.send(owner, f"📰 No encontré la noticia «{formatting.escape(str(req['resend']))}» para proponértela de nuevo.")
+        return
     if not llm.enabled():
         telegram.send(owner, "⚠️ El bot no ve la clave GEMINI_API_KEY. Revisa que el nombre del secreto en GitHub sea exacto.")
         return
@@ -333,6 +338,44 @@ def test_file(state: dict) -> None:
         return
     if not n:
         telegram.send(owner, "📰 Por ahora no encontré noticias nuevas que valgan la pena. Reviso de nuevo en 2 horas.")
+
+
+def resend(state: dict, query: str, title: str | None = None) -> bool:
+    """Vuelve a proponer (con los botones de siempre) una noticia que coincide con todas las palabras de query:
+    primero entre las ya vistas por el bot, luego en los titulares actuales de ESPN."""
+    words = [w for w in re.split(r"\s+", query.lower()) if w]
+
+    def hit(*texts) -> bool:
+        blob = " ".join(str(t or "") for t in texts).lower()
+        return all(w in blob for w in words)
+
+    row = None
+    for it in reversed(list((state.get("news_items") or {}).values()) + list((state.get("news_pending") or {}).values())):
+        if hit(it.get("orig"), it.get("headline"), it.get("titulo"), it.get("name"), it.get("_source", "")[:1500],
+               it.get("description")):
+            row = {"headline": it.get("orig") or it.get("headline"), "link": it.get("link") or "",
+                   "description": it.get("description") or (it.get("_source") or "")[:600],
+                   "sport": it.get("sport") or "basketball", "pick": None,
+                   "titulo": title or it.get("titulo") or it.get("headline"), "resumen": it.get("resumen") or it.get("sub")}
+            break
+    if not row:
+        for a in _top_articles():
+            head = html.unescape(a.get("headline") or "")
+            desc = html.unescape(a.get("description") or "")
+            if hit(head, desc):
+                row = {"headline": head, "description": desc, "sport": a.get("_sport") or "soccer", "pick": None,
+                       "link": (((a.get("links") or {}).get("web") or {}).get("href")) or "", "titulo": title or head}
+                break
+    if not row:
+        return False
+    nid = f"n{store.now_utc().strftime('%d%H%M')}r"
+    state.setdefault("news_pending", {})[nid] = dict(row, id=nid, categoria="Récord")
+    esc = formatting.escape
+    telegram.send(state["owner_chat"], f"📰 <b>Noticia sugerida</b> (de nuevo, con los formatos nuevos)\n\n"
+                  f"<b>{esc(row.get('titulo') or row['headline'])}</b>\n{esc(row.get('resumen') or '')}\n\n"
+                  + (f"🔗 Fuente (ESPN, en inglés): {esc(row['link'])}\n" if row["link"] else "")
+                  + "\n¿La preparamos para Instagram?", BUTTONS(nid))
+    return True
 
 
 def _clean(item: dict) -> dict:
