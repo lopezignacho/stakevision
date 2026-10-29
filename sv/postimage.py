@@ -876,7 +876,8 @@ def _face(im: Image.Image):
         return None
 
 
-def _cover(photo: bytes, size, focus=None, side: str = "right") -> Image.Image:
+def _cover(photo: bytes, size, focus=None, side: str = "right", face_w: float | None = None,
+           face_y: float = 0.30) -> Image.Image:
     """Llena el tamaño sin deformar. Sin focus, elige el recorte solo: deja al protagonista (la zona con
     más detalle) en la mitad derecha, que es la que no tapa el texto, y prioriza la parte de arriba (caras)."""
     im = Image.open(io.BytesIO(photo)).convert("RGB")
@@ -888,11 +889,16 @@ def _cover(photo: bytes, size, focus=None, side: str = "right") -> Image.Image:
         y = round((im.height - h) * focus[1])
         return im.crop((x, y, x + w, y + h))
     fc = _face(im)
+    if fc and face_w and fc[2] < face_w * w:   # acercar: que la cara tenga un tamaño protagonista (máx. 2.2x)
+        z = min(face_w * w / fc[2], 2.2)
+        if z > 1.05:
+            im = im.resize((round(im.width * z), round(im.height * z)), Image.LANCZOS)
+            fc = (fc[0] * z, fc[1] * z, fc[2] * z)
     if fc:   # hay una cara: el encuadre se arma alrededor de ella (nunca un brazo o el público)
         cx, cy, fw = fc
         tx = 0.5 if side == "center" else 0.66
         x = round(min(max(cx - w * tx, 0), im.width - w))
-        y = round(min(max(cy - h * 0.30, 0), im.height - h))
+        y = round(min(max(cy - h * face_y, 0), im.height - h))
         return im.crop((x, y, x + w, y + h))
     k = 8   # análisis en una versión chica
     small = im.convert("L").resize((max(1, im.width // k), max(1, im.height // k))).filter(ImageFilter.FIND_EDGES)

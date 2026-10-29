@@ -333,3 +333,228 @@ def render_versus(v: dict) -> bytes:
         d.text((P.W / 2, yb + 44), v["when"], font=P._font("Medium", 30), fill=WHITE, anchor="mt")
     _footer(im, d, v.get("source", ""), v.get("credit"))
     return P._jpeg(im)
+
+
+# ---------------------------------------------------------------- estilo «cartel» (inspirado en las cuentas grandes)
+LATAM_ZONES = (("MÉX", "America/Mexico_City"), ("COL", "America/Bogota"), ("PER", "America/Lima"),
+               ("ECU", "America/Guayaquil"), ("VEN", "America/Caracas"), ("BOL", "America/La_Paz"),
+               ("CHI", "America/Santiago"), ("ARG", "America/Argentina/Buenos_Aires"), ("URU", "America/Montevideo"),
+               ("PAR", "America/Asuncion"))
+
+
+def latam_times(utc_dt, limit: int = 3) -> list[tuple[str, str]]:
+    """[('20:00', 'CHI·ARG·URU·PAR'), ...]: la hora del partido en cada país, agrupando los que coinciden.
+    Siempre incluye la de Chile; se queda con los grupos más grandes."""
+    from zoneinfo import ZoneInfo
+    groups: dict[str, list[str]] = {}
+    for code, tz in LATAM_ZONES:
+        t = utc_dt.astimezone(ZoneInfo(tz)).strftime("%H:%M")
+        groups.setdefault(t, []).append(code)
+    chile = utc_dt.astimezone(ZoneInfo("America/Santiago")).strftime("%H:%M")
+    keys = sorted(groups, key=lambda k: (k != chile, -len(groups[k])))[:limit]
+    return [(k, "·".join(groups[k])) for k in sorted(keys)]
+
+
+def _tall(text: str, size: int, fill, stretch: float = 1.35) -> Image.Image:
+    """Texto Bebas «alto» (estirado en vertical), como los marcadores de las cuentas deportivas."""
+    f = _bebas(size)
+    d0 = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    l, t, r, b = d0.textbbox((0, 0), text, font=f)
+    im = Image.new("RGBA", (r - l + 4, b - t + 4), (0, 0, 0, 0))
+    ImageDraw.Draw(im).text((-l + 2, -t + 2), text, font=f, fill=fill)
+    return im.resize((im.width, int(im.height * stretch)), Image.LANCZOS)
+
+
+def _monogram(abbr: str, color, size: int = 150) -> Image.Image:
+    """Distintivo propio (no el escudo oficial): círculo con el color del equipo y su sigla."""
+    col = tuple(color)
+    light = sum(col) > 560
+    b = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(b)
+    d.ellipse((4, 4, size - 5, size - 5), fill=col + (255,), outline=(255, 255, 255, 235), width=max(4, size // 28))
+    txt = str(abbr or "").upper()[:4]
+    fs = int(size * (0.50 if len(txt) <= 3 else 0.40))
+    d.text((size / 2, size / 2 + size * 0.03), txt, font=_bebas(fs), fill=(15, 18, 26) if light else WHITE, anchor="mm")
+    return b
+
+
+def _beams(im: Image.Image, c_left, c_right, y0: int) -> None:
+    """Haces de luz en diagonal (colores de cada equipo) en las esquinas de abajo."""
+    w, h = im.size
+    lay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(lay)
+    for i, (dx, a) in enumerate(((0, 150), (60, 90), (120, 50))):
+        d.polygon([(0, y0 + 120 + dx), (260 - dx, h), (200 - dx, h), (0, y0 + 220 + dx)], fill=tuple(c_left) + (a,))
+        d.polygon([(w, y0 + 120 + dx), (w - 260 + dx, h), (w - 200 + dx, h), (w, y0 + 220 + dx)], fill=tuple(c_right) + (a,))
+    lay = lay.filter(ImageFilter.GaussianBlur(10))
+    im.alpha_composite(lay)
+
+
+def _glow_line(im: Image.Image, p0, p1, width: int = 4) -> None:
+    lay = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(lay)
+    d.line([p0, p1], fill=(255, 255, 255, 200), width=width * 4)
+    lay = lay.filter(ImageFilter.GaussianBlur(8))
+    im.alpha_composite(lay)
+    ImageDraw.Draw(im).line([p0, p1], fill=(255, 255, 255, 255), width=width)
+
+
+def _bright(c, k: float = 1.0):
+    """Color de equipo usable sobre fondo oscuro (los muy oscuros se aclaran un poco)."""
+    c = tuple(int(v) for v in c)
+    if sum(c) < 150:
+        c = tuple(min(255, int(v * 1.8 + 40)) for v in c)
+    return tuple(min(255, int(v * k)) for v in c)
+
+
+def _small_credit(im, d, credit: str | None, y: int) -> None:
+    if not credit:
+        return
+    cf = P._font("Regular", 18)
+    txt = credit
+    while d.textlength(txt, font=cf) > P.W - 120 and len(txt) > 20:
+        txt = txt[:-2]
+    d.text((P.W / 2, y), txt if txt == credit else txt.rstrip() + "…", font=cf, fill=(170, 176, 188), anchor="mm")
+
+
+def render_cartel(v: dict) -> bytes:
+    """Versus estilo cartel: dos figuras frente a frente partidas por una línea de luz, los equipos en grande
+    al centro con su sigla y récord a los lados, y la hora en cada país.
+    v = {home:{name, short, abbr, player, color, photo, record}, away:{...}, kickoff (datetime UTC) | when,
+    competition, credit}"""
+    w, h = P.W, H
+    im = Image.new("RGBA", (w, h), (8, 10, 16, 255))
+    ph_h = 1060
+    for side in ("home", "away"):
+        t = v[side]
+        hw = w // 2 + 40
+        if t.get("photo"):
+            half = P._enhance(P._cover(t["photo"], (hw, ph_h), side="center", face_w=0.34)).convert("RGBA")
+        else:
+            half = _half(None, (hw, ph_h), t.get("color") or (40, 50, 70))
+        tint = Image.new("RGBA", half.size, tuple(t.get("color") or (20, 30, 50)) + (38,))
+        half.alpha_composite(tint)
+        mask = Image.new("L", (w, ph_h), 0)
+        if side == "home":
+            ImageDraw.Draw(mask).polygon([(0, 0), (w // 2 + 18, 0), (w // 2 - 18, ph_h), (0, ph_h)], fill=255)
+            layer = Image.new("RGBA", (w, ph_h), (0, 0, 0, 0))
+            layer.paste(half, (0, 0))
+        else:
+            ImageDraw.Draw(mask).polygon([(w // 2 + 18, 0), (w, 0), (w, ph_h), (w // 2 - 18, ph_h)], fill=255)
+            layer = Image.new("RGBA", (w, ph_h), (0, 0, 0, 0))
+            layer.paste(half, (w - hw, 0))
+        im.paste(layer, (0, 0), mask)
+    _glow_line(im, (w // 2 + 18, 0), (w // 2 - 18, ph_h - 220), 3)
+    fade = Image.new("RGBA", (w, h), (8, 10, 16, 0))
+    fade.putalpha(P._alpha_ramp((w, h), [(0, 0), (0.50, 0), (0.70, 215), (0.80, 255), (1, 255)], False))
+    im.alpha_composite(fade)
+    top = Image.new("RGBA", (w, 260), (0, 0, 0, 255))
+    top.putalpha(Image.linear_gradient("L").resize((w, 260)).point(lambda x: int((255 - x) * 0.55)))
+    im.alpha_composite(top, (0, 0))
+    hc, ac = _bright(v["home"].get("color") or (60, 80, 160)), _bright(v["away"].get("color") or (160, 40, 40))
+    _beams(im, hc, ac, 760)
+    P._put_logo(im, 230, "dark", 44, 36)
+    d = ImageDraw.Draw(im)
+    # equipos al centro: LOCAL / v e r s u s / VISITA
+    names = [str(v[s].get("short") or v[s].get("name") or "").upper() for s in ("home", "away")]
+    size = 180
+    while size > 100 and max(d.textlength(n, font=_bebas(size)) for n in names) > 640:
+        size -= 6
+    y1 = 690
+    big = [_tall(n, size, WHITE, 1.10) for n in names]
+    im.alpha_composite(big[0], ((w - big[0].width) // 2, y1))
+    vs_y = y1 + big[0].height + 14
+    d.text((w / 2, vs_y), "V   E   R   S   U   S", font=P._font("Medium", 22), fill=(220, 225, 235), anchor="mt")
+    im.alpha_composite(big[1], ((w - big[1].width) // 2, vs_y + 40))
+    y_mid = vs_y + 10
+    for side, cx in (("home", 125), ("away", w - 125)):
+        t = v[side]
+        b = _monogram(t.get("abbr") or names[0 if side == "home" else 1][:3], t.get("color") or (60, 60, 60), 150)
+        im.alpha_composite(b, (cx - 75, y_mid - 120))
+        if t.get("record"):
+            ImageDraw.Draw(im).text((cx, y_mid + 52), t["record"], font=P._font("Bold", 40), fill=WHITE, anchor="mt")
+    d = ImageDraw.Draw(im)
+    # horarios por país
+    y3 = vs_y + 40 + big[1].height + 46
+    times = latam_times(v["kickoff"]) if v.get("kickoff") else []
+    if times:
+        cw = (w - 120) // len(times)
+        for i, (hh, who) in enumerate(times):
+            cx = 60 + cw * i + cw // 2
+            hf = _tall(hh, 80, WHITE, 1.05)
+            im.alpha_composite(hf, (cx - hf.width // 2, y3))
+            d.text((cx, y3 + hf.height + 8), who, font=P._font("Bold", 20), fill=(215, 220, 230), anchor="mt")
+        y_end = y3 + hf.height + 50
+    else:
+        d.text((w / 2, y3 + 10), v.get("when", ""), font=P._font("Bold", 40), fill=WHITE, anchor="mt")
+        y_end = y3 + 80
+    if v.get("competition"):
+        d.text((w / 2, 140), v["competition"].upper(), font=P._font("Bold", 26), fill=(255, 196, 0), anchor="mt")
+    d.text((w / 2, min(y_end, H - 84)), "@" + P.INSTAGRAM, font=_bebas(38), fill=WHITE, anchor="mt")
+    _small_credit(im, d, v.get("credit"), H - 22)
+    return P._jpeg(im)
+
+
+def render_figura(g: dict) -> bytes:
+    """La figura del partido: foto grande, su planilla a la izquierda y el marcador gigante abajo.
+    g = {photo, player, stats:[(valor, 'PTS'), ...], color, home:{abbr, color, score, record},
+    away:{...}, winner: 'home'|'away'|None, competition, credit}"""
+    w, h = P.W, H
+    col = tuple(g.get("color") or (30, 50, 110))
+    if g.get("photo"):
+        im = P._enhance(P._cover(g["photo"], (w, h), side="right", face_w=0.24, face_y=0.25)).convert("RGBA")
+    else:
+        im = _backdrop(col, (10, 12, 18))
+    tint = Image.new("RGBA", (w, h), tuple(int(c * 0.5) for c in col) + (60,))
+    im.alpha_composite(tint)
+    left = Image.new("RGBA", (w, h), (6, 8, 14, 0))
+    left.putalpha(P._alpha_ramp((w, h), [(0, 215), (0.30, 150), (0.50, 0), (1, 0)], True))
+    im.alpha_composite(left)
+    bot = Image.new("RGBA", (w, h), (6, 8, 14, 0))
+    bot.putalpha(P._alpha_ramp((w, h), [(0, 0), (0.55, 0), (0.78, 200), (1, 245)], False))
+    im.alpha_composite(bot)
+    P._put_logo(im, 210, "dark", 44, 36)
+    d = ImageDraw.Draw(im)
+    # nombre + planilla
+    parts = str(g.get("player", "")).upper().split(" ", 1)
+    nf = P._font("Bold", 46)
+    y = 220
+    for ln in parts:
+        d.text((52, y), ln, font=nf, fill=WHITE)
+        y += 52
+    y += 24
+    line_col = _bright(col, 1.0)
+    for i, (val, lab) in enumerate((g.get("stats") or [])[:4]):
+        num = _tall(str(val), 104, WHITE, 1.15)
+        im.alpha_composite(num, (54, y))
+        ImageDraw.Draw(im).text((54 + num.width + 16, y + num.height - 8), str(lab).upper(), font=P._font("Bold", 36),
+                                fill=WHITE, anchor="ls")
+        y += num.height + 22
+        if i < len(g["stats"][:4]) - 1:
+            ImageDraw.Draw(im).line((54, y - 11, 300, y - 11), fill=line_col + (200,), width=2)
+    d = ImageDraw.Draw(im)
+    # marcador gigante
+    hs, as_ = str(g["home"]["score"]), str(g["away"]["score"])
+    win = g.get("winner")
+    grey = (170, 176, 188)
+    sh = _tall(hs, 250, WHITE if win in ("home", None) else grey, 1.45)
+    sa = _tall(as_, 250, WHITE if win in ("away", None) else grey, 1.45)
+    ys = H - 110 - sh.height
+    gap = 90
+    im.alpha_composite(sh, (w // 2 - gap // 2 - sh.width, ys))
+    im.alpha_composite(sa, (w // 2 + gap // 2, ys))
+    d = ImageDraw.Draw(im)
+    d.text((w / 2, ys + sh.height / 2), "vs", font=P._font("Bold", 38), fill=WHITE, anchor="mm")
+    for side, cx in (("home", 130), ("away", w - 130)):
+        t = g[side]
+        b = _monogram(t.get("abbr", ""), t.get("color") or (60, 60, 60), 140)
+        im.alpha_composite(b, (cx - 70, ys + sh.height // 2 - 100))
+        if t.get("record"):
+            ImageDraw.Draw(im).text((cx, ys + sh.height // 2 + 58), t["record"], font=P._font("Bold", 38), fill=WHITE,
+                                    anchor="mt")
+    d = ImageDraw.Draw(im)
+    if g.get("competition"):
+        d.text((w - 52, 70), g["competition"].upper(), font=P._font("Bold", 26), fill=(255, 196, 0), anchor="rt")
+    d.text((w - 52, H - 62), "@" + P.INSTAGRAM, font=_bebas(40), fill=WHITE, anchor="rm")
+    _small_credit(im, d, g.get("credit"), H - 22)
+    return P._jpeg(im)
