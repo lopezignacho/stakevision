@@ -70,21 +70,42 @@ def _call(prompt: str, want_json: bool = True, temperature: float = 0.4) -> str:
     if not enabled():
         raise LLMError("Falta GEMINI_API_KEY")
     body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": temperature, "maxOutputTokens": 2048}}
+            "generationConfig": {"temperature": temperature, "maxOutputTokens": 4096}}
     if want_json:
         body["generationConfig"]["responseMimeType"] = "application/json"
-    last = ""
-    for model in (list(config.LLM_MODELS) + [m for m in models() if m not in config.LLM_MODELS])[:8]:
-        try:
-            r = requests.post(API.format(model=model), json=body, timeout=60,
-                              headers={"x-goog-api-key": config.GEMINI_API_KEY})
-        except requests.RequestException as e:
-            raise LLMError(f"sin conexión con Gemini ({type(e).__name__})") from None
-        if r.status_code in (404, 400) and "not found" in r.text.lower() or r.status_code == 404:
-            last = f"{model}: no disponible"
-            continue   # ese modelo no existe en esta cuenta: probar el siguiente
+    last = []
+    for model in (list(config.LLM_MODELS) + [m for m in models() if m not in config.LLM_MODELS])[:6]:
+        cfg = dict(body["generationConfig"])
+        low = model.lower()
+        if "2.5" in low:   # respuesta directa, sin «pensar» (más rápido y alcanza para redactar)
+            cfg["thinkingConfig"] = {"thinkingBudget": 0}
+        elif low.startswith("gemini-3"):
+            cfg["thinkingConfig"] = {"thinkingLevel": "low"}
+        for attempt in (1, 2):
+            try:
+                r = requests.post(API.format(model=model), json=dict(body, generationConfig=cfg), timeout=120,
+                                  headers={"x-goog-api-key": config.GEMINI_API_KEY})
+            except requests.Timeout:
+                r = None
+                last.append(f"{model}: tardó demasiado")
+                break
+            except requests.RequestException as e:
+                raise LLMError(f"sin conexión con Gemini ({type(e).__name__})") from None
+            if r.status_code == 400 and "thinking" in r.text.lower() and "thinkingConfig" in cfg:
+                cfg.pop("thinkingConfig")   # ese modelo no acepta la opción: sin ella
+                continue
+            break
+        if r is None:
+            continue
+        if r.status_code == 404 or (r.status_code == 400 and "not found" in r.text.lower()):
+            last.append(f"{model}: no disponible")
+            continue
         if r.status_code == 429:
-            raise LLMError("se alcanzó el límite gratuito de Gemini por ahora; reintento más tarde")
+            last.append(f"{model}: límite gratuito alcanzado")
+            continue
+        if r.status_code >= 500:
+            last.append(f"{model}: error de Google {r.status_code}")
+            continue
         if r.status_code >= 400:
             try:
                 msg = r.json().get("error", {}).get("message", "")
@@ -95,10 +116,11 @@ def _call(prompt: str, want_json: bool = True, temperature: float = 0.4) -> str:
         LAST_MODEL = model
         try:
             parts = r.json()["candidates"][0]["content"]["parts"]
-            return "".join(p.get("text", "") for p in parts).strip()
+            return "".join(p.get("text", "") for p in parts if not p.get("thought")).strip()
         except (KeyError, IndexError, ValueError):
-            raise LLMError("Gemini no devolvió texto") from None
-    raise LLMError(f"ningún modelo disponible ({last}); la clave ve: {', '.join(models()[:6]) or 'ninguno'}")
+            last.append(f"{model}: respuesta vacía")
+            continue
+    raise LLMError("ningún modelo respondió (" + "; ".join(last[:4]) + f"); la clave ve: {', '.join(models()[:6]) or 'ninguno'}")
 
 
 def ask_json(prompt: str, temperature: float = 0.4):
