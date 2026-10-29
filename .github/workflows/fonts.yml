@@ -1,0 +1,22 @@
+name: Descargar fuentes
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  fonts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          cd sv/assets/fonts
+          B=https://raw.githubusercontent.com/google/fonts/main/ofl
+          curl -fsSL -o LeagueGothic-Variable.ttf "$B/leaguegothic/LeagueGothic%5Bwdth%5D.ttf"
+          curl -fsSL -o OFL-LeagueGothic.txt "$B/leaguegothic/OFL.txt"
+          curl -fsSL -o Archivo-Variable.ttf "$B/archivo/Archivo%5Bwdth,wght%5D.ttf"
+          curl -fsSL -o OFL-Archivo.txt "$B/archivo/OFL.txt"
+          ls -la
+      - run: |
+          git config user.name "stakevision-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add sv/assets/fonts && git commit -m "Fuentes League Gothic y Archivo (OFL)" || echo "sin cambios"
+          git pull --rebase && git push
