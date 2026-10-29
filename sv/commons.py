@@ -34,6 +34,19 @@ def candidates(name: str, limit: int = 30, team: bool = False, query: str | None
     """Fotos de Commons que nombran al jugador (o al equipo), con licencia apta, de la más reciente a la más antigua."""
     if not name.strip():
         return []
+    from . import config
+    min_year = getattr(config, "PHOTO_MIN_YEAR", 0)
+    rows = _candidates(name, limit, team, query)
+    if min_year:   # primero buscar directo fotos de este año (la búsqueda general trae muchas antiguas)
+        seen = {c["title"] for c in rows}
+        rows += [c for c in _candidates(name, limit, team, (query or f'"{name}" filetype:bitmap') + f" {min_year}")
+                 if c["title"] not in seen]
+        rows = [c for c in rows if c["year"] >= min_year]
+    rows.sort(key=lambda c: (c["good"], c["year"], c["first"], c["portrait"], c["cropped"]), reverse=True)
+    return rows
+
+
+def _candidates(name: str, limit: int, team: bool, query: str | None) -> list[dict]:
     params = {"action": "query", "format": "json", "generator": "search", "gsrnamespace": 6,
               "gsrsearch": query or f'"{name}" filetype:bitmap', "gsrlimit": limit,
               "prop": "imageinfo|categories", "iiprop": "url|extmetadata|size", "iiurlwidth": 1400,

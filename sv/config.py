@@ -79,6 +79,8 @@ ODDS_BATCHES = 4                 # máximo de grupos de 5 ligas por escaneo (20 
 
 # --- Horarios y zona -----------------------------------------------------
 TIMEZONE = "America/Santiago"
+# Fotos: solo de este año en adelante (fecha de la foto en Commons). Sin foto de 2026, se usa el diseño con escudos.
+PHOTO_MIN_YEAR = 2026
 AUTO_SCAN_FALLBACK = True
 DAILY_SCAN_AT = (0, 5)          # el escaneo del día sale a las 00:05 (hora Chile) y mira solo los partidos de ese día
 # --- Pick gratis automático ---------------------------------------------------
