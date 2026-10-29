@@ -152,7 +152,8 @@ def render_postgame(g: dict) -> bytes:
         win = g["winner"] == side
         d.rounded_rectangle((60, y, 72, y + 150), 6, fill=t["color"])
         d.text((100, y + 4), t["short"].upper(), font=_bebas(120), fill=WHITE if win else (175, 182, 194))
-        d.text((100, y + 120), t["name"], font=P._font("Medium", 28), fill=(205, 210, 220))
+        if t["name"].upper() != t["short"].upper():
+            d.text((100, y + 120), t["name"], font=P._font("Medium", 28), fill=(205, 210, 220))
         sc = str(t["score"])
         sf = _bebas(170)
         d.text((P.W - 60 - d.textlength(sc, font=sf), y - 8), sc, font=sf, fill=WHITE if win else (175, 182, 194))

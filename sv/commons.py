@@ -148,7 +148,7 @@ def player_candidates(name: str, teams: list[str], since: int = 0, sport: str = 
         c["team_hit"] = bool(toks & words_t) or bool(toks & words_all)
         c["title_hit"] = bool(toks & words_t)
         out.append(c)
-    out.sort(key=lambda c: (c["title_hit"], c["team_hit"], c["year"], c["first"], c["portrait"]), reverse=True)
+    out.sort(key=lambda c: (c["title_hit"], not c["national"], c["team_hit"], c["year"], c["first"], c["portrait"]), reverse=True)
     return out
 
 
@@ -170,8 +170,8 @@ def player_photo(name: str, teams: list[str], since: int = 0, need_team: bool = 
     for c in player_candidates(name, teams, since, sport, years if need_team else 3)[:6]:
         if need_team and not c["team_hit"]:
             continue
-        if not c["team_hit"] and c.get("national"):
-            continue
+        if c.get("national") and not c.get("title_hit"):
+            continue   # con la selección (aunque la categoría nombre al club): camiseta equivocada
         got = _download(c)
         if got:
             got[1]["player"] = name

@@ -274,7 +274,8 @@ def postgame(g: dict, duration: float = 11.0) -> tuple[bytes, bytes]:
         while dn.textlength(nm, font=bf) > W - 440 and bf.size > 70:
             bf = NI._bebas(bf.size - 6)
         dn.text((40, 0), nm, font=bf, fill=col)
-        dn.text((40, 140), tm["name"], font=P._font("Medium", 30), fill=(205, 210, 220))
+        if tm["name"].upper() != tm["short"].upper():
+            dn.text((40, 140), tm["name"], font=P._font("Medium", 30), fill=(205, 210, 220))
         layers.append(Layer(name, 60, y, 0.8 + i * 0.25, 0.5, 60))
         rows.append((y, int(tm["score"]), col, 1.1 + i * 0.25))
         y += 210
