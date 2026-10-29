@@ -470,6 +470,7 @@ def _photo_for(item: dict):
         return commons.file_photo(item["photo_file"])
     if item.get("player"):
         return (commons.player_photo(item["player"], item.get("teams") or [], need_team=True, sport=sport)
+                or commons.player_photo(item["player"], item.get("teams") or [], need_team=True, sport=sport, years=8)
                 or commons.player_photo(item["player"], item.get("teams") or [], need_team=False, sport=sport))
     if item.get("teams"):
         return commons.team_photo(item["teams"][0], sport)

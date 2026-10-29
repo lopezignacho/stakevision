@@ -4,8 +4,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sv import commons, newsimage, reel  # noqa: E402
 OUT = "data/probe/hero"
 os.makedirs(OUT, exist_ok=True)
-got = (commons.player_photo("Stephen Curry", ["Golden State Warriors", "Warriors"], sport="basketball")
-       or commons.player_photo("Stephen Curry", ["Golden State Warriors", "Warriors"], need_team=False, sport="basketball"))
+from sv import newswatch  # noqa: E402
+got = newswatch._photo_for({"player": "Stephen Curry", "teams": ["Golden State Warriors", "Warriors"], "sport": "basketball"})
 info = {"photo": bool(got), "credit": got[1] if got else None}
 if got:
     cr = f"Foto: {got[1]['author']} / Wikimedia Commons ({got[1]['license']}), modificada"
