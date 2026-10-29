@@ -1,0 +1,27 @@
+{
+ "figura": {
+  "player": "Stephen Curry",
+  "stats": [
+   [
+    "44",
+    "PTS"
+   ],
+   [
+    "8",
+    "REB"
+   ],
+   [
+    "6",
+    "AST"
+   ],
+   [
+    "6",
+    "T3"
+   ]
+  ],
+  "winner": "away",
+  "score": "114-119",
+  "photo": true,
+  "game": "Golden State Warriors at Minnesota Timberwolves"
+ }
+}
