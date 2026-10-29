@@ -24,5 +24,18 @@
   "sport": "soccer",
   "status": "pending",
   "requested_at": "2026-10-28T16:45:49Z"
+ },
+ {
+  "id": "n22290300",
+  "headline": "Carabao Cup quarterfinal draw: Liverpool to face Bournemouth",
+  "description": "Liverpool will host fellow Premier League side Bournemouth in the Carabao Cup quarterfinals after making it past Chelsea in a penalty shootout on Wednesday.",
+  "link": "https://www.espn.com/soccer/story/_/id/50311784/carabao-cup-quarterfinal-draw-liverpool-bournemouth-fleetwood",
+  "published": "2026-10-28T23:44:34Z",
+  "pick": "145",
+  "home": "Liverpool",
+  "away": "Chelsea",
+  "sport": "soccer",
+  "status": "pending",
+  "requested_at": "2026-10-29T03:11:16Z"
  }
 ]
