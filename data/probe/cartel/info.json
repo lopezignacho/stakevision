@@ -49,5 +49,12 @@
    ],
    "photos": 0
   }
- ]
+ ],
+ "cartel": {
+  "game": "Cleveland Cavaliers at Atlanta Hawks",
+  "players": [
+   "Jalen Johnson",
+   "Donovan Mitchell"
+  ]
+ }
 }
