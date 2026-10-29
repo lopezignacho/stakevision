@@ -23,7 +23,10 @@ def photo(name, team):
     from sv import postimage
     got = (commons.player_photo(name, [team["displayName"], team["name"]], need_team=True, sport="basketball")
            or commons.player_photo(name, [team["displayName"], team["name"]], need_team=True, sport="basketball", years=10))
-    if got and postimage.portrait_ok(got[0]) is False:
+    ok = postimage.portrait_ok(got[0]) if got else None
+    if got:
+        info.setdefault("faces", {})[name] = postimage.PORTRAIT_DEBUG[-1] if postimage.PORTRAIT_DEBUG else None
+    if got and ok is False:
         info.setdefault("rejected", []).append(name)
         return None
     return got

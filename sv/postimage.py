@@ -876,6 +876,9 @@ def _face(im: Image.Image):
         return None
 
 
+PORTRAIT_DEBUG: list = []
+
+
 def portrait_ok(photo: bytes) -> bool | None:
     """¿La foto muestra a UNA persona protagonista? (una cara clara y ninguna otra de tamaño parecido).
     En fotos de juego con varios jugadores no sabemos cuál es el nuestro: mejor no usarlas en carteles.
@@ -893,12 +896,15 @@ def portrait_ok(photo: bytes) -> bool | None:
             cas = cv2.CascadeClassifier(cv2.data.haarcascades + name)
             faces += [int(w) for (_x, _y, w, _h) in cas.detectMultiScale(g, scaleFactor=1.1, minNeighbors=6,
                                                                           minSize=(24, 24))]
+        PORTRAIT_DEBUG.append({"w": im.width, "faces": sorted(faces, reverse=True)[:8]})
         if not faces:
             return False
         big = max(faces)
-        if big < im.width * 0.07:
-            return False   # la cara es muy chica: foto de lejos
-        return sum(1 for f in faces if f >= big * 0.6) <= 2   # la misma cara puede salir de frente y de perfil
+        if big < im.width * 0.09:
+            return False   # la cara es muy chica: foto de lejos (de juego, con más jugadores)
+        if sum(1 for f in faces if f >= big * 0.6) > 2:   # la misma cara puede salir de frente y de perfil
+            return False
+        return sum(1 for f in faces if f >= big * 0.35) <= 3
     except Exception:  # noqa: BLE001
         return None
 
