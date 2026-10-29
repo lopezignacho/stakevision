@@ -255,7 +255,8 @@ def callback(state: dict, cb: dict, action: str, nid: str) -> None:
     mid = cb["message"]["message_id"]
     if action == "nq":
         ok = request(state, nid)
-        telegram.edit_buttons_off(owner, mid, "✅ Pedida: te llega lista para aprobar" if ok else "Ya estaba procesada")
+        telegram.edit_buttons_off(owner, mid, "✅ Pedida. Para redactarla en español, pídele a Claude: «prepara las noticias "
+                                  "pendientes»; luego te llega aquí lista para aprobar" if ok else "Ya estaba procesada")
         telegram.answer(cb["id"], "La preparo" if ok else "Ya procesada")
     elif action == "nx":
         (state.get("news_pending") or {}).pop(nid, None)
