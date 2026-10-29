@@ -500,6 +500,9 @@ def render_figura(g: dict) -> bytes:
     g = {photo, player, stats:[(valor, 'PTS'), ...], color, home:{abbr, color, score, record},
     away:{...}, winner: 'home'|'away'|None, competition, credit}"""
     w, h = P.W, H
+    if g.get("focus") == "away":   # el equipo de la figura va a la izquierda
+        g = dict(g, home=g["away"], away=g["home"], focus="home",
+                 winner={"home": "away", "away": "home"}.get(g.get("winner"), g.get("winner")))
     col = tuple(g.get("color") or (30, 50, 110))
     if g.get("photo"):
         im = P._enhance(P._cover(g["photo"], (w, h), side="right", face_w=0.24, face_y=0.25)).convert("RGBA")
@@ -537,8 +540,11 @@ def render_figura(g: dict) -> bytes:
     hs, as_ = str(g["home"]["score"]), str(g["away"]["score"])
     win = g.get("winner")
     grey = (170, 176, 188)
-    sh = _tall(hs, 250, WHITE if win in ("home", None) else grey, 1.45)
-    sa = _tall(as_, 250, WHITE if win in ("away", None) else grey, 1.45)
+    fs = 250
+    while fs > 120 and max(d.textlength(x, font=_bebas(fs)) for x in (hs, as_)) > 250:
+        fs -= 10   # que los números no tapen las siglas de los lados
+    sh = _tall(hs, fs, WHITE if win in ("home", None) else grey, 1.45)
+    sa = _tall(as_, fs, WHITE if win in ("away", None) else grey, 1.45)
     ys = H - 110 - sh.height
     gap = 90
     im.alpha_composite(sh, (w // 2 - gap // 2 - sh.width, ys))

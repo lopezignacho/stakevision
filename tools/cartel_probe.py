@@ -62,7 +62,7 @@ if done:
                       "score": hs, "record": rec(cs["home"])},
              "away": {"abbr": cs["away"]["team"]["abbreviation"], "color": hexcol(cs["away"]["team"].get("color")),
                       "score": as_, "record": rec(cs["away"])},
-             "winner": "home" if hs > as_ else "away", "competition": "NBA"}
+             "winner": "home" if hs > as_ else "away", "competition": "NBA", "focus": side}
         if got:
             g["photo"] = got[0]
             g["credit"] = f"Foto: {got[1]['author']} / Wikimedia Commons ({got[1]['license']}), modificada"
@@ -71,6 +71,7 @@ if done:
                                                                              "game": done["name"]}
 
 # 2) cartel: el partido más atractivo de hoy (el primero con fotos de las dos figuras)
+info["tries"] = []
 for back in (0, 1):
     day = (today - timedelta(hours=6) + timedelta(days=back)).strftime("%Y%m%d")
     for e in nba._get("/scoreboard", dates=day).get("events") or []:
@@ -92,6 +93,8 @@ for back in (0, 1):
             if got:
                 v[side]["photo"] = got[0]
                 authors.append(got[1]["author"])
+        info["tries"].append({"game": e["name"], "players": [v["home"]["player"], v["away"]["player"]],
+                              "photos": len(authors)})
         if len(authors) == 2:
             v["credit"] = f"Fotos: {', '.join(authors)} / Wikimedia Commons, modificadas"
             open(f"{OUT}/cartel.jpg", "wb").write(newsimage.render_cartel(v))
