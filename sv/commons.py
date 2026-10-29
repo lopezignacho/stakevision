@@ -71,7 +71,7 @@ def _candidates(name: str, limit: int, team: bool, query: str | None) -> list[di
         w, h = info.get("width") or 0, info.get("height") or 0
         if min(w, h) < 700:
             continue
-        date = (meta.get("DateTimeOriginal") or {}).get("value") or (meta.get("DateTime") or {}).get("value") or ""
+        date = (meta.get("DateTimeOriginal") or {}).get("value") or ""   # fecha en que se TOMÓ la foto (no la de subida)
         year = int(m.group()) if (m := re.search(r"(19|20)\d\d", date)) else 0
         author = _clean((meta.get("Artist") or {}).get("value") or "") or "Autor desconocido"
         out.append({"title": title, "url": info.get("thumburl") or info.get("url"), "page": info.get("descriptionurl"),
@@ -151,9 +151,11 @@ def player_candidates(name: str, teams: list[str], since: int = 0, sport: str = 
         words_all = set(re.split(r"[^a-z0-9]+", f"{title} {c['desc']} {c['cats']}"))
         if any((n in words_t) if " " not in n else (n in title) for n in NATIONAL) and not (toks & words_t):
             continue   # con la selección
-        blob = f" {c['desc']} {c['cats']} "
-        c["national"] = any(w in blob for w in ("national", "selección", "seleccion", "world cup", "olympic",
-                                                "eurobasket", "fiba", "copa america", "copa américa"))
+        blob = f" {title} {c['desc']} {c['cats']} "
+        c["national"] = (any(w in blob for w in ("national", "selección", "seleccion", "world cup", "olympic",
+                                                 "eurobasket", "fiba", "copa america", "copa américa", "team usa",
+                                                 "usa basketball", "nations league", "mundial"))
+)   # los países sueltos no: «Santiago, Chile» o «San Francisco, USA» son el lugar, no la camiseta
         if not c["year"] or c["year"] < since:
             continue   # de antes de llegar al club: puede tener otra camiseta
         if not sport_ok(c, sport):
@@ -176,6 +178,26 @@ def _download(c: dict) -> tuple[bytes, dict] | None:
     return None
 
 
+JERSEY_LOG: list = []   # qué se revisó (para las pruebas y para entender por qué no hubo foto)
+
+
+def jersey_ok(photo: bytes, name: str, teams: list[str], sport: str, c: dict | None = None) -> bool:
+    """Revisión visual (Gemini) de la camiseta: tiene que ser la del equipo del partido. Sin Gemini, solo se
+    acepta si el título de la foto nombra al club y no hay rastro de selección."""
+    from . import llm
+    team = (teams or [""])[0]
+    if not team:
+        return False
+    if llm.enabled():
+        try:
+            r = llm.check_jersey(photo, name, team, sport)
+            JERSEY_LOG.append({"player": name, "team": team, "title": (c or {}).get("title"), **r})
+            return r["ok"]
+        except Exception as e:  # noqa: BLE001
+            JERSEY_LOG.append({"player": name, "team": team, "title": (c or {}).get("title"), "error": str(e)[:120]})
+    return bool(c and c.get("title_hit") and not c.get("national"))
+
+
 def player_photo(name: str, teams: list[str], since: int = 0, need_team: bool = True,
                  sport: str = "soccer", years: int = 3) -> tuple[bytes, dict] | None:
     """(jpeg, crédito) del jugador con la camiseta de su club; o None.
@@ -186,6 +208,8 @@ def player_photo(name: str, teams: list[str], since: int = 0, need_team: bool = 
         if c.get("national") and not c.get("title_hit"):
             continue   # con la selección (aunque la categoría nombre al club): camiseta equivocada
         got = _download(c)
+        if got and not jersey_ok(got[0], name, teams, sport, c):
+            continue
         if got:
             got[1]["player"] = name
             got[1]["team_hit"] = c["team_hit"]

@@ -66,10 +66,14 @@ def models() -> list[str]:
     return _DISCOVERED or list(config.LLM_MODELS)
 
 
-def _call(prompt: str, want_json: bool = True, temperature: float = 0.4) -> str:
+def _call(prompt: str, want_json: bool = True, temperature: float = 0.4, image: bytes | None = None) -> str:
     if not enabled():
         raise LLMError("Falta GEMINI_API_KEY")
-    body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
+    parts = [{"text": prompt}]
+    if image:
+        import base64
+        parts.append({"inline_data": {"mime_type": "image/jpeg", "data": base64.b64encode(image).decode()}})
+    body = {"contents": [{"role": "user", "parts": parts}],
             "generationConfig": {"temperature": temperature, "maxOutputTokens": 4096}}
     if want_json:
         body["generationConfig"]["responseMimeType"] = "application/json"
@@ -123,8 +127,8 @@ def _call(prompt: str, want_json: bool = True, temperature: float = 0.4) -> str:
     raise LLMError("ningún modelo respondió (" + "; ".join(last[:4]) + f"); la clave ve: {', '.join(models()[:6]) or 'ninguno'}")
 
 
-def ask_json(prompt: str, temperature: float = 0.4):
-    txt = _call(prompt, True, temperature)
+def ask_json(prompt: str, temperature: float = 0.4, image: bytes | None = None):
+    txt = _call(prompt, True, temperature, image)
     txt = re.sub(r"^```(?:json)?|```$", "", txt.strip()).strip()
     try:
         return json.loads(txt)
@@ -133,3 +137,30 @@ def ask_json(prompt: str, temperature: float = 0.4):
         if m:
             return json.loads(m.group(1))
         raise LLMError("la respuesta no vino en el formato esperado") from None
+
+
+def _small_jpeg(photo: bytes, side: int = 1024) -> bytes:
+    import io
+    from PIL import Image
+    im = Image.open(io.BytesIO(photo)).convert("RGB")
+    im.thumbnail((side, side))
+    out = io.BytesIO()
+    im.save(out, "JPEG", quality=85)
+    return out.getvalue()
+
+
+def check_jersey(photo: bytes, player: str, team: str, sport: str) -> dict:
+    """Mira la foto (pública, de Commons) y dice qué camiseta lleva el protagonista.
+    {"ok": bool, "jersey": "...", "why": "..."}; ok solo si la camiseta es del equipo pedido."""
+    deporte = "básquetbol (NBA)" if sport == "basketball" else "fútbol"
+    prompt = (f"Mira esta foto de {deporte}. Necesito saber si el protagonista de la foto (la persona más grande y "
+              f"en primer plano) lleva la camiseta del equipo «{team}» (debería ser {player}).\n"
+              "Reglas: una camiseta de selección nacional (USA, Argentina, Chile, etc.), de otro club, de "
+              "entrenamiento sin el nombre o los colores claros del equipo, ropa de calle, traje o polerón NO cuentan. "
+              "Si no se ve la camiseta con claridad, o hay otra persona más protagonista, la respuesta es no.\n"
+              'Responde en JSON: {"camiseta": "equipo o selección que se ve en la camiseta, o desconocido", '
+              '"es_del_equipo": true/false, "protagonista_claro": true/false, "deporte_correcto": true/false, '
+              '"motivo": "frase corta"}')
+    d = ask_json(prompt, 0.0, _small_jpeg(photo))
+    ok = bool(d.get("es_del_equipo")) and bool(d.get("protagonista_claro", True)) and bool(d.get("deporte_correcto", True))
+    return {"ok": ok, "jersey": str(d.get("camiseta") or ""), "why": str(d.get("motivo") or "")}
