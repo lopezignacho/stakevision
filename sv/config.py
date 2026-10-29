@@ -130,7 +130,7 @@ STATE_KEY = os.environ.get("STATE_KEY", "")
 LINK_CODE = os.environ.get("LINK_CODE", "")
 INSTAGRAM_TOKEN = os.environ.get("INSTAGRAM_TOKEN", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")   # redacción en español de las noticias (plan gratuito)
-LLM_MODELS = ["gemini-3-flash", "gemini-2.5-flash", "gemini-2.0-flash"]   # se usa el primero que responda
+LLM_MODELS: list = []   # vacío = se usan los modelos que Google ofrece a la clave (primero Flash)
 
 # --- Rutas ---------------------------------------------------------------
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
