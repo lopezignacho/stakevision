@@ -852,6 +852,8 @@ def _face(im: Image.Image):
         small = im.copy()
         small.thumbnail((900, 900))
         k = im.width / small.width
+        if not hasattr(cv2, "CascadeClassifier"):
+            return None
         g = cv2.cvtColor(np.array(small.convert("RGB")), cv2.COLOR_RGB2GRAY)
         g = cv2.equalizeHist(g)
         found = []

@@ -257,3 +257,78 @@ def render_impact(n: dict) -> bytes:
         d.text((56, y + 4), _wrap(d, n["line"], lf, P.W - 110)[0], font=lf, fill=(232, 236, 242))
     _footer(im, d, n.get("source", ""), n.get("credit"))
     return P._jpeg(im)
+
+
+# ---------------------------------------------------------------- Versus (partido atractivo, fútbol o NBA)
+def _half(photo: bytes | None, size, color) -> Image.Image:
+    """Mitad del versus: foto del referente (encuadrada en su cara) teñida con el color del equipo, o solo el color."""
+    w, h = size
+    col = tuple(color)
+    if photo:
+        im = P._enhance(P._cover(photo, (w, h), side="center")).convert("RGBA")
+        tint = Image.new("RGBA", (w, h), col + (70,))
+        im.alpha_composite(tint)
+    else:
+        g = Image.linear_gradient("L").resize((w, h))
+        base = tuple(int(v * 0.75) for v in col) if sum(col) > 560 else col   # colores muy claros: un poco más oscuros
+        im = Image.composite(Image.new("RGB", (w, h), tuple(int(v * 0.30) for v in col)),
+                             Image.new("RGB", (w, h), base), g).convert("RGBA")
+    return im
+
+
+def versus_base(v: dict, size) -> Image.Image:
+    """Fondo del versus: dos mitades en diagonal, una por equipo, con sombra abajo para el texto."""
+    w, h = size
+    hw = int(w * 0.60)   # cada foto ocupa su mitad (con un poco de cruce): la cara queda a la vista
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 255))
+    im.paste(_half(v["home"].get("photo"), (hw, h), v["home"].get("color") or (30, 60, 140)), (0, 0))
+    right = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    right.paste(_half(v["away"].get("photo"), (hw, h), v["away"].get("color") or (160, 30, 40)), (w - hw, 0))
+    mask = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mask).polygon([(int(w * 0.58), 0), (w, 0), (w, h), (int(w * 0.42), h)], fill=255)
+    im.paste(right, (0, 0), mask)
+    d = ImageDraw.Draw(im)
+    d.line([(int(w * 0.58), 0), (int(w * 0.42), h)], fill=(255, 255, 255, 230), width=8)
+    shade = Image.new("RGBA", (w, h), (6, 8, 12, 0))
+    shade.putalpha(Image.linear_gradient("L").resize((w, h)).point(lambda x: 0 if x < 140 else int((x - 140) * 2.0)))
+    im.alpha_composite(shade)
+    top = Image.new("RGBA", (w, 300), (0, 0, 0, 255))
+    top.putalpha(Image.linear_gradient("L").resize((w, 300)).point(lambda x: int((255 - x) * 0.55)))
+    im.alpha_composite(top, (0, 0))
+    return im
+
+
+def _vs_badge(size: int = 200) -> Image.Image:
+    b = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(b)
+    d.ellipse((0, 0, size - 1, size - 1), fill=(10, 12, 18, 235), outline=(255, 196, 0), width=8)
+    d.text((size / 2, size / 2 + 6), "VS", font=_bebas(int(size * 0.55)), fill=(255, 196, 0), anchor="mm")
+    return b
+
+
+def render_versus(v: dict) -> bytes:
+    """v = {home:{name, short, player, color, photo}, away:{...}, kicker, when, line, tag, credit, source}"""
+    im = versus_base(v, (P.W, H))
+    d = ImageDraw.Draw(im)
+    P._put_logo(im, 260, "dark", 56, 48)
+    tag = v.get("tag", "PARTIDO")
+    tf = P._font("Bold", 28)
+    _chip(d, P.W - 60 - (d.textlength(tag, font=tf) + 44), 64, tag, (255, 77, 64), WHITE, 28)
+    b = _vs_badge(180)
+    im.alpha_composite(b, ((P.W - b.width) // 2, H - 700))
+    d = ImageDraw.Draw(im)
+    y = H - 500
+    for side, x, anchor in (("home", 56, "la"), ("away", P.W - 56, "ra")):
+        t = v[side]
+        nm = str(t.get("short") or t.get("name") or "").upper()
+        nf = _fit_line(d, nm, _bebas, 120, P.W // 2 - 80)
+        d.text((x, y), nm, font=nf, fill=WHITE, anchor=anchor)
+        if t.get("player"):
+            d.text((x, y + nf.size + 4), str(t["player"]), font=P._font("Medium", 28), fill=(225, 230, 238), anchor=anchor)
+    yb = y + 168
+    if v.get("kicker"):
+        d.text((P.W / 2, yb), v["kicker"], font=P._font("Bold", 30), fill=(255, 196, 0), anchor="mt")
+    if v.get("when"):
+        d.text((P.W / 2, yb + 44), v["when"], font=P._font("Medium", 30), fill=WHITE, anchor="mt")
+    _footer(im, d, v.get("source", ""), v.get("credit"))
+    return P._jpeg(im)

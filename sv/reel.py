@@ -459,3 +459,62 @@ def impact(n: dict, duration: float = 9.0) -> tuple[bytes, bytes]:
 
     cover = frame(end_at - 0.05)
     return _mp4(frame, duration), P._jpeg(cover)
+
+
+def versus(v: dict, duration: float = 9.0) -> tuple[bytes, bytes]:
+    """Reel «versus»: las dos mitades entran desde los costados, aparece el VS y luego los equipos y la hora."""
+    base = NI.versus_base(v, (W, H))
+    hw = W // 2 + 60
+    left_half = base.crop((0, 0, hw, H))
+    right_half = base.crop((W - hw, 0, W, H))
+    badge = NI._vs_badge(230)
+    layers: list[Layer] = []
+    lg = P._logo_t(300, "dark")
+    layers.append(Layer(lg, 56 - lg.info.get("pad", 0), 70 - lg.info.get("pad", 0), 0.2, 0.5, 0))
+    tag = _chip_layer(v.get("tag", "PARTIDO"), (255, 77, 64), WHITE, 34)
+    layers.append(Layer(tag, W - 60 - tag.width, 92, 0.5, 0.4, -30))
+    d0 = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
+    y = SAFE_BOTTOM - 520
+    for i, side in enumerate(("home", "away")):
+        t = v[side]
+        nm = str(t.get("short") or t.get("name") or "").upper()
+        nf = NI._fit_line(d0, nm, NI._bebas, 140, W // 2 - 80)
+        img = _text_layer(nm, nf, WHITE)
+        x = 56 if side == "home" else W - 56 - img.width
+        layers.append(Layer(img, x, y, 1.4 + 0.2 * i, 0.5, 60))
+        if t.get("player"):
+            pl = _text_layer(str(t["player"]), P._font("Medium", 32), (225, 230, 238))
+            layers.append(Layer(pl, 58 if side == "home" else W - 58 - pl.width, y + nf.size + 6, 1.8 + 0.2 * i))
+    if v.get("kicker"):
+        k = _text_layer(v["kicker"], P._font("Bold", 34), GOLD)
+        layers.append(Layer(k, (W - k.width) // 2, y + 210, 2.3))
+    if v.get("when"):
+        wl = _text_layer(v["when"], P._font("Medium", 36), WHITE)
+        layers.append(Layer(wl, (W - wl.width) // 2, y + 262, 2.5))
+    layers += _footer_layers(v.get("credit"), v.get("source", ""))
+    end_at = duration - 2.3
+    by = SAFE_BOTTOM - 800
+
+    def frame(tt: float) -> Image.Image:
+        im = Image.new("RGBA", (W, H), (6, 8, 12, 255))
+        k = _ease(tt / 0.8)
+        im.alpha_composite(left_half, (int(-hw * (1 - k)), 0))
+        rh = right_half.copy()
+        mask = Image.new("L", (W, H), 0)
+        ImageDraw.Draw(mask).polygon([(int(W * 0.58), 0), (W, 0), (W, H), (int(W * 0.42), H)], fill=255)
+        rl = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        rl.paste(rh, (W - hw + int(hw * (1 - k)), 0))
+        im.paste(rl, (0, 0), Image.composite(mask, Image.new("L", (W, H), 0), rl.getchannel("A")))
+        kb = _ease((tt - 0.9) / 0.35)
+        if kb > 0:
+            s_ = max(1, int(badge.width * (0.6 + 0.4 * kb)))
+            b = badge.resize((s_, s_))
+            b.putalpha(b.getchannel("A").point(lambda a: int(a * kb)))
+            im.alpha_composite(b, ((W - s_) // 2, by + (badge.width - s_) // 2))
+        for L in layers:
+            L.draw(im, tt)
+        _end_card(im, (tt - end_at) / 0.8)
+        return im
+
+    cover = frame(end_at - 0.05)
+    return _mp4(frame, duration), P._jpeg(cover)

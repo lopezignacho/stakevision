@@ -1514,3 +1514,18 @@ _nw2.callback(st, {"id": "c", "message": {"message_id": 6}}, "nt", nid)
 assert st["ig_jobs"][nid]["status"] in ("queued", "scheduled") and st["ig_jobs"][nid]["mode"] == "reel"
 config.GEMINI_API_KEY = ""
 print("OK editor de noticias en español")
+
+# 47) formatos de noticia: el editor sugiere y el bot valida (versus / resultado / héroe / impacto / clásico)
+_m = {"home": {"name": "Colo-Colo", "short": "Colo-Colo", "color": [255, 255, 255], "score": None},
+      "away": {"name": "Universidad de Chile", "short": "la U", "color": [0, 50, 160], "score": None}, "when": "Domingo"}
+it = _nw2._clean({"headline": "x", "facts": ["a"], "match": _m, "format": "versus"})
+assert _nw2._layouts_for(it, True)[0] == "versus" and "result" not in _nw2._layouts_for(it, True)
+_m2 = {**_m, "home": {**_m["home"], "score": 2}, "away": {**_m["away"], "score": "1"}}
+it = _nw2._clean({"headline": "x", "facts": ["a"], "match": _m2, "format": "versus"})
+assert it["match"]["played"] and _nw2._layouts_for(it, False) == ["result", "classic"]
+it = _nw2._clean({"headline": "x", "facts": ["a"], "stat": {"value": "44", "label": "PUNTOS"}, "format": "hero"})
+assert it["match"] is None and _nw2._layouts_for(it, True) == ["hero", "impact", "classic"]
+assert _nw2._layouts_for(it, False) == ["classic"]
+it = _nw2._clean({"headline": "x", "facts": ["a"], "format": "algo raro", "match": {"home": {}}})
+assert it["format"] is None and it["match"] is None
+print("OK formatos de noticia")
