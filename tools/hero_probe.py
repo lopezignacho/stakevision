@@ -1,16 +1,19 @@
-"""Diagnóstico: fotos de Commons de un jugador y por qué pasan o no los filtros."""
+"""Prueba de plantillas visuales con una foto real (Commons) del protagonista."""
 import json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from sv import commons  # noqa: E402
+from sv import newsimage, newswatch, reel  # noqa: E402
 OUT = "data/probe/hero"
 os.makedirs(OUT, exist_ok=True)
-NAME, TEAMS = "Stephen Curry", ["Golden State Warriors", "Warriors"]
-rows = []
-for q in (None, f'"{NAME}" Warriors filetype:bitmap'):
-    for c in commons.candidates(NAME, limit=40, query=q):
-        rows.append({"title": c["title"], "year": c["year"], "lic": c["license"], "author": c["author"][:30],
-                     "sport_ok": commons.sport_ok(c, "basketball"), "desc": c["desc"][:120], "cats": c["cats"][:160]})
-pc = commons.player_candidates(NAME, TEAMS, 0, "basketball", 8)
-json.dump({"raw": rows, "passed": [{"title": c["title"], "team_hit": c["team_hit"], "year": c["year"]} for c in pc]},
-          open(f"{OUT}/diag.json", "w"), ensure_ascii=False, indent=1)
-print(len(rows), "candidatos;", len(pc), "pasan")
+got = newswatch._photo_for({"player": "Stephen Curry", "teams": ["Golden State Warriors", "Warriors"], "sport": "basketball"})
+info = {"photo": bool(got), "credit": got[1] if got else None}
+if got:
+    cr = f"Foto: {got[1]['author']} / Wikimedia Commons ({got[1]['license']}), modificada"
+    n = dict(photo=got[0], colors=[(29, 66, 138), (255, 199, 44)], tag="NBA", source="Fuente: ESPN", credit=cr,
+             name="Stephen Curry", stat={"value": "44", "label": "puntos"}, line="Brilló en el triunfo de los Warriors.",
+             kicker="GOLDEN STATE WARRIORS · NBA", headline="Curry vuelve a encender San Francisco")
+    open(f"{OUT}/hero.jpg", "wb").write(newsimage.render_hero(n))
+    open(f"{OUT}/impact.jpg", "wb").write(newsimage.render_impact(n))
+    mp4, cov = reel.hero(n)
+    open(f"{OUT}/hero.mp4", "wb").write(mp4)
+json.dump(info, open(f"{OUT}/info.json", "w"), ensure_ascii=False, indent=1, default=str)
+print(json.dumps(info, ensure_ascii=False, default=str))
