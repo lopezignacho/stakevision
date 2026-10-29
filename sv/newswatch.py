@@ -542,8 +542,7 @@ def _side_photo(t: dict, sport: str):
         if t.get("player"):
             got = (commons.player_photo(t["player"], [t["name"], t["short"]], need_team=True, sport=sport)
                    or commons.player_photo(t["player"], [t["name"], t["short"]], need_team=True, sport=sport, years=10))
-            if got:
-                return got
+            return got   # si no hay foto suya con el club, mitad con el color del equipo (no otra foto con su nombre)
         return commons.team_photo(t["name"], sport)
     except Exception:  # noqa: BLE001
         traceback.print_exc()
