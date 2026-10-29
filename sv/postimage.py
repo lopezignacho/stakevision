@@ -223,7 +223,8 @@ def _render_coupon(pick: dict, tier: str | None) -> bytes:
     d.text((fx + 60, fy - 1), INSTAGRAM, font=ff, fill=(240, 240, 240))
 
     out = io.BytesIO()
-    im.convert("RGB").save(out, "JPEG", quality=92, optimize=True)
+    im.convert("RGB").save(out, "JPEG", quality=97, optimize=True, progressive=True, subsampling=0)   # HD: sin
+    # submuestreo de color (bordes de letras y escudos nítidos)
     return out.getvalue()
 
 
@@ -940,7 +941,7 @@ def _cover(photo: bytes, size, focus=None, side: str = "right", face_w: float | 
     sub = _subject(photo)   # dónde está la cara del protagonista (Gemini); si no, el detector de caras
     fc = (sub[0] * im.width, sub[1] * im.height, sub[2] * im.width) if sub else _face(im)
     if fc and face_w and fc[2] < face_w * w:   # acercar: que la cara tenga un tamaño protagonista (máx. 2.2x)
-        z = min(face_w * w / fc[2], 2.2)
+        z = min(face_w * w / fc[2], 2.2, max(1.0, 1.25 / scale))   # sin agrandar más allá de la resolución real
         if z > 1.05:
             im = im.resize((round(im.width * z), round(im.height * z)), Image.LANCZOS)
             fc = (fc[0] * z, fc[1] * z, fc[2] * z)
@@ -1263,7 +1264,8 @@ def render_recap(m: dict, theme: str = "dark") -> bytes:
 
 def _enhance(ph: Image.Image) -> Image.Image:
     from PIL import ImageEnhance
-    return ImageEnhance.Color(ImageEnhance.Contrast(ph).enhance(1.08)).enhance(1.1)
+    ph = ImageEnhance.Color(ImageEnhance.Contrast(ph).enhance(1.08)).enhance(1.1)
+    return ph.filter(ImageFilter.UnsharpMask(radius=1.4, percent=55, threshold=2))   # nitidez suave (más HD)
 
 
 # ---------------------------------------------------------------- adelanto (historia, modo día)

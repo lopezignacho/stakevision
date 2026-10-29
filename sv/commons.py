@@ -49,7 +49,7 @@ def candidates(name: str, limit: int = 30, team: bool = False, query: str | None
 def _candidates(name: str, limit: int, team: bool, query: str | None) -> list[dict]:
     params = {"action": "query", "format": "json", "generator": "search", "gsrnamespace": 6,
               "gsrsearch": query or f'"{name}" filetype:bitmap', "gsrlimit": limit,
-              "prop": "imageinfo|categories", "iiprop": "url|extmetadata|size", "iiurlwidth": 1400,
+              "prop": "imageinfo|categories", "iiprop": "url|extmetadata|size", "iiurlwidth": 3000,
               "clshow": "!hidden", "cllimit": "max"}
     try:
         pages = (requests.get(API, params=params, headers=UA, timeout=25).json().get("query") or {}).get("pages") or {}
@@ -276,7 +276,7 @@ def file_photo(filename: str) -> tuple[bytes, dict] | None:
     """Una foto concreta de Commons (por ejemplo la imagen principal del jugador en Wikidata), si la licencia sirve."""
     title = filename if filename.lower().startswith("file:") else f"File:{filename}"
     params = {"action": "query", "format": "json", "titles": title, "prop": "imageinfo",
-              "iiprop": "url|extmetadata|size", "iiurlwidth": 1400}
+              "iiprop": "url|extmetadata|size", "iiurlwidth": 3000}
     try:
         pages = (requests.get(API, params=params, headers=UA, timeout=25).json().get("query") or {}).get("pages") or {}
     except Exception:  # noqa: BLE001

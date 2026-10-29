@@ -367,6 +367,8 @@ def resend(state: dict, query: str, title: str | None = None) -> bool:
                    "description": it.get("description") or (it.get("_source") or "")[:600],
                    "sport": it.get("sport") or "basketball", "pick": None,
                    "titulo": title or it.get("titulo") or it.get("headline"), "resumen": it.get("resumen") or it.get("sub")}
+            if it.get("own_photos"):   # la foto que ya mandaste (con permiso) se mantiene
+                row["own_photos"] = it["own_photos"]
             break
     if not row:
         for a in _top_articles():
@@ -491,6 +493,8 @@ def draft(state: dict, nid: str) -> bool:
     data = _clean(llm.ask_json(prompt, 0.4))
     data.update(id=nid, sources=data.get("sources") or "ESPN", link=item.get("link"), _source=src[:6000],
                 rev=0, orig=item.get("headline"))
+    if item.get("own_photos"):
+        data["own_photos"] = item["own_photos"]
     state.setdefault("news_items", {})[nid] = data
     _prepare(state, data)
     return True
