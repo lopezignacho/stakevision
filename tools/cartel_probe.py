@@ -72,6 +72,7 @@ if done:
 
 # 2) cartel: el partido más atractivo de hoy (el primero con fotos de las dos figuras)
 info["tries"] = []
+best_v = None
 for back in (0, 1):
     day = (today - timedelta(hours=6) + timedelta(days=back)).strftime("%Y%m%d")
     for e in nba._get("/scoreboard", dates=day).get("events") or []:
@@ -84,9 +85,18 @@ for back in (0, 1):
         authors = []
         for side in ("home", "away"):
             c = cs[side]
-            lead = next((l["leaders"][0]["athlete"]["displayName"] for l in c.get("leaders") or []
-                         if l.get("name") in ("points", "pointsPerGame") and l.get("leaders")), "")
-            got = photo(lead, c["team"]) if lead else None
+            cands = []
+            for l in c.get("leaders") or []:   # el goleador; si no hay foto suya, otro líder del equipo
+                for x in l.get("leaders") or []:
+                    nm = x["athlete"]["displayName"]
+                    if nm not in cands:
+                        cands.append(nm)
+            lead, got = (cands[0] if cands else ""), None
+            for nm in cands[:3]:
+                got = photo(nm, c["team"])
+                if got:
+                    lead = nm
+                    break
             v[side] = {"name": c["team"]["displayName"], "short": c["team"]["name"],
                        "abbr": c["team"]["abbreviation"], "color": hexcol(c["team"].get("color")),
                        "record": rec(c), "player": lead}
@@ -95,6 +105,9 @@ for back in (0, 1):
                 authors.append(got[1]["author"])
         info["tries"].append({"game": e["name"], "players": [v["home"]["player"], v["away"]["player"]],
                               "photos": len(authors)})
+        if len(authors) == 2 or (len(authors) == 1 and not best_v):
+            best_v = dict(v, credit=f"Foto{'s' if len(authors) > 1 else ''}: {', '.join(authors)} / Wikimedia Commons, modificada{'s' if len(authors) > 1 else ''}",
+                          _game=e["name"])
         if len(authors) == 2:
             v["credit"] = f"Fotos: {', '.join(authors)} / Wikimedia Commons, modificadas"
             open(f"{OUT}/cartel.jpg", "wb").write(newsimage.render_cartel(v))
@@ -102,5 +115,8 @@ for back in (0, 1):
             break
     if "cartel" in info:
         break
+if "cartel" not in info and best_v:
+    open(f"{OUT}/cartel.jpg", "wb").write(newsimage.render_cartel(best_v))
+    info["cartel"] = {"game": best_v["_game"], "players": [best_v["home"]["player"], best_v["away"]["player"]]}
 json.dump(info, open(f"{OUT}/info.json", "w"), ensure_ascii=False, indent=1, default=str)
 print(json.dumps(info, ensure_ascii=False, default=str))
