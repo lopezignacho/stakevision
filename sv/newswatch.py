@@ -39,11 +39,20 @@ def BUTTONS(nid: str) -> list:
     return [[("✅ Sí, prepárala", f"nq:{nid}"), ("✖️ No", f"nx:{nid}")]]
 
 
+def IMAGE_BUTTONS(nid: str, more_designs: bool = True) -> list:
+    """Primer paso: la imagen. El Reel se arma solo si te gusta."""
+    rows = [[("🎬 Generar Reel", f"ng:{nid}")],
+            [("📸 Publicar imagen", f"ni:{nid}"), ("⏰ Imagen en horario", f"nh:{nid}")],
+            [("✏️ Modificar", f"ne:{nid}")] + ([("🎨 Otro diseño", f"nd:{nid}")] if more_designs else []),
+            [("📷 Cambiar foto", f"nf:{nid}"), ("🚫 Sin foto", f"nz:{nid}")],
+            [("✖️ No publicar", f"nn:{nid}")]]
+    return rows
+
+
 def PUBLISH_BUTTONS(nid: str, reel: bool = True) -> list:
     rows = ([[("🎬 Reel ahora", f"np:{nid}"), ("⏰ Reel en horario", f"nt:{nid}")]] if reel else
             [[("📸 Publicar ahora", f"ni:{nid}"), ("⏰ En horario", f"nh:{nid}")]])
     rows.append(([("🖼 Solo imagen", f"ni:{nid}")] if reel else []) + [("✏️ Modificar", f"ne:{nid}")])
-    rows.append([("📷 Cambiar foto", f"nf:{nid}"), ("🚫 Sin foto", f"nz:{nid}")])
     rows.append([("✖️ No publicar", f"nn:{nid}")])
     return rows
 
@@ -826,21 +835,10 @@ def _prepare(state: dict, item: dict, approved: bool = False) -> None:
     if credit and "Wikimedia" in credit and "Wikimedia" not in caption:
         caption += "\n\n📸 Foto de referencia: Wikimedia Commons (licencia libre), modificada."
     job = {"key": key, "caption": caption, "status": "draft", "title": item.get("headline", "")}
-    reel_mp4 = None
-    try:   # Reel (video vertical con animación): es lo que más alcance da en Instagram
-        from . import reel
-        nr = dict(nd, credit=(nd.get("credit") or "").replace("Foto de referencia:", "Foto:"))
-        lay = nd.get("layout")
-        reel_mp4, cover = (reel.still(img) if lay == "figura" else
-                           reel.versus(nd["versus"]) if lay == "versus" else
-                           reel.postgame(nd["result"]) if lay == "result" else
-                           reel.hero(nr) if lay == "hero" else reel.impact(nr) if lay == "impact" else reel.news(nr))
-        instagram.save_video(key, reel_mp4, cover)
-        job["reel"] = key
-    except Exception:  # noqa: BLE001
-        traceback.print_exc()
+    reel_mp4 = _build_reel(img, nd, key, job) if approved else None   # para revisar: primero la imagen; el Reel, a pedido
     job["layout"] = nd.get("layout")
     state.setdefault("ig_jobs", {})[nid] = job
+    state.setdefault("news_items", {}).setdefault(nid, item)
     if approved:
         job["status"] = "queued"
         job["mode"] = "reel" if job.get("reel") else "image"
@@ -852,18 +850,51 @@ def _prepare(state: dict, item: dict, approved: bool = False) -> None:
             telegram.send_photo(owner, img, caption="📰 <b>Noticia para Instagram</b> (aprobada en el chat): "
                                 "se publica en unos minutos.")
         return
-    cap = (f"📰 <b>Noticia lista para revisar</b> · diseño {LAYOUT_NAME.get(nd.get('layout'), '')}\n"
-           "Abajo va el texto para Instagram. Puedes publicarla, dejarla para el horario de más movimiento, "
-           "pedirme cambios, probar otro diseño o descartarla.")
-    try:
-        msg = telegram.send_video(owner, reel_mp4, caption=cap) if reel_mp4 else telegram.send_photo(owner, img, caption=cap)
-    except Exception:  # noqa: BLE001
-        msg = telegram.send_photo(owner, img, caption=cap)
+    cap = (f"📰 <b>Imagen lista para revisar</b> · diseño {LAYOUT_NAME.get(nd.get('layout'), '')}\n"
+           "Si te gusta, toca «🎬 Generar Reel» y te armo el video con esta misma imagen. También puedes publicar "
+           "solo la imagen, pedirme cambios, cambiar la foto, probar otro diseño o descartarla.")
+    msg = telegram.send_photo(owner, img, caption=cap)
     telegram.send(owner, "<pre>" + formatting.escape(caption) + "</pre>")
-    btns = PUBLISH_BUTTONS(nid, bool(reel_mp4))
-    if len(item.get("_layouts") or []) > 1 and nid in (state.get("news_items") or {}):
-        btns.insert(-1, [("🎨 Otro diseño", f"nd:{nid}")])
+    btns = IMAGE_BUTTONS(nid, len(item.get("_layouts") or []) > 1)
     telegram.set_buttons(owner, msg["message_id"], btns)
+
+
+def _build_reel(img: bytes, nd: dict, key: str, job: dict) -> bytes | None:
+    """Reel (video vertical) con el mismo diseño de la imagen. Queda guardado para publicarlo."""
+    from . import instagram
+    try:
+        from . import reel
+        nr = dict(nd, credit=(nd.get("credit") or "").replace("Foto de referencia:", "Foto:"))
+        lay = nd.get("layout")
+        mp4, cover = (reel.still(img) if lay == "figura" else
+                      reel.versus(nd["versus"]) if lay == "versus" else
+                      reel.postgame(nd["result"]) if lay == "result" else
+                      reel.hero(nr) if lay == "hero" else reel.impact(nr) if lay == "impact" else reel.news(nr))
+        instagram.save_video(key, mp4, cover)
+        job["reel"] = key
+        return mp4
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+        return None
+
+
+def make_reel(state: dict, nid: str) -> bool:
+    """«🎬 Generar Reel»: arma el video de la imagen que aprobaste y te lo manda para publicarlo."""
+    from . import instagram
+    owner = state["owner_chat"]
+    item = (state.get("news_items") or {}).get(nid)
+    job = (state.get("ig_jobs") or {}).get(nid)
+    if not item or not job or job.get("status") != "draft":
+        return False
+    img, _credit, nd = _render(item)   # mismo diseño y misma foto que la imagen aprobada
+    instagram.save_image(job["key"], img)
+    mp4 = _build_reel(img, nd, job["key"], job)
+    if not mp4:
+        telegram.send(owner, "⚠️ No pude armar el Reel. Puedes publicar solo la imagen desde el mensaje anterior.")
+        return True
+    msg = telegram.send_video(owner, mp4, caption="🎬 <b>Reel listo</b>. ¿Lo publicamos?")
+    telegram.set_buttons(owner, msg["message_id"], PUBLISH_BUTTONS(nid, True))
+    return True
 
 
 def ready(state: dict) -> None:
@@ -924,6 +955,18 @@ def callback(state: dict, cb: dict, action: str, nid: str) -> None:
         telegram.edit_buttons_off(owner, mid, f"🎨 Probando diseño {LAYOUT_NAME[item['layout']]} 👇")
         telegram.answer(cb["id"], "Armando otro diseño")
         _prepare(state, item)
+    elif action == "ng":   # generar el Reel de la imagen aprobada
+        job = (state.get("ig_jobs") or {}).get(nid)
+        if not job or job.get("status") != "draft":
+            telegram.answer(cb["id"], "Ya estaba procesada")
+            return
+        telegram.answer(cb["id"], "Armando el Reel")
+        telegram.edit_buttons_off(owner, mid, "🎬 Armando el Reel con esta imagen… (1-2 min)")
+        try:
+            make_reel(state, nid)
+        except Exception as e:  # noqa: BLE001
+            traceback.print_exc()
+            telegram.send(owner, f"⚠️ No pude armar el Reel: {formatting.escape(str(e))}")
     elif action in ("nf", "nz"):   # cambiar foto (una tuya, con permiso) / sin foto
         item = (state.get("news_items") or {}).get(nid)
         job = (state.get("ig_jobs") or {}).get(nid)

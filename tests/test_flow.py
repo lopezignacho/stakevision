@@ -1359,7 +1359,12 @@ import sv.reel as _rl0  # noqa: E402
 _rl0.news = lambda n_, duration=11.0: (b"mp4", b"jpg")
 _ig.save_video = lambda k, m, c=None: _saved.setdefault("v-" + k, m)
 _nw.ready(st)
-assert st["ig_jobs"]["jw1"].get("mode") == "reel" and st["ig_jobs"]["w2"].get("reel")
+assert st["ig_jobs"]["jw1"].get("mode") == "reel" and not st["ig_jobs"]["w2"].get("reel")   # revisión: primero la imagen
+_r0 = _nw._render
+_nw._render = lambda item: (b"img", None, {"layout": "classic"})
+_nw.callback(st, {"id": "c", "message": {"message_id": 70}}, "ng", "w2")   # «🎬 Generar Reel»
+assert st["ig_jobs"]["w2"].get("reel") and st["ig_jobs"]["w2"]["status"] == "draft"
+_nw._render = _r0
 assert st["ig_jobs"]["jw1"]["status"] == "queued" and st["ig_jobs"]["w2"]["status"] == "draft" and "news-jw1" in _saved
 _nw.callback(st, {"id": "c", "message": {"message_id": 70}}, "ni", "w2")   # solo imagen
 assert st["ig_jobs"]["w2"]["status"] == "queued" and st["ig_jobs"]["w2"]["mode"] == "image"

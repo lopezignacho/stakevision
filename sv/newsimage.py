@@ -215,7 +215,7 @@ def render_postgame(g: dict) -> bytes:
 def _full_photo(photo: bytes, size, colors, dark_from: float = 0.42) -> Image.Image:
     """Foto a toda la pantalla, con el protagonista centrado y un degradado oscuro abajo (con el color del equipo)."""
     w, h = size
-    ph = P._enhance(P._cover(photo, (w, h), side="center")).convert("RGBA")
+    ph = P._enhance(P._cover(photo, (w, h), side="center", face_w=0.17)).convert("RGBA")
     c = tuple(colors[0]) if colors else (10, 12, 18)
     tint = tuple(int(v * 0.35) for v in c)
     grad = Image.new("RGBA", (w, h), tint + (0,))

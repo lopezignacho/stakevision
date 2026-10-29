@@ -3184,7 +3184,7 @@ def _handle_update(state: dict, u: dict) -> None:
         telegram.answer(cb["id"], "No autorizado")
         return
     action, _, pid = (cb.get("data") or "").partition(":")
-    if action in ("nq", "nx", "np", "ni", "nn", "ne", "nt", "nh", "nd", "nf", "nz"):   # noticias para Instagram
+    if action in ("nq", "nx", "np", "ni", "nn", "ne", "nt", "nh", "nd", "nf", "nz", "ng"):   # noticias para Instagram
         from . import newswatch
         newswatch.callback(state, cb, action, pid)
         return

@@ -877,6 +877,22 @@ def _face(im: Image.Image):
 
 
 PORTRAIT_DEBUG: list = []
+_SUBJECT: dict = {}
+
+
+def _subject(photo: bytes):
+    """(x, y, ancho) de 0 a 1 de la cara del protagonista según Gemini; se guarda para no preguntar dos veces."""
+    import hashlib
+    k = hashlib.sha1(photo).hexdigest()
+    if k not in _SUBJECT:
+        _SUBJECT[k] = None
+        try:
+            from . import llm
+            if llm.enabled():
+                _SUBJECT[k] = llm.subject_box(photo)
+        except Exception as e:  # noqa: BLE001
+            print(f"Encuadre con Gemini: {e}")
+    return _SUBJECT[k]
 
 
 def portrait_ok(photo: bytes) -> bool | None:
@@ -921,7 +937,8 @@ def _cover(photo: bytes, size, focus=None, side: str = "right", face_w: float | 
         x = round((im.width - w) * focus[0])
         y = round((im.height - h) * focus[1])
         return im.crop((x, y, x + w, y + h))
-    fc = _face(im)
+    sub = _subject(photo)   # dónde está la cara del protagonista (Gemini); si no, el detector de caras
+    fc = (sub[0] * im.width, sub[1] * im.height, sub[2] * im.width) if sub else _face(im)
     if fc and face_w and fc[2] < face_w * w:   # acercar: que la cara tenga un tamaño protagonista (máx. 2.2x)
         z = min(face_w * w / fc[2], 2.2)
         if z > 1.05:

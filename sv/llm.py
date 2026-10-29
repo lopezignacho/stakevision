@@ -164,3 +164,20 @@ def check_jersey(photo: bytes, player: str, team: str, sport: str) -> dict:
     d = ask_json(prompt, 0.0, _small_jpeg(photo))
     ok = bool(d.get("es_del_equipo")) and bool(d.get("protagonista_claro", True)) and bool(d.get("deporte_correcto", True))
     return {"ok": ok, "jersey": str(d.get("camiseta") or ""), "why": str(d.get("motivo") or "")}
+
+
+def subject_box(photo: bytes) -> tuple[float, float, float] | None:
+    """Dónde está la cara del protagonista de la foto (x, y del centro y ancho, de 0 a 1), o None."""
+    prompt = ("En esta foto deportiva, ubica la CARA del protagonista: el jugador o la persona más grande, nítida y "
+              "en primer plano (no el público ni jugadores del fondo). Si no se ve ninguna cara, ubica al sujeto "
+              "principal. Responde en JSON: {\"box_2d\": [ymin, xmin, ymax, xmax]} con valores de 0 a 1000.")
+    d = ask_json(prompt, 0.0, _small_jpeg(photo))
+    b = d.get("box_2d") if isinstance(d, dict) else None
+    if isinstance(d, list) and d and isinstance(d[0], dict):
+        b = d[0].get("box_2d")
+    if not (isinstance(b, list) and len(b) == 4):
+        return None
+    y0, x0, y1, x1 = [max(0.0, min(1000.0, float(v))) / 1000 for v in b]
+    if x1 <= x0 or y1 <= y0:
+        return None
+    return (x0 + x1) / 2, (y0 + y1) / 2, x1 - x0
