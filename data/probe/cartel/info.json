@@ -1,30 +1,4 @@
 {
- "faces": {
-  "Stephen Curry": {
-   "w": 900,
-   "faces": [
-    137,
-    64,
-    57,
-    49,
-    46,
-    41
-   ]
-  },
-  "Donovan Mitchell": {
-   "w": 582,
-   "faces": [
-    357,
-    238,
-    89,
-    69
-   ]
-  },
-  "Zion Williamson": {
-   "w": 513,
-   "faces": []
-  }
- },
  "figura": {
   "player": "Stephen Curry",
   "stats": [
@@ -47,7 +21,7 @@
   ],
   "winner": "away",
   "score": "114-119",
-  "photo": true,
+  "photo": false,
   "game": "Golden State Warriors at Minnesota Timberwolves"
  },
  "tries": [
@@ -65,7 +39,7 @@
     "Zion Williamson",
     "Zach LaVine"
    ],
-   "photos": 1
+   "photos": 0
   },
   {
    "game": "Memphis Grizzlies at Portland Trail Blazers",
@@ -76,6 +50,17 @@
    "photos": 0
   }
  ],
+ "faces": {
+  "Donovan Mitchell": {
+   "w": 582,
+   "faces": [
+    357,
+    238,
+    89,
+    69
+   ]
+  }
+ },
  "cartel": {
   "game": "Cleveland Cavaliers at Atlanta Hawks",
   "players": [
