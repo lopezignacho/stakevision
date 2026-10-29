@@ -39,7 +39,7 @@
     "Zion Williamson",
     "Zach LaVine"
    ],
-   "photos": 1
+   "photos": 0
   },
   {
    "game": "Memphis Grizzlies at Portland Trail Blazers",
@@ -49,6 +49,9 @@
    ],
    "photos": 0
   }
+ ],
+ "rejected": [
+  "Zion Williamson"
  ],
  "cartel": {
   "game": "Cleveland Cavaliers at Atlanta Hawks",
