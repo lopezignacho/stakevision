@@ -14,6 +14,37 @@ H = 1350
 WHITE = (255, 255, 255)
 
 
+_FCACHE: dict = {}
+
+
+def _league(size: int, width: int = 100):
+    """League Gothic: números altos y angostos (marcadores, planillas)."""
+    from PIL import ImageFont
+    k = ("lg", size, width)
+    if k not in _FCACHE:
+        f = ImageFont.truetype(f"{P.FONTS}/LeagueGothic-Variable.ttf", size)
+        try:
+            f.set_variation_by_axes([width])
+        except Exception:  # noqa: BLE001
+            pass
+        _FCACHE[k] = f
+    return _FCACHE[k]
+
+
+def _wide(size: int, weight: int = 700, width: int = 125):
+    """Archivo ancho (extendido): nombres y etiquetas con aire deportivo."""
+    from PIL import ImageFont
+    k = ("ar", size, weight, width)
+    if k not in _FCACHE:
+        f = ImageFont.truetype(f"{P.FONTS}/Archivo-Variable.ttf", size)
+        try:
+            f.set_variation_by_axes([weight, width])
+        except Exception:  # noqa: BLE001
+            pass
+        _FCACHE[k] = f
+    return _FCACHE[k]
+
+
 def _bebas(size: int):
     from PIL import ImageFont
     return ImageFont.truetype(f"{P.FONTS}/BebasNeue-Regular.ttf", size)
@@ -355,9 +386,9 @@ def latam_times(utc_dt, limit: int = 3) -> list[tuple[str, str]]:
     return [(k, "·".join(groups[k])) for k in sorted(keys)]
 
 
-def _tall(text: str, size: int, fill, stretch: float = 1.35) -> Image.Image:
-    """Texto Bebas «alto» (estirado en vertical), como los marcadores de las cuentas deportivas."""
-    f = _bebas(size)
+def _tall(text: str, size: int, fill, stretch: float = 1.35, font=None) -> Image.Image:
+    """Texto «alto» (Bebas estirado, o League Gothic), como los marcadores de las cuentas deportivas."""
+    f = font or _bebas(size)
     d0 = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
     l, t, r, b = d0.textbbox((0, 0), text, font=f)
     im = Image.new("RGBA", (r - l + 4, b - t + 4), (0, 0, 0, 0))
@@ -543,17 +574,20 @@ def render_figura(g: dict) -> bytes:
     d = ImageDraw.Draw(im)
     # nombre + planilla
     parts = str(g.get("player", "")).upper().split(" ", 1)
-    nf = P._font("Bold", 46)
+    nf = _wide(44, 700)
     y = 220
     for ln in parts:
-        d.text((52, y), ln, font=nf, fill=WHITE)
-        y += 52
-    y += 24
+        f_ = nf
+        while d.textlength(ln, font=f_) > 360 and f_.size > 28:
+            f_ = _wide(f_.size - 2, 700)
+        d.text((52, y), ln, font=f_, fill=WHITE)
+        y += f_.size + 8
+    y += 26
     line_col = _bright(col, 1.0)
     for i, (val, lab) in enumerate((g.get("stats") or [])[:4]):
-        num = _tall(str(val), 104, WHITE, 1.15)
+        num = _tall(str(val), 132, WHITE, 1.0, _league(132))
         im.alpha_composite(num, (54, y))
-        ImageDraw.Draw(im).text((54 + num.width + 16, y + num.height - 8), str(lab).upper(), font=P._font("Bold", 36),
+        ImageDraw.Draw(im).text((54 + num.width + 18, y + num.height - 4), str(lab).upper(), font=_wide(34, 700),
                                 fill=WHITE, anchor="ls")
         y += num.height + 22
         if i < len(g["stats"][:4]) - 1:
@@ -563,27 +597,27 @@ def render_figura(g: dict) -> bytes:
     hs, as_ = str(g["home"]["score"]), str(g["away"]["score"])
     win = g.get("winner")
     grey = (170, 176, 188)
-    fs = 250
-    while fs > 120 and max(d.textlength(x, font=_bebas(fs)) for x in (hs, as_)) > 250:
-        fs -= 10   # que los números no tapen las siglas de los lados
-    sh = _tall(hs, fs, WHITE if win in ("home", None) else grey, 1.45)
-    sa = _tall(as_, fs, WHITE if win in ("away", None) else grey, 1.45)
+    fs = 360
+    while fs > 160 and max(d.textlength(x, font=_league(fs)) for x in (hs, as_)) > 250:
+        fs -= 10   # que los números no tapen los escudos de los lados
+    sh = _tall(hs, fs, WHITE if win in ("home", None) else grey, 1.0, _league(fs))
+    sa = _tall(as_, fs, WHITE if win in ("away", None) else grey, 1.0, _league(fs))
     ys = H - 110 - sh.height
     gap = 90
     im.alpha_composite(sh, (w // 2 - gap // 2 - sh.width, ys))
     im.alpha_composite(sa, (w // 2 + gap // 2, ys))
     d = ImageDraw.Draw(im)
-    d.text((w / 2, ys + sh.height / 2), "vs", font=P._font("Bold", 38), fill=WHITE, anchor="mm")
+    d.text((w / 2, ys + sh.height / 2), "VS", font=_wide(34, 800), fill=WHITE, anchor="mm")
     for side, cx in (("home", 130), ("away", w - 130)):
         t = g[side]
         b = _badge(t, 150)
         im.alpha_composite(b, (cx - b.width // 2, ys + sh.height // 2 - 30 - b.height // 2))
         if t.get("record"):
-            ImageDraw.Draw(im).text((cx, ys + sh.height // 2 + 58), t["record"], font=P._font("Bold", 38), fill=WHITE,
+            ImageDraw.Draw(im).text((cx, ys + sh.height // 2 + 58), t["record"], font=_wide(36, 700), fill=WHITE,
                                     anchor="mt")
     d = ImageDraw.Draw(im)
     if g.get("competition"):
         d.text((w - 52, 70), g["competition"].upper(), font=P._font("Bold", 26), fill=(255, 196, 0), anchor="rt")
-    d.text((w - 52, H - 62), "@" + P.INSTAGRAM, font=_bebas(40), fill=WHITE, anchor="rm")
+    d.text((w - 52, H - 62), "@" + P.INSTAGRAM.upper(), font=_league(46), fill=WHITE, anchor="rm")
     _small_credit(im, d, g.get("credit"), H - 22)
     return P._jpeg(im)

@@ -405,6 +405,11 @@ def _clean(item: dict) -> dict:
     val = str((stv or {}).get("value") or "").strip()
     out["stat"] = {"value": val[:6], "label": str(stv.get("label") or "")[:14]} if val and len(val) <= 6 else None
     out["match"] = _clean_match(item.get("match"))
+    sts = []
+    for x in item.get("stats") or []:
+        if isinstance(x, dict) and str(x.get("value") or "").strip() and len(str(x["value"]).strip()) <= 4:
+            sts.append({"value": str(x["value"]).strip(), "label": str(x.get("label") or "").upper()[:6]})
+    out["stats"] = sts[:4]
     fmt = str(item.get("format") or "").lower().strip()
     out["format"] = fmt if fmt in LAYOUTS else None
     return out
@@ -453,7 +458,10 @@ FIELDS = ('{"tag": "LESIÓN|BAJA|FICHAJE|PREMIO|CAMPEÓN|RÉCORD|SORTEO|RESULTAD
           '"nombre del equipo local", "short": "nombre corto (ej. Warriors, Colo-Colo)", "player": "su figura o '
           'vacío", "color": [r,g,b], "score": número o null si no se ha jugado}, "away": {igual}, "when": "ej. Hoy '
           '· 22:00 (Chile) o Final"}; si no trata de un partido, null, '
-          '"format": "hero (actuación individual con una cifra: puntos, goles) | versus (partido que viene, '
+          '"stats": si hay un jugador figura del partido, hasta 4 cifras de SU planilla tal como dice el texto '
+          '[{"value": "44", "label": "PTS"}, {"value": "8", "label": "REB"}] (fútbol: GOLES, ASIST, TIROS…), o [], '
+          '"format": "figura (la gran actuación de un jugador en un partido ya jugado: su planilla y el marcador) | '
+          'hero (actuación individual con una cifra: puntos, goles) | versus (partido que viene, '
           'previa o duelo) | result (resultado de un partido importante) | impact (fichaje, lesión, premio, '
           'campeón, polémica) | classic (varios datos, sin protagonista claro)", '
           '"caption": "texto para Instagram en español: 2-3 párrafos cortos con los hechos, una pregunta para '
@@ -542,8 +550,8 @@ def request(state: dict, nid: str) -> bool:
 
 
 # ---------------------------------------------------------------- 3) listas para publicar
-LAYOUTS = ("hero", "versus", "result", "impact", "classic")
-LAYOUT_NAME = {"hero": "Héroe (foto + cifra)", "versus": "Versus (cara a cara)", "result": "Resultado (marcador)",
+LAYOUTS = ("figura", "hero", "versus", "result", "impact", "classic")
+LAYOUT_NAME = {"figura": "Figura (planilla + marcador)", "hero": "Héroe (foto + cifra)", "versus": "Versus (cara a cara)", "result": "Resultado (marcador)",
                "impact": "Impacto (foto + titular)", "classic": "Clásico (datos)"}
 
 
@@ -570,6 +578,9 @@ def _layouts_for(item: dict, has_photo: bool) -> list[str]:
     """Plantillas que sirven para esta noticia; la primera es la que se usa (la que sugirió el editor, si aplica)."""
     m = item.get("match") or None
     opts = []
+    if m and m.get("played") and (item.get("player") or item.get("name")) and \
+            (len(item.get("stats") or []) >= 2 or item.get("sport") == "basketball"):
+        opts.append("figura")   # la figura del partido: su planilla + el marcador (aunque no haya foto)
     if m and m.get("played"):
         opts.append("result")
     elif m:
@@ -706,6 +717,41 @@ def _crest(t: dict, sport: str):
         return None
 
 
+def _figura_data(item: dict, n: dict) -> dict | None:
+    """Datos de la «Figura». En NBA se toman de ESPN (planilla y marcador verificados); si no, del texto."""
+    sport = item.get("sport") or ("basketball" if "NBA" in item.get("kicker", "") else "soccer")
+    player = item.get("player") or item.get("name") or ""
+    g = None
+    if sport == "basketball":
+        try:
+            from . import espnstats
+            g = espnstats.nba_figura(player)
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+    if not g:
+        m = item.get("match") or {}
+        if not (m.get("played") and len(item.get("stats") or []) >= 2):
+            return None
+        h, a = dict(m["home"]), dict(m["away"])
+        h["logo"], a["logo"] = _crest(h, sport), _crest(a, sport)
+        h["color"], a["color"] = tuple(h["color"]), tuple(a["color"])
+        teams = [x.lower() for x in item.get("teams") or []]
+        side = "away" if any(x and (x in a["name"].lower() or x in a["short"].lower()) for x in teams) else "home"
+        g = {"player": player, "stats": [(x["value"], x["label"]) for x in item["stats"]], "focus": side,
+             "color": (h if side == "home" else a)["color"], "home": h, "away": a,
+             "winner": "home" if h["score"] > a["score"] else "away" if a["score"] > h["score"] else None,
+             "competition": (item.get("kicker") or "").split("·")[0].strip(), "team": (h if side == "home" else a)["name"]}
+    if g.get("team") and g["team"] not in (item.get("teams") or []):   # la foto se valida con SU equipo
+        item = dict(item, teams=[g["team"]] + list(item.get("teams") or []), player=g["player"])
+    got = None if item.get("no_photo") else _photo_for(item)
+    if got:
+        cr = got[1] or {}
+        g["photo"] = got[0]
+        g["credit"] = (f"Foto: {cr.get('author')} (con permiso)" if cr.get("own") else
+                       f"Foto: {cr.get('author')} / Wikimedia Commons ({cr.get('license')}), modificada")
+    return g
+
+
 def _result_data(item: dict, n: dict) -> dict:
     m = item["match"]
     sport = item.get("sport") or ("basketball" if "NBA" in item.get("kicker", "") else "soccer")
@@ -746,6 +792,17 @@ def _render(item: dict) -> tuple[bytes, str | None, dict]:
         n["versus"] = _versus_data(item, n)
         cr = n["versus"].get("credit")
         return newsimage.render_versus(n["versus"]), cr, n
+    if layout == "figura":
+        fg = _figura_data(item, n)
+        if fg:
+            n["figura"] = fg
+            return newsimage.render_figura(fg), fg.get("credit"), n
+        options.remove("figura")
+        layout = options[0]
+        item["layout"], item["_layouts"], n["layout"] = layout, options, layout
+        if layout == "versus":
+            n["versus"] = _versus_data(item, n)
+            return newsimage.render_versus(n["versus"]), n["versus"].get("credit"), n
     if layout == "result":
         n["result"] = _result_data(item, n)
         return newsimage.render_postgame(n["result"]), credit, n
@@ -772,7 +829,8 @@ def _prepare(state: dict, item: dict, approved: bool = False) -> None:
         from . import reel
         nr = dict(nd, credit=(nd.get("credit") or "").replace("Foto de referencia:", "Foto:"))
         lay = nd.get("layout")
-        reel_mp4, cover = (reel.versus(nd["versus"]) if lay == "versus" else
+        reel_mp4, cover = (reel.still(img) if lay == "figura" else
+                           reel.versus(nd["versus"]) if lay == "versus" else
                            reel.postgame(nd["result"]) if lay == "result" else
                            reel.hero(nr) if lay == "hero" else reel.impact(nr) if lay == "impact" else reel.news(nr))
         instagram.save_video(key, reel_mp4, cover)

@@ -1554,3 +1554,22 @@ _nw2.callback(st, {"id": "c", "message": {"message_id": 10}}, "nz", "z1")
 assert it["no_photo"] and _nw2._photo_for(it) is None
 telegram.download = _orig_dl
 print("OK cambiar foto de noticia")
+
+# 49) formato «Figura»: planilla + marcador; con ESPN en NBA
+from sv import espnstats as _es
+_es.nba_figura = lambda player, days=3: {"player": "Stephen Curry", "stats": [("44", "PTS"), ("8", "REB")], "focus": "away",
+                                          "color": (29, 66, 138), "winner": "away", "competition": "NBA",
+                                          "team": "Golden State Warriors",
+                                          "home": {"abbr": "MIN", "color": (12, 35, 64), "score": 114, "record": "3-2"},
+                                          "away": {"abbr": "GS", "color": (29, 66, 138), "score": 119, "record": "2-3"}}
+_m3 = {"home": {"name": "Minnesota Timberwolves", "short": "Timberwolves", "score": 114},
+       "away": {"name": "Golden State Warriors", "short": "Warriors", "score": 119}}
+it = _nw2._clean({"headline": "x", "facts": ["a"], "match": _m3, "player": "Stephen Curry", "sport": "basketball",
+                  "format": "figura", "stats": [{"value": "44", "label": "pts"}]})
+assert _nw2._layouts_for(it, False)[0] == "figura"
+_pf = _nw2._photo_for
+_nw2._photo_for = lambda item: None
+img, cr, nd = _nw2._render(it)
+assert nd["layout"] == "figura" and nd["figura"]["home"]["score"] == 114 and img[:2] == b"\xff\xd8"
+_nw2._photo_for = _pf
+print("OK formato figura")

@@ -11,7 +11,7 @@ import os
 import subprocess
 import tempfile
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 from . import newsimage as NI
 from . import postimage as P
@@ -519,3 +519,25 @@ def versus(v: dict, duration: float = 9.0) -> tuple[bytes, bytes]:
 
     cover = frame(end_at - 0.05)
     return _mp4(frame, duration), P._jpeg(cover)
+
+
+def still(img: bytes, duration: float = 8.0) -> tuple[bytes, bytes]:
+    """Reel a partir de una imagen ya armada (4:5): fondo desenfocado, la imagen con un acercamiento lento y el cierre."""
+    src = Image.open(io.BytesIO(img)).convert("RGBA")
+    scale = W / src.width
+    fg = src.resize((W, int(src.height * scale)), Image.LANCZOS)
+    bg = src.resize((int(src.width * H / src.height), H), Image.LANCZOS)
+    bg = bg.crop(((bg.width - W) // 2, 0, (bg.width - W) // 2 + W, H)).filter(ImageFilter.GaussianBlur(30))
+    bg.alpha_composite(Image.new("RGBA", (W, H), (0, 0, 0, 120)))
+    y0 = max(0, (SAFE_BOTTOM - fg.height) // 2 + 40)
+    end_at = duration - 2.2
+
+    def frame(tt: float) -> Image.Image:
+        im = bg.copy()
+        z = 1.0 + 0.05 * min(1.0, tt / end_at)
+        f = fg.resize((int(W * z), int(fg.height * z)), Image.BILINEAR)
+        im.alpha_composite(f, ((W - f.width) // 2, y0 - (f.height - fg.height) // 2))
+        _end_card(im, (tt - end_at) / 0.8)
+        return im
+
+    return _mp4(frame, duration), P._jpeg(frame(0.5))
