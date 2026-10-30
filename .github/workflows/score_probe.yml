@@ -1,0 +1,24 @@
+name: Marcador - prueba
+on:
+  workflow_dispatch:
+    inputs:
+      liga: {default: "bra.1"}
+      equipo: {default: "Flamengo"}
+      dia: {default: ""}
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install requests
+      - env:
+          LEAGUE: ${{ github.event.inputs.liga }}
+          MATCH_TEAM: ${{ github.event.inputs.equipo }}
+          DAY: ${{ github.event.inputs.dia }}
+        run: mkdir -p data/probe && python tools/score_probe.py
+      - run: |
+          git config user.name "stakevision-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/probe && (git commit -m "prueba marcador" || true) && git pull --rebase && git push
