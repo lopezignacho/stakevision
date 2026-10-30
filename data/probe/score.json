@@ -1,0 +1,32 @@
+[
+ {
+  "name": "Flamengo at Vasco da Gama",
+  "status": "FT",
+  "score": {
+   "Vasco da Gama": "1",
+   "Flamengo": "4"
+  },
+  "goals": [
+   [
+    "10'",
+    "Pedro"
+   ],
+   [
+    "15'",
+    "Alan Lescano"
+   ],
+   [
+    "41'",
+    "Pedro"
+   ],
+   [
+    "53'",
+    "Samuel Lino"
+   ],
+   [
+    "85'",
+    "Samuel Lino"
+   ]
+  ]
+ }
+]
