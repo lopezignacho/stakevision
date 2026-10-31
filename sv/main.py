@@ -882,11 +882,17 @@ def _manual_free(state: dict, req: dict) -> None:
                    or _name_hit(req["team"], f.get("participant2Name") or "")), None)
     except Exception:  # noqa: BLE001
         traceback.print_exc()
+    sport = req.get("sport") or "soccer"
     if not fx:   # respaldo: el partido desde el calendario de ESPN (sin cuota de referencia)
         from . import espn
         from zoneinfo import ZoneInfo
         day = now.astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d")
-        for e in espn._scoreboard(day, "soccer"):
+        if sport == "basketball":
+            from . import nba
+            events = nba._get("/scoreboard", dates=day).get("events") or []
+        else:
+            events = espn._scoreboard(day, "soccer")
+        for e in events:
             c = (e.get("competitions") or [{}])[0]
             comp = c.get("competitors") or []
             h = next((x for x in comp if x.get("homeAway") == "home"), None)
@@ -902,22 +908,26 @@ def _manual_free(state: dict, req: dict) -> None:
         return
     side = "1" if _name_hit(req["team"], fx.get("participant1Name") or "") else "2"
     mtype = f"teamtotals-team{side}" if req["mtype"] == "teamtotals" else req["mtype"]
+    if req["mtype"] in ("moneyline", "1x2") and req.get("outcome") in (None, "", "gana", "win"):
+        req["outcome"] = side   # «gana el equipo»: 1 si es local, 2 si es visita
     sel = None
     try:
         rows = oddspapi.odds_by_tournaments([fx["tournamentId"]]) if fx.get("tournamentId") else []
         row = next((r for r in rows if r.get("fixtureId") == fx["fixtureId"]), None)
         if row:
             for x in selections_for_fixture(fx, row, oddspapi.markets()):
-                if (x.mtype == mtype and x.handicap is not None and abs(float(x.handicap) - float(req["handicap"])) < 1e-9
-                        and str(x.outcome).lower()[:3] == req["outcome"].lower()[:3]):
+                same_line = (x.handicap is None and req.get("handicap") is None) or (
+                    x.handicap is not None and req.get("handicap") is not None
+                    and abs(float(x.handicap) - float(req["handicap"])) < 1e-9)
+                if x.mtype == mtype and same_line and str(x.outcome).lower()[:3] == str(req["outcome"]).lower()[:3]:
                     sel = x
                     break
     except Exception:  # noqa: BLE001
         traceback.print_exc()
     if not req.get("price"):   # sin cuota tuya: la de Betano ahora
         if not sel:
-            telegram.send(owner, f"⚠️ No encontré la cuota de {formatting.escape(req['team'])} más de {req['handicap']} "
-                                 "goles en Betano. Mándame la cuota de tu app y lo publico.")
+            telegram.send(owner, f"⚠️ No encontré la cuota de {formatting.escape(req['team'])} en Betano. "
+                                 "Mándame la cuota de tu app y lo publico.")
             return
         req["price"] = sel.price
     price = float(req["price"])
@@ -927,14 +937,18 @@ def _manual_free(state: dict, req: dict) -> None:
     else:   # sin cuota de referencia: la probabilidad parte de la cuota de tu app
         leg = {"fixture_id": fx["fixtureId"], "home": fx.get("participant1Name"), "away": fx.get("participant2Name"),
                "league": fx.get("league") or config.TOURNAMENTS.get(fx.get("tournamentId"), "") or req.get("league", ""),
-               "kickoff": fx["startTime"], "market": "Goles del equipo",
-               "mtype": mtype, "outcome": req["outcome"], "handicap": float(req["handicap"]), "price": price,
-               "fair_odds": price, "edge": 0.0, "sport": "soccer"}
+               "kickoff": fx["startTime"],
+               "market": {"moneyline": "Ganador del partido", "1x2": "Resultado del partido"}.get(mtype, "Goles del equipo"),
+               "mtype": mtype, "outcome": req["outcome"],
+               "handicap": float(req["handicap"]) if req.get("handicap") is not None else None, "price": price,
+               "fair_odds": price, "edge": 0.0, "sport": sport}
         d = {"kind": "simple", "tier": "justa", "price": price, "prob": round(1 / price, 4), "edge": 0.0, "stake": 3,
              "kickoff": fx["startTime"], "legs": [leg]}
+        if req.get("stake"):
+            d["stake"] = int(req["stake"])
     for l in d["legs"]:
+        l["sport"] = sport
         l["label"] = formatting.outcome_label(l)
-        l["sport"] = "soccer"
     d["analysis"] = formatting.analysis(d)
     state["seq"] += 1
     pid = str(state["seq"])
@@ -957,7 +971,7 @@ def _manual_free(state: dict, req: dict) -> None:
     from . import argument
     pp = argument.shown_prob(d)
     telegram.send(owner, f"✅ <b>Pick gratis #{pid} publicado</b> (Gratis + VIP{note})\n"
-                  f"⚽ {formatting.escape(d['legs'][0]['home'])} vs {formatting.escape(d['legs'][0]['away'])}\n"
+                  f"{'🏀' if sport == 'basketball' else '⚽'} {formatting.escape(d['legs'][0]['home'])} vs {formatting.escape(d['legs'][0]['away'])}\n"
                   f"🎯 {formatting.escape(formatting.public_label(d['legs'][0]))} @ {formatting.odds(price)}\n"
                   + evidence.line(d["legs"][0].get("evidence")) + "\n"
                   + f"📈 Le damos {argument.prob_text(pp)}; la cuota pide {argument.prob_text(1 / price)}."
