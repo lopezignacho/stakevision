@@ -63,7 +63,9 @@ def SHARE_BUTTONS(p: dict) -> list:
 
 
 def _vip_only(p: dict) -> bool:
-    """Regla: la NBA es exclusiva del VIP; el gratis del día siempre es fútbol."""
+    """Regla: la NBA es exclusiva del VIP; el gratis del día siempre es fútbol (salvo que TÚ elijas un gratis NBA)."""
+    if p.get("manual_free"):
+        return False
     return (any((l.get("sport") or "soccer") == "basketball" for l in p.get("legs") or [])
             or p.get("sport") == "basketball" or p.get("kind") == "builder")
 
@@ -996,6 +998,42 @@ def _manual_free(state: dict, req: dict) -> None:
                   + evidence.line(d["legs"][0].get("evidence")) + "\n"
                   + f"📈 Le damos {argument.prob_text(pp)}; la cuota pide {argument.prob_text(1 / price)}."
                   + ("" if sel else "\n(No encontré la cuota de referencia: la probabilidad parte de tu cuota.)"))
+
+
+def _free_now_file(state: dict) -> None:
+    """data/free_now.json ({"id": "...", "pid": "auto" | "80"}): publicar en el canal gratis un pick ya publicado
+    en el VIP (una sola vez)."""
+    import json
+    path = os.path.join(config.ROOT, "data", "free_now.json")
+    owner = state.get("owner_chat")
+    if not os.path.exists(path) or not owner:
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("free_now_done") or []):
+        return
+    state.setdefault("free_now_done", []).append(req["id"])
+    pid = str(req.get("pid") or "").lstrip("#")
+    if pid == "auto":
+        af = state.get("auto_free") or {}
+        pid = af.get("pid") if af.get("date") == _local_today() else ""
+    p = state["picks"].get(pid)
+    if not p:
+        telegram.send(owner, "⚠️ No encontré el pick para publicarlo en el canal gratis.")
+        return
+    p["manual_free"] = True
+    if "free" in (p.get("channel_msgs") or {}):
+        telegram.send(owner, f"El pick #{pid} ya estaba en el canal gratis.")
+        return
+    try:
+        _publish(state, p, free=True, vip_too=False)
+        telegram.send(owner, f"✅ Pick #{pid} publicado en el canal gratis como pick del día.")
+    except Exception as e:  # noqa: BLE001
+        traceback.print_exc()
+        telegram.send(owner, f"⚠️ No pude publicarlo en el canal gratis: {formatting.escape(str(e))[:300]}")
 
 
 def _cancel_file(state: dict) -> None:
@@ -3919,6 +3957,7 @@ def poll() -> None:
         _refresh_file(state)
         _recap_fix_file(state)
         _manual_free_file(state)
+        _free_now_file(state)
         _lock_now_file(state, now)
         _force_free_file(state)
         _auto_free_tick(state, now)
