@@ -2,9 +2,9 @@ name: Por qué - prueba
 on:
   workflow_dispatch:
     inputs:
-      liga: {default: "bra.1"}
-      equipo: {default: "Flamengo"}
-      dia: {default: ""}
+      equipo:
+        description: "Equipo"
+        default: "Atalanta"
 permissions:
   contents: write
 jobs:
@@ -12,13 +12,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
       - run: pip install -r requirements.txt
       - env:
-          LEAGUE: ${{ github.event.inputs.liga }}
+          ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
           MATCH_TEAM: ${{ github.event.inputs.equipo }}
-          DAY: ${{ github.event.inputs.dia }}
-        run: mkdir -p data/probe && python tools/why_probe.py
-      - run: |
+        run: mkdir -p data/probe && (python tools/why_probe.py 2>&1 | tee data/probe/why-run.txt) || true
+      - if: always()
+        run: |
           git config user.name "stakevision-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add data/probe && (git commit -m "prueba porque" || true) && git pull --rebase && git push
+          git add data/probe
+          git commit -m "prueba porque" || echo "sin cambios"
+          git pull --rebase && git push
