@@ -688,10 +688,25 @@ def _fresh_evidence(p: dict) -> None:
             _leg_evidence(l)
 
 
+def _nba_ctx_pick(p: dict) -> None:
+    """Pick NBA de una sola pata: contexto de ESPN (forma, últimos 10, bajas) para que el «por qué» use datos reales."""
+    if len(p.get("legs") or []) != 1 or p["legs"][0].get("sport") != "basketball":
+        return
+    from . import nba
+    l = p["legs"][0]
+    try:
+        ctx = _ctx_for(nba.context(l["home"], l["away"], l["kickoff"]), l["home"])
+        if ctx:
+            _nba_enrich(p, ctx)
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+
+
 def _refresh_post(state: dict, p: dict) -> list[str]:
     """Reescribe un pick ya publicado con el formato simple: mismo mensaje en Gratis y VIP (imagen + texto)
     y, para Instagram, la versión nueva lista para publicar (Instagram no deja al bot editar ni borrar)."""
     notes = []
+    _nba_ctx_pick(p)
     _fresh_evidence(p)
     p["pick_style"] = "coupon"
     for where, mid in (p.get("channel_msgs") or {}).items():
@@ -762,6 +777,8 @@ def _refresh_file(state: dict) -> None:
     if not p:
         telegram.send(owner, "⚠️ No encontré el pick gratis de hoy para corregirlo.")
         return
+    if req.get("why"):   # «por qué» con datos revisados a mano
+        p["legs"][0]["why"] = [str(x) for x in req["why"]][:3]
     try:
         notes = _refresh_post(state, p)
     except Exception as e:  # noqa: BLE001
@@ -954,6 +971,9 @@ def _manual_free(state: dict, req: dict) -> None:
     pid = str(state["seq"])
     d.update(id=pid, status="selected", created_at=_iso(now), stake_v=2, pick_style="coupon", manual_free=True)
     state["picks"][pid] = d
+    if req.get("why"):
+        d["legs"][0]["why"] = [str(x) for x in req["why"]][:3]
+    _nba_ctx_pick(d)
     _fresh_evidence(d)
     _publish(state, d, free=True, vip_too=bool(state.get("vip_chat")))
     d["auto_free"] = True   # mismo trato que el gratis automático (postpartido)

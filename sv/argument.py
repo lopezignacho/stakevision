@@ -263,10 +263,7 @@ def _nba(l: dict) -> list[str]:
 
 def _market_fallback(pick: dict, l: dict) -> list[str]:
     """Sin datos del partido: se explica con lo que dicen las casas, en simple."""
-    out = []
-    fp = 1 / l["fair_odds"] if l.get("fair_odds") else pick.get("prob")
-    if fp and fp >= 0.5:
-        out.append(f"Para las casas de apuestas es el resultado más probable ({prob_text(fp)}).")
+    out = []   # sin «lo que dicen las casas»: solo datos verificados (si no hay, mejor no inventar)
     o = str(l.get("outcome", "")).lower()
     if o == "1" and l.get("mtype") in ("1x2", "drawnobet", "spreads", "moneyline"):
         out.append(f"{escape(team(l['home']))} juega de local.")
@@ -274,6 +271,8 @@ def _market_fallback(pick: dict, l: dict) -> list[str]:
 
 
 def facts(pick: dict, l: dict) -> list[str]:
+    if l.get("why"):   # datos revisados a mano (cada uno con su fuente verificada)
+        return [escape(str(x)) for x in l["why"]][:3]
     sport = l.get("sport") or "soccer"
     fs = _nba(l) if sport == "basketball" else _soccer(l)
     if len(fs) < 2:
