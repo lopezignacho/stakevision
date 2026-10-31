@@ -1,0 +1,242 @@
+{
+ "kickoff": "2026-10-31T22:00:00Z",
+ "facts": [
+  "76ers ganó 7 de sus últimos 10 partidos.",
+  "De visita, 76ers ganó 3 de sus últimos 5.",
+  "Hornets jugó anoche: llega con menos descanso."
+ ],
+ "body": "🧠 <b>Por qué:</b>\n• 76ers ganó 7 de sus últimos 10 partidos.\n• De visita, 76ers ganó 3 de sus últimos 5.\n• Hornets jugó anoche: llega con menos descanso.\n\n📈 Le damos un 57% de probabilidad.\n💰 <b>Stake 4/10</b>",
+ "ev": {
+  "me": [
+   7,
+   10
+  ],
+  "op": [
+   5,
+   10
+  ],
+  "rate": 0.6,
+  "verdict": "ok"
+ },
+ "key_out": null,
+ "records": {
+  "home": {
+   "name": "Charlotte Hornets",
+   "record": "3-3",
+   "home_rec": "2-1",
+   "road_rec": "1-2"
+  },
+  "away": {
+   "name": "Philadelphia 76ers",
+   "record": "5-1",
+   "home_rec": "3-1",
+   "road_rec": "2-0"
+  }
+ },
+ "games": {
+  "home": [
+   [
+    "2026-10-30T23:00Z",
+    "Washington Wizards",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-10-28T23:00Z",
+    "Detroit Pistons",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-10-26T23:00Z",
+    "Washington Wizards",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-10-24T22:00Z",
+    "Miami Heat",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-10-23T23:00Z",
+    "Atlanta Hawks",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-10-21T23:30Z",
+    "Brooklyn Nets",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-04-12T22:00Z",
+    "New York Knicks",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-04-10T23:00Z",
+    "Detroit Pistons",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-04-08T00:00Z",
+    "Boston Celtics",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-04-05T23:00Z",
+    "Minnesota Timberwolves",
+    null,
+    null,
+    null
+   ]
+  ],
+  "away": [
+   [
+    "2026-10-30T23:30Z",
+    "New York Knicks",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-10-28T23:00Z",
+    "Indiana Pacers",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-10-25T23:30Z",
+    "Detroit Pistons",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-10-24T23:30Z",
+    "Milwaukee Bucks",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-10-22T23:00Z",
+    "Cleveland Cavaliers",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-10-20T23:00Z",
+    "New York Knicks",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-04-12T22:00Z",
+    "Milwaukee Bucks",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-04-10T23:30Z",
+    "Indiana Pacers",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-04-10T00:00Z",
+    "Houston Rockets",
+    null,
+    null,
+    null
+   ],
+   [
+    "2026-04-07T00:00Z",
+    "San Antonio Spurs",
+    null,
+    null,
+    null
+   ]
+  ]
+ },
+ "injuries": {
+  "home": [
+   {
+    "name": "Kon Knueppel",
+    "status": "Out",
+    "key": false,
+    "type": "Hamstring"
+   },
+   {
+    "name": "Coby White",
+    "status": "Out",
+    "key": false,
+    "type": "Calf"
+   },
+   {
+    "name": "Grant Williams",
+    "status": "Out",
+    "key": false,
+    "type": "Hamstring"
+   },
+   {
+    "name": "Kylan Boswell",
+    "status": "Out",
+    "key": false,
+    "type": "Knee"
+   }
+  ],
+  "away": [
+   {
+    "name": "Jabari Walker",
+    "status": "Out",
+    "key": false,
+    "type": "Knee"
+   },
+   {
+    "name": "LeBron James",
+    "status": "Out",
+    "key": true,
+    "type": "Back"
+   },
+   {
+    "name": "Tacko Fall",
+    "status": "Out",
+    "key": false,
+    "type": "Quadriceps"
+   },
+   {
+    "name": "Joel Embiid",
+    "status": "Out",
+    "key": true,
+    "type": "Foot"
+   },
+   {
+    "name": "Jaylen Brown",
+    "status": "Day-To-Day",
+    "key": false,
+    "type": "Knee"
+   }
+  ]
+ }
+}
