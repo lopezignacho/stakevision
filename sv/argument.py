@@ -252,8 +252,8 @@ def _nba(l: dict) -> list[str]:
     if outs and t != "totals":
         names = ", ".join(f"{x['name']} ({x['pts']:g} pts por partido)".replace(".", ",") for x in outs[:2])
         facts.append((2, f"{on} no tendrá a {names}."))
-    rd = op.get("rest_days")
-    if rd is not None and rd < 1.6 and t != "totals":
+    rd, my_rd = op.get("rest_days"), me.get("rest_days")
+    if rd is not None and rd < 1.6 and t != "totals" and not (my_rd is not None and my_rd < 1.6):   # solo si NOSOTROS sí descansamos
         facts.append((4, f"{on} jugó anoche: llega con menos descanso."))
     if t == "moneyline" and me.get("espn_prob") and me["espn_prob"] >= 0.5:
         facts.append((5, f"El pronóstico de ESPN le da {prob_text(me['espn_prob'])} de ganar."))
