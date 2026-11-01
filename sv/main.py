@@ -3048,7 +3048,7 @@ def _recap_share(state: dict, p: dict, where: str) -> None:
         telegram.send(chat, text)
 
 
-def _recap_fix(state: dict, p: dict) -> list[str]:
+def _recap_fix(state: dict, p: dict, ig_image: bool = False) -> list[str]:
     """Rehace el postpartido de un pick (otra foto, mismo resumen) y lo corrige donde ya salió:
     edita la imagen en VIP/Gratis y prepara el Reel nuevo para Instagram."""
     notes = []
@@ -3078,6 +3078,20 @@ def _recap_fix(state: dict, p: dict) -> list[str]:
     p.pop("ig_res_job", None)
     if st_ == "queued":
         notes.append("Instagram: aún no salía; saldrá el Reel corregido")
+    elif st_ == "posted" and ig_image:   # tú publicas imágenes (no Reels): la imagen corregida, con su botón
+        owner = state.get("owner_chat")
+        nid = f"recapfix-{p['id']}-{int(store.now_utc().timestamp())}"
+        key = f"res-{p['id']}-img{int(store.now_utc().timestamp())}"
+        instagram.save_image(key, image)
+        state.setdefault("ig_jobs", {})[nid] = {"key": key, "caption": r.get("ig") or p.get("ig_res_caption") or "",
+                                                "status": "draft", "title": f"Postpartido pick #{p['id']}"}
+        if owner:
+            msg = telegram.send_photo(owner, image, caption=f"📸 <b>Postpartido corregido · pick #{p['id']}</b>\n"
+                                      "Instagram no deja al bot borrar: borra la publicación anterior desde la app y "
+                                      "toca «Publicar imagen».")
+            telegram.set_buttons(owner, msg["message_id"], [[("📸 Publicar imagen", f"ni:{nid}")],
+                                                            [("Dejar Instagram como está", f"nn:{nid}")]])
+        notes.append("Instagram: te mandé la imagen corregida con el botón para publicarla")
     elif st_ == "posted":
         owner = state.get("owner_chat")
         if owner and r.get("reel"):
@@ -3111,11 +3125,12 @@ def _recap_fix_file(state: dict) -> None:
         telegram.send(owner, "⚠️ No encontré el pick para corregir su postpartido.")
         return
     try:
-        notes = _recap_fix(state, p)
+        notes = _recap_fix(state, p, bool(req.get("ig_image")))
     except Exception as e:  # noqa: BLE001
         traceback.print_exc()
         notes = [f"⚠️ falló la corrección: {e}"]
-    telegram.send(owner, f"🔧 <b>Postpartido del pick #{p['id']} corregido</b> (la foto no era del partido)\n"
+    why = req.get("reason") or "la foto no era del partido"
+    telegram.send(owner, f"🔧 <b>Postpartido del pick #{p['id']} corregido</b> ({formatting.escape(why)})\n"
                   + "\n".join(f"• {formatting.escape(n)}" for n in notes))
 
 
