@@ -1094,6 +1094,58 @@ def _post_media_file(state: dict) -> None:
     telegram.send(owner, "📣 <b>Postpartido publicado</b>: " + formatting.escape(", ".join(notes)))
 
 
+def _score_fix_file(state: dict) -> None:
+    """data/score_fix.json ({"id", "pid", "score": [5, 2]}): corrige el marcador de un pick ya cerrado (imagen del
+    resultado en los canales y la web), una vez. Si el resultado cambia, usa la corrección normal."""
+    import json
+    path = os.path.join(config.ROOT, "data", "score_fix.json")
+    owner = state.get("owner_chat")
+    if not os.path.exists(path) or not owner:
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("score_fix_done") or []):
+        return
+    state.setdefault("score_fix_done", []).append(req["id"])
+    p = state["picks"].get(str(req.get("pid") or ""))
+    if not p or len(p["legs"]) != 1:
+        telegram.send(owner, "⚠️ No encontré el pick para corregir el marcador.")
+        return
+    l = p["legs"][0]
+    old = l.get("score")
+    l["score"] = [int(x) for x in req["score"]]
+    new_res = grade_leg(l, *l["score"])
+    notes = [f"marcador {old[0]}-{old[1] if old else '?'} → {l['score'][0]}-{l['score'][1]}" if old else "marcador corregido"]
+    if new_res and new_res != p.get("result"):
+        _correct(state, p, new_res)
+        notes.append(f"resultado corregido a {new_res}")
+    else:
+        image = _result_image(state, p)
+        text = formatting.result_post(p) if p.get("result") != "L" else _loss_text(p)
+        for where, mid in (p.get("result_msgs") or {}).items():
+            chat = state.get("vip_chat") if where == "vip" else config.FREE_CHANNEL
+            try:
+                if image and (p.get("result_is_photo") or {}).get(where):
+                    ok = telegram.edit_photo(chat, mid, image, text)
+                else:
+                    telegram.edit_text(chat, mid, text)
+                    ok = True
+                notes.append(f"{'VIP' if where == 'vip' else 'Gratis'}: {'corregido' if ok else 'no se pudo editar'}")
+            except Exception as e:  # noqa: BLE001
+                notes.append(f"{where}: error {e}")
+        if p.get("ig_status") in ("queued",) and image:
+            from . import instagram
+            instagram.save_image(p["id"], image)
+            notes.append("Instagram: imagen corregida antes de publicarse")
+        elif p.get("ig_status") == "posted":
+            notes.append("Instagram: la celebración ya estaba publicada con el marcador anterior (bórrala y te "
+                         "mando la correcta si quieres)")
+    telegram.send(owner, f"🔧 <b>Pick #{p['id']}</b>: " + formatting.escape("; ".join(notes)))
+
+
 def _cancel_file(state: dict) -> None:
     """data/cancel.json ({"id": "...", "pid": "39", "refree": true}): cancelar un pick publicado, una sola vez."""
     import json
@@ -4017,6 +4069,7 @@ def poll() -> None:
         _manual_free_file(state)
         _free_now_file(state)
         _post_media_file(state)
+        _score_fix_file(state)
         _lock_now_file(state, now)
         _force_free_file(state)
         _auto_free_tick(state, now)

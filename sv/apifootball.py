@@ -44,11 +44,30 @@ def _sim(a: str, b: str) -> float:
 _day_cache: dict[str, list] = {}
 
 
-def find_fixture(home: str, away: str, date: str):
+_YOUTH = re.compile(r"\b(u ?1[5-9]|u ?2[0-3]|sub ?\d\d|women|w|femenino|fem|ii|b|reserves?|youth|primavera|juvenil)\b", re.I)
+
+
+def find_fixture(home: str, away: str, date: str, kickoff_iso: str | None = None):
+    """El partido de API-Football que corresponde al pick. Nunca uno juvenil, femenino o de reservas (salvo
+    que el pick lo sea), y si sabemos la hora, solo uno que empiece a esa hora (±2 h)."""
     if date not in _day_cache:
         _day_cache[date] = _get("/fixtures", date=date, timezone="UTC") or []
+    ours_youth = bool(_YOUTH.search(f"{home} {away}"))
+    ko_ts = None
+    if kickoff_iso:
+        try:
+            from datetime import datetime
+            ko_ts = datetime.fromisoformat(kickoff_iso.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            ko_ts = None
     best, score = None, 0.0
     for f in _day_cache[date]:
+        names = f"{f['teams']['home']['name']} {f['teams']['away']['name']}"
+        if not ours_youth and _YOUTH.search(names):
+            continue   # el plantel juvenil o femenino del mismo club: otro partido
+        ts = (f.get("fixture") or {}).get("timestamp")
+        if ko_ts and ts and abs(ts - ko_ts) > 2 * 3600:
+            continue
         s = (_sim(home, f["teams"]["home"]["name"]) + _sim(away, f["teams"]["away"]["name"])) / 2
         if s > score:
             best, score = f, s
@@ -71,7 +90,7 @@ def context(home: str, away: str, kickoff_iso: str) -> dict | None:
 def final_score(home: str, away: str, kickoff_iso: str):
     """Marcador al minuto 90 (sin prórroga) si el partido terminó; si no, None."""
     _day_cache.pop(kickoff_iso[:10], None)  # refrescar: queremos el estado actual
-    fx = find_fixture(home, away, kickoff_iso[:10])
+    fx = find_fixture(home, away, kickoff_iso[:10], kickoff_iso)
     if not fx or fx.get("fixture", {}).get("status", {}).get("short") not in ("FT", "AET", "PEN"):
         return None
     ft = (fx.get("score") or {}).get("fulltime") or {}

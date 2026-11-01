@@ -32,7 +32,9 @@ def _line(x) -> str:
 TEAM_FIX = {"Vina del Mar": "Viña del Mar", "Nunoa": "Ñuñoa", "Nuble": "Ñublense", "Espanol": "Español",
             "Penarol": "Peñarol", "Atletico": "Atlético", "Gremio": "Grêmio", "Sao Paulo": "São Paulo",
             "Union Espanola": "Unión Española", "Cobresal": "Cobresal", "Nublense": "Ñublense",
-            "Alaves": "Alavés", "Cadiz": "Cádiz", "Leganes": "Leganés", "Almeria": "Almería"}
+            "Alaves": "Alavés", "Cadiz": "Cádiz", "Leganes": "Leganés", "Almeria": "Almería",
+            "Istanbul Basaksehir": "Başakşehir", "Basaksehir": "Başakşehir", "Besiktas": "Beşiktaş",
+            "Fenerbahce": "Fenerbahçe", "Galatasaray": "Galatasaray", "Kasimpasa": "Kasımpaşa", "Goztepe": "Göztepe"}
 
 
 def team(name: str) -> str:
