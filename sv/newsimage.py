@@ -625,6 +625,17 @@ def render_figura(g: dict) -> bytes:
     d = ImageDraw.Draw(im)
     if g.get("competition"):
         d.text((w - 52, 70), g["competition"].upper(), font=P._font("Bold", 26), fill=(255, 196, 0), anchor="rt")
+    if g.get("pick"):   # nuestro pick, arriba a la derecha: verde si salió
+        pk = g["pick"]
+        ok = pk.get("result") == "W"
+        f1, f2 = _wide(30, 800), _wide(24, 600)
+        t1 = ("✓ " if False else "") + (pk.get("title") or ("PICK GRATIS · VERDE" if ok else "PICK GRATIS"))
+        t2 = pk.get("text", "")
+        bw = int(max(d.textlength(t1, font=f1), d.textlength(t2, font=f2))) + 56
+        x0, y0 = w - 52 - bw, 118
+        d.rounded_rectangle((x0, y0, w - 52, y0 + 104), 26, fill=(34, 170, 76) if ok else (60, 66, 78))
+        d.text((x0 + 28, y0 + 18), t1, font=f1, fill=WHITE)
+        d.text((x0 + 28, y0 + 62), t2, font=f2, fill=(232, 255, 238) if ok else WHITE)
     d.text((w - 52, H - 62), "@" + P.INSTAGRAM.upper(), font=_league(46), fill=WHITE, anchor="rm")
     _small_credit(im, d, g.get("credit"), H - 22)
     return P._jpeg(im)

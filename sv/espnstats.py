@@ -34,6 +34,37 @@ def _side(c: dict) -> dict:
             "logo": crest.get("", url=t.get("logo", ""))}
 
 
+def nba_top_player(team: str, days: int = 2) -> str | None:
+    """El goleador del equipo en su último partido terminado."""
+    key = nba._plain(team)
+    now = store.now_utc()
+    for back in range(days + 1):
+        day = (now - timedelta(days=back)).strftime("%Y%m%d")
+        for e in nba._get("/scoreboard", dates=day).get("events") or []:
+            comp = e["competitions"][0]
+            if not comp["status"]["type"].get("completed"):
+                continue
+            if not any(nba._same_team(team, c["team"]["displayName"]) for c in comp["competitors"]):
+                continue
+            sm = nba._get("/summary", event=e["id"])
+            best = (-1, None)
+            for t in (sm.get("boxscore") or {}).get("players") or []:
+                if not nba._same_team(team, t["team"].get("displayName", "")):
+                    continue
+                for st in t.get("statistics") or []:
+                    keys = st.get("keys") or []
+                    for a in st.get("athletes") or []:
+                        v = dict(zip(keys, a.get("stats") or []))
+                        try:
+                            pts = int(v.get("points") or 0)
+                        except ValueError:
+                            pts = 0
+                        if pts > best[0]:
+                            best = (pts, a["athlete"]["displayName"])
+            return best[1]
+    return None
+
+
 def nba_figura(player: str, days: int = 3) -> dict | None:
     """Último partido terminado del jugador (hasta `days` días atrás): su planilla, el marcador y los escudos."""
     key = nba._plain(player)
