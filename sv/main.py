@@ -1146,6 +1146,40 @@ def _score_fix_file(state: dict) -> None:
     telegram.send(owner, f"🔧 <b>Pick #{p['id']}</b>: " + formatting.escape("; ".join(notes)))
 
 
+def _win_repost_file(state: dict) -> None:
+    """data/win_repost.json ({"id", "pid"}): vuelve a publicar en Instagram la celebración de un pick verde (con los
+    datos ya corregidos) y te manda la imagen. Para cuando borraste la anterior. Una vez."""
+    import json
+    path = os.path.join(config.ROOT, "data", "win_repost.json")
+    owner = state.get("owner_chat")
+    if not os.path.exists(path) or not owner:
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("win_repost_done") or []):
+        return
+    state.setdefault("win_repost_done", []).append(req["id"])
+    p = state["picks"].get(str(req.get("pid") or ""))
+    if not p or p.get("result") != "W":
+        telegram.send(owner, "⚠️ No encontré ese pick verde para volver a publicarlo.")
+        return
+    from . import instagram, postimage
+    streak = _streak(state, p)
+    image = postimage.render_win(p, streak)
+    key = f"{p['id']}-v{store.now_utc().strftime('%H%M%S')}"   # archivo nuevo: Instagram no reutiliza el anterior
+    instagram.save_image(key, image)
+    from zoneinfo import ZoneInfo
+    state.setdefault("ig_jobs", {})[f"win-{req['id']}"] = {
+        "key": key, "caption": formatting.instagram_caption(p, streak), "status": "queued", "mode": "image",
+        "title": f"Celebración pick #{p['id']}", "day": store.now_utc().astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat()}
+    telegram.send_photo(owner, image, caption=f"📸 <b>Celebración corregida</b> · pick #{p['id']} "
+                                             f"({p['legs'][0]['score'][0]}-{p['legs'][0]['score'][1]}): "
+                                             "se publica en Instagram en unos minutos.")
+
+
 def _cancel_file(state: dict) -> None:
     """data/cancel.json ({"id": "...", "pid": "39", "refree": true}): cancelar un pick publicado, una sola vez."""
     import json
@@ -4070,6 +4104,7 @@ def poll() -> None:
         _free_now_file(state)
         _post_media_file(state)
         _score_fix_file(state)
+        _win_repost_file(state)
         _lock_now_file(state, now)
         _force_free_file(state)
         _auto_free_tick(state, now)
