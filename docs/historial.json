@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-11-01T00:35:31.341343+00:00",
+ "updated_at": "2026-11-01T00:41:09.789177+00:00",
  "summary": {
-  "picks": 17,
-  "wins": 12,
+  "picks": 18,
+  "wins": 13,
   "losses": 4,
-  "hit_rate": 0.75,
-  "yield": 0.3393,
+  "hit_rate": 0.7647,
+  "yield": 0.3719,
   "avg_odds": 1.8,
-  "units": 18.66
+  "units": 21.94
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 4,
    "prob": 0.5495,
    "free": true,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Charlotte Hornets",
@@ -32,7 +32,10 @@
      "mtype": "moneyline",
      "handicap": null,
      "sport": "basketball",
-     "score": null
+     "score": [
+      104,
+      109
+     ]
     }
    ],
    "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.82): el mercado no la regala, la elección se apoya en los datos de abajo.\n• Philadelphia 76ers: 7-3 en sus últimos 10, diferencia media +2.9 pts.\n• Charlotte Hornets: diferencia media -5.3 pts en sus últimos 10.\n• Philadelphia 76ers de visita esta temporada: 2-0.\n• El pronóstico de ESPN le da 59,4% de ganar.\n• Charlotte Hornets juega en back-to-back (jugó ayer): suele pesar en piernas y rotación.\n• Bajas de Charlotte Hornets: Kon Knueppel, Coby White, Grant Williams, Kylan Boswell.\n⚠️ <b>En contra:</b>\n• Philadelphia 76ers juega en back-to-back (jugó ayer): suele pesar en piernas y rotación.\n• Bajas de Philadelphia 76ers: Jabari Walker, LeBron James ⭐, Tacko Fall, Joel Embiid ⭐.\nProbabilidad estimada: 54,9%. Para no perder a esta cuota se necesita 54,9%."
