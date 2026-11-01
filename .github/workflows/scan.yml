@@ -22,6 +22,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main   # siempre el estado más reciente (no el de cuando se pidió la corrida): evita repetir envíos
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
