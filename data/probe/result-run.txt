@@ -1,0 +1,1 @@
+{"layout": "result", "credit": null, "logos": [true, true], "photo": false, "jersey": []}
