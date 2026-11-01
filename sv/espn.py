@@ -83,7 +83,7 @@ def _side(t: dict, x: dict, agg: dict) -> dict:
     team = x.get("team") or {}
     return {"id": str(team.get("id") or ""), "name": team.get("displayName") or "",
             "short": (team.get("shortDisplayName") or team.get("displayName") or "").strip(),
-            "abbr": (team.get("abbreviation") or "")[:4].upper(),
+            "abbr": (team.get("abbreviation") or "")[:4].upper(), "logo_url": team.get("logo") or "",
             "color": _rgb(team.get("color"), (40, 44, 50)), "alt": _rgb(team.get("alternateColor"), (240, 240, 240)),
             "score": _int(x.get("score")) or 0, "winner": bool(x.get("winner")),
             "agg": _int(x.get("aggregateScore", agg.get(str(team.get("id"))))),

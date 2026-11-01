@@ -797,9 +797,40 @@ def _vgrad(size, c0, c1) -> Image.Image:
     return g.resize((w, h))
 
 
+_CREST_CACHE: dict = {}
+
+
+def _official_crest(team: dict) -> bytes | None:
+    """Escudo oficial (el que publica ESPN): por la URL que trae el partido o buscándolo por nombre."""
+    from . import crest
+    key = (team.get("logo_url") or "", team.get("name") or "", team.get("sport") or "")
+    if key not in _CREST_CACHE:
+        png = None
+        try:
+            png = crest.image(team.get("logo_url") or "")
+            if not png and team.get("name"):
+                sports = [team["sport"]] if team.get("sport") else ["soccer", "basketball"]
+                for sp in sports:
+                    png = crest.get(team["name"], sp, team.get("abbr") or "") or (
+                        crest.get(team.get("short") or "", sp) if team.get("short") else None)
+                    if png:
+                        break
+        except Exception:  # noqa: BLE001
+            png = None
+        _CREST_CACHE[key] = png
+    return _CREST_CACHE[key]
+
+
 def shield(team: dict, width: int) -> Image.Image:
-    """Escudo propio del equipo: forma clásica, colores del club, iniciales y borde metálico.
-    No reproduce el escudo oficial."""
+    """Escudo del equipo: el OFICIAL (ESPN) si lo encontramos; si no, uno propio con los colores y las iniciales."""
+    png = _official_crest(team)
+    if png:
+        from . import crest
+        im = crest.fitted(png, width - 24)   # fitted suma 24 px de margen para la sombra
+        if im:
+            out = Image.new("RGBA", (width, round(width * 1.25)), (0, 0, 0, 0))
+            out.alpha_composite(im, ((width - im.width) // 2, max(0, (round(width * 1.18) - im.height) // 2)))
+            return out
     fill, accent = team_palette(team)
     s = 4
     k = width * s / 200
