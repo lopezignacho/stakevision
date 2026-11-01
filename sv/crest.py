@@ -10,7 +10,9 @@ from PIL import Image
 
 BASE = "https://site.api.espn.com/apis/site/v2/sports"
 SOCCER_LEAGUES = ("chi.1", "eng.1", "esp.1", "ita.1", "ger.1", "fra.1", "por.1", "ned.1", "arg.1", "bra.1", "mex.1",
-                  "usa.1", "uefa.champions", "conmebol.libertadores", "conmebol.sudamericana")
+                  "usa.1", "tur.1", "bel.1", "sco.1", "gre.1", "aut.1", "sui.1", "den.1", "col.1", "uru.1", "par.1",
+                  "per.1", "ecu.1", "eng.2", "esp.2", "ita.2", "ger.2", "fra.2", "uefa.champions", "uefa.europa",
+                  "uefa.europa.conf", "conmebol.libertadores", "conmebol.sudamericana")
 _TEAMS: dict[str, list[dict]] = {}
 _IMG: dict[str, bytes | None] = {}
 

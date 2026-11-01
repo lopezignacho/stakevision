@@ -808,6 +808,8 @@ def _official_crest(team: dict) -> bytes | None:
         png = None
         try:
             url = team.get("logo_url") or ""
+            if not url and team.get("id") and (team.get("sport") or "soccer") == "soccer":   # reportes guardados antes
+                url = f"https://a.espncdn.com/i/teamlogos/soccer/500/{team['id']}.png"
             if "/500/" in url:   # versión para fondo oscuro (los escudos azul marino se pierden en negro)
                 png = crest.image(url.replace("/500/", "/500-dark/"))
             png = png or crest.image(url)

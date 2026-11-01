@@ -3080,6 +3080,9 @@ def _recap_fix(state: dict, p: dict, ig_image: bool = False) -> list[str]:
         notes.append("Instagram: aún no salía; saldrá el Reel corregido")
     elif st_ == "posted" and ig_image:   # tú publicas imágenes (no Reels): la imagen corregida, con su botón
         owner = state.get("owner_chat")
+        for jid, j in (state.get("ig_jobs") or {}).items():   # versiones corregidas anteriores: ya no se publican
+            if jid.startswith(f"recapfix-{p['id']}-") and j.get("status") == "draft":
+                j["status"] = "replaced"
         nid = f"recapfix-{p['id']}-{int(store.now_utc().timestamp())}"
         key = f"res-{p['id']}-img{int(store.now_utc().timestamp())}"
         instagram.save_image(key, image)
