@@ -171,7 +171,13 @@ def render_news(n: dict) -> bytes:
 
 def render_postgame(g: dict) -> bytes:
     """g = {colors, kicker, home:{name, short, score, color}, away:{...}, winner:'home'|'away', when, notes:[...], source}"""
-    im = _backdrop(*g["colors"])
+    if g.get("photo"):   # foto del protagonista de fondo (validada: su camiseta), oscurecida para leer encima
+        im = _full_photo(g["photo"], (P.W, H), g["colors"], 0.30)
+        veil = Image.new("RGBA", (P.W, H), (6, 8, 14, 0))
+        veil.putalpha(P._alpha_ramp((P.W, H), [(0, 175), (0.55, 120), (0.85, 40), (1, 0)], True))
+        im.alpha_composite(veil)
+    else:
+        im = _backdrop(*g["colors"])
     d = ImageDraw.Draw(im)
     P._put_logo(im, 300, "dark", 60, 54)
     _chip(d, P.W - 60 - 200, 70, "FINAL", (255, 255, 255), (12, 14, 20), 30)
@@ -181,10 +187,21 @@ def render_postgame(g: dict) -> bytes:
     for side in ("home", "away"):
         t = g[side]
         win = g["winner"] == side
-        d.rounded_rectangle((60, y, 72, y + 150), 6, fill=t["color"])
-        d.text((100, y + 4), t["short"].upper(), font=_bebas(120), fill=WHITE if win else (175, 182, 194))
+        x_name = 100
+        badge = None
+        if t.get("logo"):   # escudo oficial al lado del nombre
+            from . import crest
+            badge = crest.fitted(t["logo"], 118)
+        if badge:
+            im.alpha_composite(badge, (52, y + 75 - badge.height // 2))
+            d = ImageDraw.Draw(im)
+            x_name = 52 + badge.width + 10
+        else:
+            d.rounded_rectangle((60, y, 72, y + 150), 6, fill=t["color"])
+        nf = _fit_line(d, t["short"].upper(), _bebas, 120, P.W - 60 - 230 - x_name, 70)
+        d.text((x_name, y + 4), t["short"].upper(), font=nf, fill=WHITE if win else (175, 182, 194))
         if t["name"].upper() != t["short"].upper():
-            d.text((100, y + 120), t["name"], font=P._font("Medium", 28), fill=(205, 210, 220))
+            d.text((x_name, y + 120), t["name"], font=P._font("Medium", 28), fill=(205, 210, 220))
         sc = str(t["score"])
         sf = _bebas(170)
         d.text((P.W - 60 - d.textlength(sc, font=sf), y - 8), sc, font=sf, fill=WHITE if win else (175, 182, 194))
@@ -207,7 +224,7 @@ def render_postgame(g: dict) -> bytes:
             d.text((116, yy), ln, font=ff, fill=WHITE)
             yy += 38
         yy += 28
-    _footer(im, d, g["source"])
+    _footer(im, d, g["source"], g.get("credit"))
     return P._jpeg(im)
 
 
