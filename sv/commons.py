@@ -71,7 +71,8 @@ def _candidates(name: str, limit: int, team: bool, query: str | None) -> list[di
         w, h = info.get("width") or 0, info.get("height") or 0
         if min(w, h) < 700:
             continue
-        date = (meta.get("DateTimeOriginal") or {}).get("value") or ""   # fecha en que se TOMÓ la foto (no la de subida)
+        date = ((meta.get("DateTimeOriginal") or {}).get("value")   # fecha en que se TOMÓ la foto; si no está, la de subida
+                or (meta.get("DateTime") or {}).get("value") or "")
         year = int(m.group()) if (m := re.search(r"(19|20)\d\d", date)) else 0
         author = _clean((meta.get("Artist") or {}).get("value") or "") or "Autor desconocido"
         out.append({"title": title, "url": info.get("thumburl") or info.get("url"), "page": info.get("descriptionurl"),
