@@ -1055,6 +1055,16 @@ def _post_media_file(state: dict) -> None:
     from . import instagram
     key = req["key"]
     notes = []
+    for jid in req.get("cancel_jobs") or []:   # p. ej. el Reel que ya no quieres: si aún no salió, no se publica
+        j = (state.get("ig_jobs") or {}).get(jid)
+        if not j:
+            continue
+        if j.get("status") == "posted":
+            notes.append(f"ojo: {'el Reel' if j.get('mode') == 'reel' else 'la publicación'} anterior ya estaba "
+                         "publicado en Instagram (bórralo desde la app si no lo quieres)")
+        else:
+            j["status"] = "skipped"
+            notes.append("Reel anterior cancelado (no se publica)")
     try:
         with open(instagram.image_path(key), "rb") as f:
             img = f.read()
