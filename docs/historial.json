@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-01T15:24:02.396900+00:00",
+ "updated_at": "2026-11-01T15:27:37.063303+00:00",
  "summary": {
   "picks": 19,
   "wins": 14,
@@ -28,13 +28,13 @@
      "market": "Hándicap Asiático",
      "outcome": "1",
      "price": 1.85,
-     "label": "Gana Istanbul Basaksehir",
+     "label": "Gana Başakşehir",
      "mtype": "spreads",
      "handicap": -0.5,
      "sport": "soccer",
      "score": [
-      2,
-      1
+      5,
+      2
      ]
     }
    ],
