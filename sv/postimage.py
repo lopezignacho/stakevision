@@ -807,7 +807,10 @@ def _official_crest(team: dict) -> bytes | None:
     if key not in _CREST_CACHE:
         png = None
         try:
-            png = crest.image(team.get("logo_url") or "")
+            url = team.get("logo_url") or ""
+            if "/500/" in url:   # versión para fondo oscuro (los escudos azul marino se pierden en negro)
+                png = crest.image(url.replace("/500/", "/500-dark/"))
+            png = png or crest.image(url)
             if not png and team.get("name"):
                 sports = [team["sport"]] if team.get("sport") else ["soccer", "basketball"]
                 for sp in sports:
