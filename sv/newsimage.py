@@ -599,6 +599,7 @@ def render_figura(g: dict) -> bytes:
         y += num.height + 22
         if i < len(g["stats"][:4]) - 1:
             ImageDraw.Draw(im).line((54, y - 11, 300, y - 11), fill=line_col + (200,), width=2)
+    stats_end = y
     d = ImageDraw.Draw(im)
     # marcador gigante
     hs, as_ = str(g["home"]["score"]), str(g["away"]["score"])
@@ -632,8 +633,8 @@ def render_figura(g: dict) -> bytes:
         t1 = ("✓ " if False else "") + (pk.get("title") or ("PICK GRATIS · VERDE" if ok else "PICK GRATIS"))
         t2 = pk.get("text", "")
         bw = int(max(d.textlength(t1, font=f1), d.textlength(t2, font=f2))) + 56
-        x0, y0 = w - 52 - bw, 118
-        d.rounded_rectangle((x0, y0, w - 52, y0 + 104), 26, fill=(34, 170, 76) if ok else (60, 66, 78))
+        x0, y0 = 52, min(stats_end + 6, H - 470)   # bajo la planilla, a la izquierda: nunca sobre la cara
+        d.rounded_rectangle((x0, y0, x0 + bw, y0 + 104), 26, fill=(34, 170, 76) if ok else (60, 66, 78))
         d.text((x0 + 28, y0 + 18), t1, font=f1, fill=WHITE)
         d.text((x0 + 28, y0 + 62), t2, font=f2, fill=(232, 255, 238) if ok else WHITE)
     d.text((w - 52, H - 62), "@" + P.INSTAGRAM.upper(), font=_league(46), fill=WHITE, anchor="rm")
