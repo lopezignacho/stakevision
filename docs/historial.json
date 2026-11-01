@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-11-01T15:13:42.881885+00:00",
+ "updated_at": "2026-11-01T15:18:52.861031+00:00",
  "summary": {
-  "picks": 18,
-  "wins": 13,
+  "picks": 19,
+  "wins": 14,
   "losses": 4,
-  "hit_rate": 0.7647,
-  "yield": 0.3719,
+  "hit_rate": 0.7778,
+  "yield": 0.395,
   "avg_odds": 1.8,
-  "units": 21.94
+  "units": 24.49
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 3,
    "prob": 0.5418,
    "free": true,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Istanbul Basaksehir",
@@ -32,7 +32,10 @@
      "mtype": "spreads",
      "handicap": -0.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      2,
+      1
+     ]
     }
    ],
    "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.85): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\nProbabilidad estimada: 54,2%. Para no perder a esta cuota se necesita 54,1%."
