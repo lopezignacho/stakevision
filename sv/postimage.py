@@ -340,12 +340,12 @@ def render_win(pick: dict, streak: int = 1, result: str = "W") -> bytes:
             fsc = _font("Bold", 64)
             sw = d.textlength(score, font=fsc)
             d.text((mid - sw / 2, cy - 8), score, font=fsc, fill=INK)
-            home, fh = _fit(d, l["home"], "Bold", 36, mid - sw / 2 - 30 - x0)
-            away, fa = _fit(d, l["away"], "Bold", 36, x1 - (mid + sw / 2 + 30))
+            home, fh = _fit(d, formatting.team(l["home"]), "Bold", 36, mid - sw / 2 - 30 - x0)
+            away, fa = _fit(d, formatting.team(l["away"]), "Bold", 36, x1 - (mid + sw / 2 + 30))
             d.text((x0, cy + 6), home, font=fh, fill=INK)
             d.text((x1 - d.textlength(away, font=fa), cy + 6), away, font=fa, fill=INK)
         else:
-            m, fm = _fit(d, f"{l['home']} vs {l['away']}", "Bold", 36, x1 - x0)
+            m, fm = _fit(d, f"{formatting.team(l['home'])} vs {formatting.team(l['away'])}", "Bold", 36, x1 - x0)
             d.text((x0, cy + 6), m, font=fm, fill=INK)
         cy += 92
         sel = formatting.public_label(l)
