@@ -1036,6 +1036,54 @@ def _free_now_file(state: dict) -> None:
         telegram.send(owner, f"⚠️ No pude publicarlo en el canal gratis: {formatting.escape(str(e))[:300]}")
 
 
+def _post_media_file(state: dict) -> None:
+    """data/post_media.json: publicar una imagen/reel ya armados (docs/ig/pick-<key>.jpg y reel-<key>.mp4), una vez.
+    {"id", "key", "pid", "channels": ["free", "vip"], "channel_caption", "instagram": "reel" | "image", "ig_caption"}"""
+    import json
+    path = os.path.join(config.ROOT, "data", "post_media.json")
+    owner = state.get("owner_chat")
+    if not os.path.exists(path) or not owner:
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("post_media_done") or []):
+        return
+    state.setdefault("post_media_done", []).append(req["id"])
+    from . import instagram
+    key = req["key"]
+    notes = []
+    try:
+        with open(instagram.image_path(key), "rb") as f:
+            img = f.read()
+    except OSError:
+        telegram.send(owner, "⚠️ No encontré la imagen para publicar.")
+        return
+    p = state["picks"].get(str(req.get("pid") or ""))
+    for where in req.get("channels") or []:
+        chat = state.get("vip_chat") if where == "vip" else config.FREE_CHANNEL
+        if not chat:
+            continue
+        reply = ((p or {}).get("result_msgs") or {}).get(where) or ((p or {}).get("channel_msgs") or {}).get(where)
+        try:
+            telegram.send_photo(chat, img, caption=req.get("channel_caption") or "", reply_to=reply)
+            notes.append("Gratis" if where == "free" else "VIP")
+        except Exception as e:  # noqa: BLE001
+            notes.append(f"{where}: error {e}")
+    if req.get("instagram"):
+        mode = "reel" if req["instagram"] == "reel" and os.path.exists(instagram.video_path(key)) else "image"
+        from zoneinfo import ZoneInfo
+        job = {"key": key, "caption": req.get("ig_caption") or "", "status": "queued", "mode": mode,
+               "title": req.get("title") or key, "day": store.now_utc().astimezone(ZoneInfo(config.TIMEZONE)).date().isoformat()}
+        if mode == "reel":
+            job["reel"] = key
+        state.setdefault("ig_jobs", {})[f"media-{req['id']}"] = job
+        notes.append(f"Instagram ({'Reel' if mode == 'reel' else 'imagen'}) en cola")
+    telegram.send(owner, "📣 <b>Postpartido publicado</b>: " + formatting.escape(", ".join(notes)))
+
+
 def _cancel_file(state: dict) -> None:
     """data/cancel.json ({"id": "...", "pid": "39", "refree": true}): cancelar un pick publicado, una sola vez."""
     import json
@@ -3958,6 +4006,7 @@ def poll() -> None:
         _recap_fix_file(state)
         _manual_free_file(state)
         _free_now_file(state)
+        _post_media_file(state)
         _lock_now_file(state, now)
         _force_free_file(state)
         _auto_free_tick(state, now)
