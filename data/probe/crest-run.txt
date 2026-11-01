@@ -1,0 +1,2 @@
+reporte: True ('https://a.espncdn.com/i/teamlogos/soccer/500/7914.png', 'https://a.espncdn.com/i/teamlogos/soccer/500/11429.png')
+ok
