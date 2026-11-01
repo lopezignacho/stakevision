@@ -6,5 +6,62 @@
   true
  ],
  "photo": false,
- "jersey": []
+ "jersey": [
+  {
+   "player": "Jude Bellingham",
+   "team": "Real Madrid",
+   "title": "File:2025 04 26 Final de la Copa del Rey - 54482387776 (Vinícius Júnior, Jude Bellingham e Rodrygo Goés) (cropped).jpg",
+   "ok": false,
+   "jersey": "polerón/chaqueta del Real Madrid",
+   "why": "Jude Bellingham lleva puesta una chaqueta con capucha (polerón) y no la camiseta de juego directamente visible."
+  },
+  {
+   "player": "Jude Bellingham",
+   "team": "Real Madrid",
+   "title": "File:2025 04 26 Final de la Copa del Rey - 54482387776 (Vinícius Júnior, Jude Bellingham e Rodrygo Goés) (cropped).jpg",
+   "ok": false,
+   "jersey": "polerón/chaqueta del Real Madrid",
+   "why": "Lleva un polerón o chaqueta con cremallera y capucha, no la camiseta de juego."
+  },
+  {
+   "player": "Jude Bellingham",
+   "team": "Real Madrid",
+   "title": "File:Jude Bellingham EA Sports 2024.jpg",
+   "ok": false,
+   "jersey": "ninguna (ropa de calle / chándal Adidas)",
+   "why": "Lleva un chándal azul de Adidas y ropa casual, no la camiseta de fútbol del Real Madrid"
+  },
+  {
+   "player": "Jude Bellingham",
+   "team": "Real Madrid",
+   "title": "File:Jude Bellingham Laureus 2024 (cropped2).jpg",
+   "ok": false,
+   "jersey": "ninguna (lleva traje)",
+   "why": "Jude Bellingham viste un traje de gala formal, no una camiseta de fútbol."
+  },
+  {
+   "player": "Jude Bellingham",
+   "team": "Real Madrid",
+   "title": "File:Jude Bellingham during EA Sports on Sep 26 2024.jpg",
+   "ok": false,
+   "jersey": "ninguna (ropa deportiva/buzo Adidas)",
+   "why": "Lleva un chándal o buzo de calle Adidas en lugar de la camiseta del Real Madrid"
+  },
+  {
+   "player": "Jude Bellingham",
+   "team": "Real Madrid",
+   "title": "File:Jude Bellingham during an EA Sports event in September 2024.jpg",
+   "ok": false,
+   "jersey": "ninguna (chándal Adidas casual / camiseta blanca básica)",
+   "why": "Jude Bellingham lleva un chándal azul Adidas y camiseta interior blanca de calle, no la equipación de juego del Real Madrid."
+  },
+  {
+   "player": "Jude Bellingham",
+   "team": "Real Madrid",
+   "title": "File:Jude Bellingham during an EA Sports event in September 2024 2.jpg",
+   "ok": false,
+   "jersey": "ninguna / ropa deportiva casual",
+   "why": "Jude Bellingham lleva un buzo deportivo azul de Adidas, no la camiseta oficial de juego del Real Madrid."
+  }
+ ]
 }
