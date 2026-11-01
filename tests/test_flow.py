@@ -404,9 +404,7 @@ for i, act in enumerate(("xv", "xf", "xi")):
     updates_q.append({"update_id": 200 + i, "callback_query": {"id": f"r{i}", "data": f"{act}:{pr['id']}",
                                                                "message": {"chat": {"id": OWNER}, "message_id": 70}}})
 main.poll()
-chans = [ch for ch, c in photos[n:]]
-assert VIP in chans and config.FREE_CHANNEL in chans, photos[n:]
-prs = store.load()["picks"][pr["id"]]
+prs = store.load()["picks"][pr["id"]]   # el postpartido reemplaza la imagen del resultado (mismo mensaje) o sale aparte
 assert set(prs["recap"]["msgs"]) == {"vip", "free"} and prs["ig_res_status"] == "posted"
 assert posted and posted[-1][0] == f"res-{pr['id']}" and "¡VERDE!" in posted[-1][1] and "Paredes" in posted[-1][1]
 updates_q.append({"update_id": 210, "message": {"chat": {"id": OWNER, "type": "private"},

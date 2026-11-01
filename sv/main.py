@@ -1053,10 +1053,14 @@ def _post_media_file(state: dict) -> None:
         return
     state.setdefault("post_media_done", []).append(req["id"])
     from . import instagram
-    key = req["key"]
+    key = req.get("key")
     notes = []
-    for jid in req.get("cancel_jobs") or []:   # p. ej. el Reel que ya no quieres: si aún no salió, no se publica
-        j = (state.get("ig_jobs") or {}).get(jid)
+    jobs = state.get("ig_jobs") or {}
+    wanted = []
+    for jid in req.get("cancel_jobs") or []:   # «prefijo*» cancela todas las que empiezan así
+        wanted += [k for k in jobs if k.startswith(jid[:-1])] if jid.endswith("*") else [jid]
+    for jid in wanted:   # p. ej. el Reel que ya no quieres: si aún no salió, no se publica
+        j = jobs.get(jid)
         if not j:
             continue
         if j.get("status") == "posted":
@@ -1065,6 +1069,9 @@ def _post_media_file(state: dict) -> None:
         else:
             j["status"] = "skipped"
             notes.append("Reel anterior cancelado (no se publica)")
+    if not key:   # solo cancelar
+        telegram.send(owner, "🧹 " + formatting.escape("; ".join(notes) or "nada pendiente que cancelar"))
+        return
     try:
         with open(instagram.image_path(key), "rb") as f:
             img = f.read()
@@ -3041,6 +3048,15 @@ def _recap_share(state: dict, p: dict, where: str) -> None:
         image = f.read()
     reply = (p.get("channel_msgs") or {}).get(where)
     text = r["tg"]
+    res_mid = (p.get("result_msgs") or {}).get(where)
+    if res_mid and (p.get("result_is_photo") or {}).get(where) and formatting.caption_fits(text):
+        # una sola publicación por resultado: el postpartido reemplaza la imagen del resultado (mismo mensaje)
+        try:
+            if telegram.edit_photo(chat, res_mid, image, text):
+                r["msgs"][where] = res_mid
+                return
+        except Exception as e:  # noqa: BLE001
+            print(f"No se pudo reemplazar la imagen del resultado en {where}: {e}")
     if formatting.caption_fits(text):
         r["msgs"][where] = telegram.send_photo(chat, image, caption=text, reply_to=reply)["message_id"]
     else:
