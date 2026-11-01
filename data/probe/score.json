@@ -1,31 +1,39 @@
 [
  {
-  "name": "Flamengo at Vasco da Gama",
+  "name": "Samsunspor at Istanbul Basaksehir",
   "status": "FT",
   "score": {
-   "Vasco da Gama": "1",
-   "Flamengo": "4"
+   "Istanbul Basaksehir": "5",
+   "Samsunspor": "2"
   },
   "goals": [
    [
     "10'",
-    "Pedro"
+    "Eldor Shomurodov"
    ],
    [
-    "15'",
-    "Alan Lescano"
+    "22'",
+    "Tanguy Coulibaly"
+   ],
+   [
+    "25'",
+    "Andreas Skov Olsen"
    ],
    [
     "41'",
-    "Pedro"
+    "Emin Bayram"
    ],
    [
-    "53'",
-    "Samuel Lino"
+    "75'",
+    "Ousseynou Ba"
    ],
    [
-    "85'",
-    "Samuel Lino"
+    "84'",
+    "Elayis Tavsan"
+   ],
+   [
+    "90'+1'",
+    "Abbosbek Fayzullaev"
    ]
   ]
  }
