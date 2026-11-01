@@ -10,6 +10,8 @@ os.environ.setdefault("STATE_KEY", "clave-de-prueba-muy-larga")
 
 import test_engine as te  # noqa: E402
 from sv import apifootball, config, main, oddspapi, store, telegram  # noqa: E402
+# archivos de pedidos reales del repo (data/*.json): no deben correr en las pruebas
+main._post_media_file = main._score_fix_file = main._free_now_file = lambda state: None
 
 tmp = tempfile.mkdtemp()
 config.STATE_FILE = os.path.join(tmp, "state.enc")
