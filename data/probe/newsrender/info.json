@@ -5,5 +5,21 @@
  "kicker": "OKLAHOMA CITY THUNDER · NBA",
  "layout": "impact",
  "player": "Russell Westbrook",
- "credit": null
+ "credit": "Foto de referencia: Keith Allison from Hanover, MD, USA / Wikimedia Commons (CC BY-SA 2.0), modificada",
+ "jersey": [
+  {
+   "player": "Russell Westbrook",
+   "team": "Oklahoma City Thunder",
+   "title": "File:Russell Westbrook (32077032673).jpg",
+   "error": "ningún modelo respondió (gemini-3.8-flash: tardó demasiado; gemini-3.7-flash: límite gratuito alcanzado; gemini-3.6-flas"
+  },
+  {
+   "player": "Russell Westbrook",
+   "team": "Oklahoma City Thunder",
+   "title": "File:Russell Westbrook (32891950495).jpg",
+   "ok": true,
+   "jersey": "Oklahoma City Thunder",
+   "why": "Russell Westbrook aparece en primer plano llevando la camiseta oficial de los Oklahoma City Thunder."
+  }
+ ]
 }

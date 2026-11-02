@@ -1,1 +1,2 @@
+Encuadre con Gemini: ningún modelo respondió (gemini-3.8-flash: límite gratuito alcanzado; gemini-3.7-flash: límite gratuito alcanzado; gemini-3.6-flash: límite gratuito alcanzado; gemini-3.5-flash: límite gratuito alcanzado); la clave ve: gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash, gemini-2.5-flash, gemini-flash-latest
 ok n0220410
