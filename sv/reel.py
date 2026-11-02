@@ -211,21 +211,22 @@ def news(n: dict, duration: float = 11.0) -> tuple[bytes, bytes]:
     k = _text_layer(n["kicker"], P._font("Bold", 34), GOLD)
     layers.append(Layer(k, 60, y, 0.6))
     y += 62
-    hf = NI._bebas(150)
+    hf = NI._fit_all(d0, [n["headline"]], NI._bebas(150), W - 120, 3)
     t = 0.8
-    for line in NI._wrap(d0, n["headline"], hf, W - 120)[:3]:
+    for line in NI._wrap(d0, n["headline"], hf, W - 120):
         layers.append(Layer(_text_layer(line, hf, WHITE), 60, y, t, 0.5, 70))
         y += 140
         t += 0.22
     if n.get("sub"):
-        sf = P._font("Medium", 38)
-        for line in NI._wrap(d0, n["sub"], sf, W - 120)[:2]:
+        sf = NI._fit_all(d0, [n["sub"]], P._font("Medium", 38), W - 120, 2)
+        for line in NI._wrap(d0, n["sub"], sf, W - 120):
             layers.append(Layer(_text_layer(line, sf, (225, 230, 238)), 60, y + 8, t + 0.2))
             y += 52
     y += 40
     ff = P._font("Medium", 36)
     lh = 46
-    items = [NI._wrap(d0, f, ff, W - 220)[:2] for f in n["facts"][:2 if photo else 3]]
+    ff = NI._fit_all(d0, n["facts"][:2 if photo else 3], ff, W - 220, 2)
+    items = [NI._wrap(d0, f, ff, W - 220) for f in n["facts"][:2 if photo else 3]]
     panel, ys = _panel_layer(items, ff, lh)
     t_panel = t + 0.9
     layers.append(Layer(panel, 48, y, t_panel, 0.5, 40))
@@ -284,7 +285,8 @@ def postgame(g: dict, duration: float = 11.0) -> tuple[bytes, bytes]:
     y += 60
     ff = P._font("Medium", 36)
     lh = 46
-    items = [NI._wrap(d0, x, ff, W - 220)[:2] for x in g["notes"][:3 if photo else 4]]
+    ff = NI._fit_all(d0, g["notes"][:3 if photo else 4], ff, W - 220, 2)
+    items = [NI._wrap(d0, x, ff, W - 220) for x in g["notes"][:3 if photo else 4]]
     if items:
         panel, ys = _panel_layer(items, ff, lh, g.get("note_title", "LO QUE DEJÓ EL PARTIDO"))
         tp = 2.2
@@ -388,8 +390,8 @@ def hero(n: dict, duration: float = 9.5) -> tuple[bytes, bytes]:
     tag = _chip_layer(n.get("tag", "NOTICIA"), (255, 77, 64), WHITE, 34)
     layers.append(Layer(tag, W - 60 - tag.width, 92, 0.3, 0.4, -30))
     d0 = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    lf = P._font("Medium", 40)
-    lines = NI._wrap(d0, n["line"], lf, W - 120)[:2] if n.get("line") else []
+    lf = NI._fit_all(d0, [n.get("line")], P._font("Medium", 40), W - 120, 2)
+    lines = NI._wrap(d0, n["line"], lf, W - 120) if n.get("line") else []
     name = str(n.get("name") or n.get("headline") or "").upper()
     nf = NI._fit_line(d0, name, NI._bebas, 160, W - 110)
     bottom = SAFE_BOTTOM - 90
@@ -436,18 +438,18 @@ def impact(n: dict, duration: float = 9.0) -> tuple[bytes, bytes]:
     tag = _chip_layer(n.get("tag", "NOTICIA"), (255, 77, 64), WHITE, 34)
     layers.append(Layer(tag, W - 60 - tag.width, 92, 0.3, 0.4, -30))
     d0 = ImageDraw.Draw(Image.new("RGBA", (1, 1)))
-    hf = NI._bebas(170)
-    lines = NI._wrap(d0, str(n.get("headline", "")).upper(), hf, W - 110)[:3]
-    lf = P._font("Medium", 38)
-    line2 = NI._wrap(d0, n["line"], lf, W - 120)[:1] if n.get("line") else []
-    y = SAFE_BOTTOM - 110 - 150 * len(lines) - (56 if line2 else 0)
+    hf = NI._fit_all(d0, [str(n.get("headline", "")).upper()], NI._bebas(170), W - 110, 3)
+    lines = NI._wrap(d0, str(n.get("headline", "")).upper(), hf, W - 110)
+    lf = NI._fit_all(d0, [n.get("line")], P._font("Medium", 38), W - 120, 2)
+    line2 = NI._wrap(d0, n["line"], lf, W - 120) if n.get("line") else []
+    y = SAFE_BOTTOM - 110 - 150 * len(lines) - (lf.size + 14) * len(line2)
     if n.get("kicker"):
         layers.append(Layer(_text_layer(n["kicker"], P._font("Bold", 32), GOLD), 56, y - 60, 0.6))
     for i, ln in enumerate(lines):
         layers.append(Layer(_text_layer(ln, hf, WHITE), 52, y, 0.9 + 0.35 * i, 0.5, 80))
         y += 150
-    if line2:
-        layers.append(Layer(_text_layer(line2[0], lf, (232, 236, 242)), 58, y + 6, 2.2))
+    for i, ln in enumerate(line2):   # bajada completa, nunca cortada
+        layers.append(Layer(_text_layer(ln, lf, (232, 236, 242)), 58, y + 6 + (lf.size + 14) * i, 2.2))
     layers += _footer_layers(n.get("credit"), n.get("source", ""))
     end_at = duration - 2.3
 

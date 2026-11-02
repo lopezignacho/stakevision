@@ -326,6 +326,10 @@ def test_file(state: dict) -> None:
     if not req.get("id") or req["id"] in (state.get("news_test_done") or []):
         return
     state.setdefault("news_test_done", []).append(req["id"])
+    if req.get("redo"):   # rearmar una noticia en revisión (p. ej. tras corregir el diseño)
+        if not redo(state, str(req["redo"])):
+            telegram.send(owner, f"📰 No encontré en revisión la noticia «{formatting.escape(str(req['redo']))}».")
+        return
     if req.get("resend"):   # volver a proponer una noticia puntual (ej. «Curry 44»)
         if not resend(state, str(req["resend"]), req.get("title")):
             telegram.send(owner, f"📰 No encontré la noticia «{formatting.escape(str(req['resend']))}» para proponértela de nuevo.")
@@ -348,6 +352,25 @@ def test_file(state: dict) -> None:
         return
     if not n:
         telegram.send(owner, "📰 Por ahora no encontré noticias nuevas que valgan la pena. Reviso de nuevo en 2 horas.")
+
+
+def redo(state: dict, query: str) -> bool:
+    """Vuelve a armar (con el diseño corregido) la noticia en revisión que coincide con query; reemplaza la anterior."""
+    words = [w for w in query.lower().split() if w]
+    for nid, it in reversed(list((state.get("news_items") or {}).items())):
+        blob = " ".join(str(it.get(k) or "") for k in ("headline", "orig", "line", "player", "name")).lower()
+        if words and all(w in blob for w in words):
+            job = (state.get("ig_jobs") or {}).get(nid)
+            if job and job.get("status") == "posted":
+                return False
+            if job and job.get("status") in ("draft", "queued", "scheduled"):
+                job["status"] = "replaced"
+            it["rev"] = it.get("rev", 0) + 1
+            telegram.send(state["owner_chat"], "🔧 Corregí el texto que salía cortado. Esta es la versión buena "
+                                               "(la anterior ya no se publica) 👇")
+            _prepare(state, it)
+            return True
+    return False
 
 
 def resend(state: dict, query: str, title: str | None = None) -> bool:

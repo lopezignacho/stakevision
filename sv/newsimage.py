@@ -81,6 +81,17 @@ def _wrap(d, text, font, max_w) -> list[str]:
     return lines
 
 
+def _fit_all(d, texts, font, max_w, max_lines, min_ratio: float = 0.6):
+    """La letra más grande (hasta un 60% del tamaño original) con la que CADA texto cabe entero en max_lines
+    líneas. Así nunca se corta una frase a la mitad."""
+    texts = [str(t) for t in texts if t]
+    f, size = font, font.size
+    while True:
+        if all(len(_wrap(d, t, f, max_w)) <= max_lines for t in texts) or f.size <= size * min_ratio:
+            return f
+        f = f.font_variant(size=f.size - 2)
+
+
 def _chip(d, x, y, text, fill, ink, size=30, pad=22):
     f = P._font("Bold", size)
     w = d.textlength(text, font=f) + pad * 2
@@ -141,8 +152,8 @@ def render_news(n: dict) -> bytes:
         d.text((60, y), line, font=hf, fill=WHITE)
         y += step
     if n.get("sub"):
-        sf = P._font("Medium", 30 if photo else 34)
-        for line in _wrap(d, n["sub"], sf, P.W - 120)[:2]:
+        sf = _fit_all(d, [n["sub"]], P._font("Medium", 30 if photo else 34), P.W - 120, 2)
+        for line in _wrap(d, n["sub"], sf, P.W - 120):
             d.text((60, y + 6), line, font=sf, fill=(225, 230, 238))
             y += 42
     # tarjeta de datos
@@ -150,7 +161,9 @@ def render_news(n: dict) -> bytes:
     ff = P._font("Medium", 28 if photo else 31)
     lh = 36 if photo else 40
     facts = n["facts"][:2] if photo else n["facts"]
-    wrapped = [_wrap(d, f, ff, P.W - 200)[:2] for f in facts]
+    ff = _fit_all(d, facts, ff, P.W - 200, 2)
+    lh = round(lh * ff.size / (28 if photo else 31))
+    wrapped = [_wrap(d, f, ff, P.W - 200) for f in facts]
     box_h = 50 + sum(lh * len(w) + 24 for w in wrapped)
     panel = Image.new("RGBA", im.size, (0, 0, 0, 0))
     ImageDraw.Draw(panel).rounded_rectangle((48, y, P.W - 48, y + box_h), 28, fill=(10, 12, 18, 185))
@@ -209,8 +222,8 @@ def render_postgame(g: dict) -> bytes:
     d.text((60, y - 6), g["when"], font=P._font("Regular", 26), fill=(205, 210, 220))
     # claves del partido
     y += 50
-    ff = P._font("Medium", 30)
-    wrapped = [_wrap(d, x, ff, P.W - 200)[:2] for x in g["notes"]]
+    ff = _fit_all(d, g["notes"], P._font("Medium", 30), P.W - 200, 2)
+    wrapped = [_wrap(d, x, ff, P.W - 200) for x in g["notes"]]
     box_h = 100 + sum(38 * len(w) + 28 for w in wrapped)
     panel = Image.new("RGBA", im.size, (0, 0, 0, 0))
     ImageDraw.Draw(panel).rounded_rectangle((48, y, P.W - 48, y + box_h), 28, fill=(10, 12, 18, 175))
@@ -263,8 +276,8 @@ def render_hero(n: dict) -> bytes:
     _chip(d, P.W - 60 - (d.textlength(n.get("tag", "NOTICIA"), font=tf) + 44), 64, n.get("tag", "NOTICIA"),
           n.get("tag_color", (255, 77, 64)), WHITE, 28)
     accent = n.get("accent", (255, 196, 0))
-    lf = P._font("Medium", 34)
-    lines = _wrap(d, n["line"], lf, P.W - 110)[:2] if n.get("line") else []
+    lf = _fit_all(d, [n.get("line")], P._font("Medium", 34), P.W - 110, 2)
+    lines = _wrap(d, n["line"], lf, P.W - 110) if n.get("line") else []
     name = str(n.get("name") or n.get("headline") or "").upper()
     nf = _fit_line(d, name, _bebas, 130, P.W - 110)
     bottom = H - 180                                  # sobre el crédito y la firma
@@ -293,17 +306,20 @@ def render_impact(n: dict) -> bytes:
     tf = P._font("Bold", 28)
     _chip(d, P.W - 60 - (d.textlength(n.get("tag", "NOTICIA"), font=tf) + 44), 64, n.get("tag", "NOTICIA"),
           n.get("tag_color", (255, 77, 64)), WHITE, 28)
-    hf = _bebas(150)
-    lines = _wrap(d, str(n.get("headline", "")).upper(), hf, P.W - 110)[:3]
-    y = H - 210 - 132 * len(lines) - (50 if n.get("line") else 0)
+    hf = _fit_all(d, [str(n.get("headline", "")).upper()], _bebas(150), P.W - 110, 3)
+    lines = _wrap(d, str(n.get("headline", "")).upper(), hf, P.W - 110)
+    step = round(132 * hf.size / 150)
+    lf = _fit_all(d, [n.get("line")], P._font("Medium", 32), P.W - 110, 2)
+    sub = _wrap(d, n["line"], lf, P.W - 110) if n.get("line") else []
+    y = H - 210 - step * len(lines) - (lf.size + 12) * len(sub)
     if n.get("kicker"):
         d.text((56, y - 52), n["kicker"], font=P._font("Bold", 28), fill=n.get("accent", (255, 196, 0)))
     for ln in lines:
         d.text((52, y), ln, font=hf, fill=WHITE)
-        y += 132
-    if n.get("line"):
-        lf = P._font("Medium", 32)
-        d.text((56, y + 4), _wrap(d, n["line"], lf, P.W - 110)[0], font=lf, fill=(232, 236, 242))
+        y += step
+    for ln in sub:   # la bajada completa (hasta 2 líneas), nunca cortada
+        d.text((56, y + 4), ln, font=lf, fill=(232, 236, 242))
+        y += lf.size + 12
     _footer(im, d, n.get("source", ""), n.get("credit"))
     return P._jpeg(im)
 
