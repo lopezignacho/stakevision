@@ -1,7 +1,7 @@
 """Vista previa (sin enviar nada) de una noticia en revisión, con el diseño actual."""
 import json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from sv import newswatch, store  # noqa: E402
+from sv import commons, newswatch, store  # noqa: E402
 q = os.environ.get("Q", "westbrook").lower().split()
 st = store.load()
 OUT = "data/probe/newsrender"
@@ -11,7 +11,7 @@ for nid, it in reversed(list((st.get("news_items") or {}).items())):
     if all(w in blob for w in q):
         img, cr, nd = newswatch._render(dict(it))
         open(f"{OUT}/preview.jpg", "wb").write(img)
-        json.dump({k: it.get(k) for k in ("headline", "line", "sub", "kicker", "layout", "player")} | {"credit": cr},
+        json.dump({k: it.get(k) for k in ("headline", "line", "sub", "kicker", "layout", "player")} | {"credit": cr, "jersey": commons.JERSEY_LOG},
                   open(f"{OUT}/info.json", "w"), ensure_ascii=False, indent=1)
         print("ok", nid)
         break
