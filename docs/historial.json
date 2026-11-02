@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-02T03:20:32.035813+00:00",
+ "updated_at": "2026-11-02T03:21:41.128450+00:00",
  "summary": {
   "picks": 19,
   "wins": 14,
@@ -10,6 +10,33 @@
   "units": 24.49
  },
  "picks": [
+  {
+   "id": "201",
+   "published_at": "2026-11-02T03:21:38Z",
+   "kickoff": "2026-11-02T22:00:00.000Z",
+   "kind": "simple",
+   "price": 1.67,
+   "stake": 4,
+   "prob": 0.6001,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "CA Platense",
+     "away": "CA Central Cordoba SE",
+     "league": "Argentina · Liga Profesional",
+     "market": "Más/Menos Tiempo Completo",
+     "outcome": "Más",
+     "price": 1.67,
+     "label": "Más de 2 goles (si hay 2 justos, se devuelve)",
+     "mtype": "totals",
+     "handicap": 2.0,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.67): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\nProbabilidad estimada: 60,0%. Para no perder a esta cuota se necesita 59,9%."
+  },
   {
    "id": "189",
    "published_at": "2026-11-01T03:21:08Z",
