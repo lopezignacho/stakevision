@@ -221,6 +221,146 @@ def _top_articles() -> list[dict]:
     return out
 
 
+# ---------------------------------------------------------------- postpartidos al instante
+POSTMATCH_LEAGUES = (("uefa.champions", "Champions League"), ("uefa.europa", "Europa League"),
+                     ("conmebol.libertadores", "Copa Libertadores"), ("conmebol.sudamericana", "Copa Sudamericana"),
+                     ("eng.1", "Premier League"), ("esp.1", "LaLiga"), ("ita.1", "Serie A"), ("ger.1", "Bundesliga"),
+                     ("fra.1", "Ligue 1"), ("chi.1", "Primera División de Chile"))
+POSTMATCH_WINDOW_MIN = 60          # se proponen hasta 1 hora después de terminado
+NBA_STAR_PTS = 35                  # NBA: solo partidos con una actuación grande o un final apretado
+
+
+def _soccer_events(lg: str, day: str) -> list[dict]:
+    try:
+        return requests.get(f"https://site.api.espn.com/apis/site/v2/sports/soccer/{lg}/scoreboard",
+                            params={"dates": day}, timeout=20).json().get("events") or []
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _end_estimate(e: dict, sport: str):
+    """Hora aproximada del final (ESPN no la da): inicio + duración típica."""
+    ko = datetime.fromisoformat(e["date"].replace("Z", "+00:00"))
+    return ko + (timedelta(minutes=150) if sport == "basketball" else timedelta(minutes=115))
+
+
+def _soccer_item(e: dict, league: str) -> dict:
+    c = e["competitions"][0]
+    cs = {x["homeAway"]: x for x in c["competitors"]}
+    h, a = cs["home"], cs["away"]
+    hs, as_ = int(h.get("score") or 0), int(a.get("score") or 0)
+    goals = []
+    for d in c.get("details") or []:
+        if d.get("scoringPlay"):
+            who = ((d.get("athletesInvolved") or [{}])[0]).get("displayName") or "?"
+            team_id = str((d.get("team") or {}).get("id") or "")
+            side = "local" if team_id == str(h["team"]["id"]) else "visita"
+            extra = " (penal)" if d.get("penaltyKick") else " (autogol)" if d.get("ownGoal") else ""
+            goals.append(f"{(d.get('clock') or {}).get('displayValue', '')} {who}{extra} [{side}]")
+    stats = {}
+    for x, side in ((h, "local"), (a, "visita")):
+        for st in x.get("statistics") or []:
+            if st.get("name") in ("possessionPct", "shotsOnTarget", "totalShots"):
+                stats.setdefault(st["name"], {})[side] = st.get("displayValue")
+    src = (f"Resultado final de {league}: {h['team']['displayName']} {hs} - {as_} {a['team']['displayName']}.\n"
+           f"Goles: {'; '.join(goals) or 'sin goles'}.\n"
+           + "".join(f"{k}: local {v.get('local')}, visita {v.get('visita')}.\n" for k, v in stats.items())
+           + f"Récords/tabla: local {(h.get('records') or [{}])[0].get('summary', '')}, "
+             f"visita {(a.get('records') or [{}])[0].get('summary', '')}.")
+    return {"headline": f"{h['team']['displayName']} {hs}-{as_} {a['team']['displayName']}", "sport": "soccer",
+            "description": f"{league}: {', '.join(goals[:6])}", "src": src, "league": league,
+            "link": next((l_.get("href") for l_ in e.get("links") or [] if "summary" in (l_.get("rel") or [])), ""),
+            "match": {"home": {"name": h["team"]["displayName"], "short": h["team"].get("shortDisplayName") or
+                               h["team"]["displayName"], "score": hs},
+                      "away": {"name": a["team"]["displayName"], "short": a["team"].get("shortDisplayName") or
+                               a["team"]["displayName"], "score": as_}, "when": "Final"}}
+
+
+def _nba_item(e: dict) -> dict | None:
+    c = e["competitions"][0]
+    cs = {x["homeAway"]: x for x in c["competitors"]}
+    h, a = cs["home"], cs["away"]
+    hs, as_ = int(h.get("score") or 0), int(a.get("score") or 0)
+    star, best = None, 0
+    lines = []
+    for x in (h, a):
+        for ld in x.get("leaders") or []:
+            if ld.get("name") in ("points", "rebounds", "assists") and ld.get("leaders"):
+                top = ld["leaders"][0]
+                lines.append(f"{x['team']['displayName']}: {top['athlete']['displayName']} {top.get('displayValue')} "
+                             f"({ld.get('name')})")
+                if ld.get("name") == "points":
+                    try:
+                        v = int(float(top.get("value") or 0))
+                    except ValueError:
+                        v = 0
+                    if v > best:
+                        best, star = v, top["athlete"]["displayName"]
+    ot = (c.get("status") or {}).get("period", 4) > 4
+    if best < NBA_STAR_PTS and abs(hs - as_) > 3 and not ot:
+        return None
+    return {"headline": f"{h['team']['displayName']} {hs}-{as_} {a['team']['displayName']}" + (" (prórroga)" if ot else ""),
+            "sport": "basketball", "league": "NBA", "player": star,
+            "description": "; ".join(lines), "src": f"Final NBA: {h['team']['displayName']} {hs} - {as_} "
+            f"{a['team']['displayName']}{' en prórroga' if ot else ''}.\nLíderes: " + "; ".join(lines),
+            "link": "", "match": {"home": {"name": h["team"]["displayName"], "short": h["team"]["name"], "score": hs},
+                                  "away": {"name": a["team"]["displayName"], "short": a["team"]["name"], "score": as_},
+                                  "when": "Final"}}
+
+
+def postmatch(state: dict, window_min: int = POSTMATCH_WINDOW_MIN) -> int:
+    """Apenas termina un partido importante (máx. 1 hora después), te lo propone para hacer contenido.
+    Va UN mensaje por partido, una sola vez."""
+    owner = state.get("owner_chat")
+    if not owner:
+        return 0
+    now = store.now_utc()
+    done = state.setdefault("news_pm_done", [])
+    days = {(now - timedelta(hours=h)).strftime("%Y%m%d") for h in (0, 6)}
+    found = []
+    for lg, name in POSTMATCH_LEAGUES:
+        for day in days:
+            for e in _soccer_events(lg, day):
+                c = e["competitions"][0]
+                if not c["status"]["type"].get("completed") or e["id"] in done:
+                    continue
+                if now - _end_estimate(e, "soccer") > timedelta(minutes=window_min):
+                    continue
+                found.append((e["id"], lambda e=e, name=name: _soccer_item(e, name)))
+    try:
+        from . import nba
+        for day in days:
+            for e in nba._get("/scoreboard", dates=day).get("events") or []:
+                c = e["competitions"][0]
+                if not c["status"]["type"].get("completed") or e["id"] in done:
+                    continue
+                if now - _end_estimate(e, "basketball") > timedelta(minutes=window_min):
+                    continue
+                found.append((e["id"], lambda e=e: _nba_item(e)))
+    except Exception:  # noqa: BLE001
+        traceback.print_exc()
+    sent = 0
+    esc = formatting.escape
+    for eid, make in found:
+        if eid in done:
+            continue
+        done.append(eid)   # se marca antes de enviar: nunca dos veces el mismo partido
+        try:
+            item = make()
+        except Exception:  # noqa: BLE001
+            traceback.print_exc()
+            continue
+        if not item:
+            continue
+        nid = f"m{eid}"
+        state.setdefault("news_pending", {})[nid] = dict(item, id=nid, titulo=item["headline"], categoria="Resultado")
+        telegram.send(owner, f"⚽ <b>Partido terminado</b> · {esc(item['league'])}\n\n<b>{esc(item['headline'])}</b>\n"
+                             f"{esc(item.get('description') or '')}\n\n¿Hacemos contenido para Instagram?", BUTTONS(nid))
+        sent += 1
+    del done[:-400]
+    return sent
+
+
 def check_editor(state: dict, force: bool = False) -> int:
     """Con Gemini: noticias importantes (generales + de nuestros picks), elegidas y resumidas en español."""
     from . import llm
@@ -326,6 +466,11 @@ def test_file(state: dict) -> None:
     if not req.get("id") or req["id"] in (state.get("news_test_done") or []):
         return
     state.setdefault("news_test_done", []).append(req["id"])
+    if req.get("postmatch_hours"):   # buscar ya los partidos terminados en las últimas N horas
+        n = postmatch(state, int(float(req["postmatch_hours"]) * 60))
+        if not n:
+            telegram.send(owner, "⚽ No hay partidos importantes terminados en ese rango para proponerte.")
+        return
     if req.get("redo"):   # rearmar una noticia en revisión (p. ej. tras corregir el diseño)
         if not redo(state, str(req["redo"])):
             telegram.send(owner, f"📰 No encontré en revisión la noticia «{formatting.escape(str(req['redo']))}».")
@@ -509,11 +654,16 @@ def draft(state: dict, nid: str) -> bool:
     item = (state.get("news_pending") or {}).pop(nid, None)
     if not item:
         return False
-    src = _article_text(item.get("link"), item.get("description") or "")
+    src = item.get("src") or _article_text(item.get("link"), item.get("description") or "")
     prompt = (EDITORIAL + "\n\nRedacta esta noticia para una imagen y un Reel de Instagram.\n"
               f"Titular original: {item['headline']}\nResumen: {item.get('description', '')}\n"
               f"Texto fuente:\n{src}\n\nResponde en JSON con este formato: {FIELDS}")
     data = _clean(llm.ask_json(prompt, 0.4))
+    if item.get("match") and not (data.get("match") or {}).get("played"):   # partido recién terminado: datos de ESPN
+        data["match"] = _clean_match(item["match"])
+        data["format"] = data.get("format") if data.get("format") in ("result", "figura") else "result"
+    if item.get("player") and not data.get("player"):
+        data["player"] = item["player"]
     data.update(id=nid, sources=data.get("sources") or "ESPN", link=item.get("link"), _source=src[:6000],
                 rev=0, orig=item.get("headline"))
     if item.get("own_photos"):

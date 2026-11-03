@@ -1578,3 +1578,23 @@ img, cr, nd = _nw2._render(it)
 assert nd["layout"] == "figura" and nd["figura"]["home"]["score"] == 114 and img[:2] == b"\xff\xd8"
 _nw2._photo_for = _pf
 print("OK formato figura")
+
+# 50) postpartido al instante: partido terminado hace < 1 h → UNA propuesta, una sola vez
+from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+_ko = (_dt.now(_tz.utc) - _td(minutes=140)).strftime("%Y-%m-%dT%H:%MZ")
+_ev = {"id": "777", "date": _ko, "competitions": [{"status": {"type": {"completed": True}}, "details": [
+    {"scoringPlay": True, "clock": {"displayValue": "12'"}, "athletesInvolved": [{"displayName": "Kane"}], "team": {"id": "1"}}],
+    "competitors": [{"homeAway": "home", "score": "2", "team": {"id": "1", "displayName": "Bayern Munich", "shortDisplayName": "Bayern"}},
+                    {"homeAway": "away", "score": "1", "team": {"id": "2", "displayName": "PSG", "shortDisplayName": "PSG"}}]}]}
+_se = _nw2._soccer_events
+_nw2._soccer_events = lambda lg, day: [_ev] if lg == "uefa.champions" else []
+st = {"owner_chat": OWNER}
+n0 = len(sent)
+assert _nw2.postmatch(st) == 1 and "m777" in st["news_pending"] and "Bayern Munich 2-1 PSG" in sent[-1][1]
+assert _nw2.postmatch(st) == 0 and len(sent) == n0 + 1   # nunca dos veces
+_ev2 = dict(_ev, id="778", date=(_dt.now(_tz.utc) - _td(minutes=300)).strftime("%Y-%m-%dT%H:%MZ"))
+_nw2._soccer_events = lambda lg, day: [_ev2] if lg == "uefa.champions" else []
+assert _nw2.postmatch(st) == 0   # terminó hace más de 1 hora: no
+assert _nw2.postmatch(st, 300) == 1   # pedido a mano con una ventana mayor
+_nw2._soccer_events = _se
+print("OK postpartido al instante")

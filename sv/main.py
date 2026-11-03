@@ -4121,6 +4121,7 @@ def poll() -> None:
         newswatch.ready(st)
         newswatch.test_file(st)
         if llm.enabled():
+            newswatch.postmatch(st)   # partidos recién terminados (máx. 1 hora): contenido al instante
             newswatch.check_editor(st)
         else:
             newswatch.check(st)
