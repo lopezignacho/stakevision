@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-03T04:05:27.524352+00:00",
+ "updated_at": "2026-11-03T04:10:36.300818+00:00",
  "summary": {
   "picks": 20,
   "wins": 14,
@@ -28,7 +28,7 @@
      "market": "Hándicap Asiático",
      "outcome": "2",
      "price": 1.65,
-     "label": "Lille OSC gana o empata (si pierde por 1 gol, se devuelve)",
+     "label": "Lille OSC +1 (hándicap asiático)",
      "mtype": "spreads",
      "handicap": -1.0,
      "sport": "soccer",
