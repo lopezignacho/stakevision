@@ -1,7 +1,7 @@
 {
- "updated_at": "2026-11-03T00:10:42.858148+00:00",
+ "updated_at": "2026-11-03T00:16:47.151491+00:00",
  "summary": {
-  "picks": 19,
+  "picks": 20,
   "wins": 14,
   "losses": 4,
   "hit_rate": 0.7778,
@@ -19,7 +19,7 @@
    "stake": 4,
    "prob": 0.6001,
    "free": true,
-   "result": null,
+   "result": "V",
    "legs": [
     {
      "home": "CA Platense",
@@ -32,7 +32,10 @@
      "mtype": "totals",
      "handicap": 2.0,
      "sport": "soccer",
-     "score": null
+     "score": [
+      2,
+      0
+     ]
     }
    ],
    "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.67): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\nProbabilidad estimada: 60,0%. Para no perder a esta cuota se necesita 59,9%."
