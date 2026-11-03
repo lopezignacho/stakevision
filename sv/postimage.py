@@ -67,6 +67,9 @@ MARKET_NAME = {"1x2": "Resultado del partido", "totals": "Total de goles", "both
 def _market(l: dict) -> str:
     """Tipo de apuesta en palabras simples (sin «hándicap asiático» ni jerga)."""
     t = l.get("mtype") or ""
+    h = l.get("handicap")
+    if t == "spreads" and h is not None and float(h) != 0 and float(h) == int(float(h)):
+        return "Hándicap asiático"   # se dice tal cual (no se disfraza de «resultado del partido»)
     if l.get("sport") == "basketball":
         if t == "totals":
             return "Total de puntos"

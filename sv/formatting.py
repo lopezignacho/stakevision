@@ -33,7 +33,7 @@ TEAM_FIX = {"Vina del Mar": "Viña del Mar", "Nunoa": "Ñuñoa", "Nuble": "Ñubl
             "Penarol": "Peñarol", "Atletico": "Atlético", "Gremio": "Grêmio", "Sao Paulo": "São Paulo",
             "Union Espanola": "Unión Española", "Cobresal": "Cobresal", "Nublense": "Ñublense",
             "Alaves": "Alavés", "Cadiz": "Cádiz", "Leganes": "Leganés", "Almeria": "Almería",
-            "Istanbul Basaksehir": "Başakşehir", "Basaksehir": "Başakşehir", "Besiktas": "Beşiktaş",
+            "Istanbul Basaksehir": "Başakşehir", "Bodoe/Glimt": "Bodø/Glimt", "Basaksehir": "Başakşehir", "Besiktas": "Beşiktaş",
             "Fenerbahce": "Fenerbahçe", "Galatasaray": "Galatasaray", "Kasimpasa": "Kasımpaşa", "Goztepe": "Göztepe"}
 
 
@@ -99,18 +99,13 @@ def public_label(l: dict) -> str:
             return f"Gana {who}"
         if hh == 0.5:
             return f"{who} gana o empata"
-        if hh < 0:
-            need = int(-hh) + 1 if hh % 1 else int(-hh)
-            if hh % 1:   # -1.5 → gana por 2 o más
-                return f"{who} gana por {_goals(need, unit)} o más"
-            return f"{who} gana por {_goals(need + 1, unit)} o más (si gana por {need}, se devuelve)"
-        lim = int(hh) if hh % 1 else int(hh) - 1   # +1.5 → no pierde por más de 1
-        if hh % 1:
-            return f"{who} gana, empata o pierde por {_goals(lim, unit)} como máximo" if unit == "goles" \
-                else f"{who} gana o pierde por {_goals(lim, unit)} como máximo"
-        if int(hh) == 1:
-            return f"{who} gana o empata (si pierde por {_goals(1, unit)}, se devuelve)"
-        return f"{who} no pierde por más de {_goals(lim, unit)} (si pierde por {int(hh)}, se devuelve)"
+        if not hh % 1:   # línea entera (+1, -2…): se dice tal cual es, sin mezclarla con «gana o empata»
+            return f"{who} {'+' if hh > 0 else '-'}{_line(abs(hh))} (hándicap asiático)"
+        if hh < 0:   # -1.5 → gana por 2 o más (equivale exacto)
+            return f"{who} gana por {_goals(int(-hh) + 1, unit)} o más"
+        lim = int(hh)   # +1.5 → no pierde por más de 1 (equivale exacto)
+        return f"{who} gana, empata o pierde por {_goals(lim, unit)} como máximo" if unit == "goles" \
+            else f"{who} gana o pierde por {_goals(lim, unit)} como máximo"
     if t == "totals" and h is not None:
         txt = f"{'Más' if over else 'Menos'} de {_line(h)} {unit}"
         if float(h) == int(float(h)):
