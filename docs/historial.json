@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-04T03:35:25.499172+00:00",
+ "updated_at": "2026-11-04T03:40:51.117898+00:00",
  "summary": {
   "picks": 21,
   "wins": 15,
@@ -10,6 +10,33 @@
   "units": 27.09
  },
  "picks": [
+  {
+   "id": "238",
+   "published_at": "2026-11-04T03:40:44Z",
+   "kickoff": "2026-11-05T00:30:00.000Z",
+   "kind": "simple",
+   "price": 1.78,
+   "stake": 3,
+   "prob": 0.561,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Sao Paulo FC SP",
+     "away": "SC Corinthians SP",
+     "league": "Brasil · Serie A",
+     "market": "Más/Menos Tiempo Completo",
+     "outcome": "Más",
+     "price": 1.78,
+     "label": "Más de 2 goles (si hay 2 justos, se devuelve)",
+     "mtype": "totals",
+     "handicap": 2.0,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.78).\nProbabilidad estimada: 56,1%. Para no perder a esta cuota se necesita 56,2%."
+  },
   {
    "id": "236",
    "published_at": "2026-11-03T03:40:28Z",
