@@ -1401,7 +1401,7 @@ _ig._call = _fake_call
 _ig._publish_container = lambda st_, uid, cid: "https://instagram.com/reel/x"
 _ig.image_live = lambda k: True
 job = {"reel": "news-x"}
-assert _ig.reel_step(st, job, "cap") is None and job["cid"] == "c1" and calls_ig[0][2] == "REELS"
+assert _ig.reel_step(st, job, "cap") is None and job["cid"] == "c1" and [c for c in calls_ig if c[0] == "POST"][0][2] == "REELS"
 assert _ig.reel_step(st, job, "cap") == "https://instagram.com/reel/x" and "cid" not in job
 # postpartido: con IG_REELS, el recap guarda su Reel y el envío a Instagram usa el Reel
 config.IG_REELS = True
@@ -1598,3 +1598,12 @@ assert _nw2.postmatch(st) == 0   # terminó hace más de 1 hora: no
 assert _nw2.postmatch(st, 300) == 1   # pedido a mano con una ventana mayor
 _nw2._soccer_events = _se
 print("OK postpartido al instante")
+
+# 51) Instagram: nunca dos veces la misma publicación (si ya salió, no se repite)
+importlib.reload(_ig)
+_ig._call = lambda m, p, st_, **k: {"data": [{"caption": "Mismo texto", "timestamp": store.now_utc().strftime("%Y-%m-%dT%H:%M:%S+0000"),
+                                               "permalink": "https://ig/p/1"}]} if p == "me/media" else (_ for _ in ()).throw(AssertionError("publicó de nuevo"))
+assert _ig.publish({}, "k", "Mismo   texto") == "https://ig/p/1"
+assert _ig.publish_single({}, "u", "mismo texto") == "https://ig/p/1"
+importlib.reload(_ig)
+print("OK sin publicaciones repetidas en Instagram")

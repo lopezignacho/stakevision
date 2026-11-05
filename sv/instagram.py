@@ -8,7 +8,7 @@ El token dura 60 días: se renueva solo cada semana y se guarda cifrado en el es
 from __future__ import annotations
 
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import requests
 
@@ -77,8 +77,59 @@ def image_live(pid: str) -> bool:
         return False
 
 
+def _key(caption: str) -> str:
+    import re
+    return re.sub(r"\s+", " ", (caption or "").strip())[:120].lower()
+
+
+def already_posted(state: dict, caption: str, hours: int = 48) -> str | None:
+    """¿Ya hay en la cuenta una publicación con este mismo texto (últimas `hours` horas)? Devuelve su enlace.
+    Es la última barrera contra duplicados: si una vuelta anterior publicó y se cortó antes de anotarlo,
+    no se vuelve a publicar."""
+    if not caption:
+        return None
+    try:
+        rows = _call("GET", "me/media", state, fields="caption,timestamp,permalink", limit=15).get("data") or []
+    except InstagramError:
+        return None
+    k = _key(caption)
+    now = store.now_utc()
+    for m in rows:
+        try:
+            ts = datetime.strptime(m.get("timestamp", ""), "%Y-%m-%dT%H:%M:%S%z")
+        except ValueError:
+            continue
+        if now - ts <= timedelta(hours=hours) and _key(m.get("caption") or "") == k:
+            return m.get("permalink") or "(ya publicada)"
+    return None
+
+
+def _guard(fn):
+    """Envuelve una publicación: antes revisa si ya salió; si falla a medio camino, revisa si alcanzó a salir."""
+    def wrapper(state, *a, caption=None, **kw):
+        cap = caption if caption is not None else (a[-1] if a else "")
+        done = already_posted(state, cap)
+        if done:
+            print("Instagram: ya estaba publicada, no se repite")
+            return done
+        try:
+            return fn(state, *a, **({"caption": caption} if caption is not None else {}), **kw)
+        except InstagramError:
+            import time
+            time.sleep(8)
+            done = already_posted(state, cap)
+            if done:
+                return done
+            raise
+    return wrapper
+
+
 def publish(state: dict, pid: str, caption: str) -> str:
     """Publica la imagen del pick. Devuelve el enlace de la publicación."""
+    return _publish_guarded(state, pid, caption)
+
+
+def _publish_raw(state: dict, pid: str, caption: str) -> str:
     me = _call("GET", "me", state, fields="user_id,username")
     uid = me.get("user_id") or me.get("id")
     c = _call("POST", f"{uid}/media", state, image_url=image_url(pid), caption=caption)
@@ -224,6 +275,10 @@ def reel_step(state: dict, job: dict, caption: str) -> str | None:
     y guarda su id en job['cid']; las siguientes revisan si quedó listo y lo publican.
     Devuelve el enlace cuando se publicó; None si aún está procesando."""
     uid = _uid(state)
+    done = already_posted(state, caption)
+    if done:   # una vuelta anterior ya lo publicó (y se cortó antes de anotarlo)
+        job.pop("cid", None)
+        return done
     if not job.get("cid"):
         params = {"media_type": "REELS", "video_url": video_url(job["reel"]), "caption": caption, "share_to_feed": "true"}
         if image_live(f"reel-{job['reel']}"):
@@ -239,3 +294,8 @@ def reel_step(state: dict, job: dict, caption: str) -> str | None:
     link = _publish_container(state, uid, job["cid"])
     job.pop("cid", None)
     return link
+
+
+_publish_guarded = _guard(_publish_raw)
+publish_single = _guard(publish_single)
+publish_carousel = _guard(publish_carousel)
