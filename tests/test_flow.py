@@ -538,7 +538,7 @@ updates_q.append({"update_id": 801, "message": {"chat": {"id": OWNER, "type": "p
 main.poll()
 st = store.load()
 n2, n3 = st["picks"]["N2"]["recap"]["layout"], st["picks"]["N3"]["recap"]["layout"]
-assert n2 != n3 and n2 in layouts.RECAP_LAYOUTS and n3 in layouts.RECAP_LAYOUTS, (n2, n3)
+assert n2 == n3 == "scoreboard", (n2, n3)   # diseño fijo elegido por el dueño
 updates_q.append({"update_id": 802, "callback_query": {"id": "z1", "data": "xl:N3",
                                                        "message": {"chat": {"id": OWNER}, "message_id": 120}}})
 main.poll()

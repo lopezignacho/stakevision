@@ -12,7 +12,7 @@ from . import formatting
 from . import postimage as P
 
 W, H = 1080, 1350
-RECAP_LAYOUTS = ["revista", "marcador", "poster"]
+RECAP_LAYOUTS = ["scoreboard"]   # diseño fijo elegido por el dueño (marcador grande con escudos oficiales)
 PICK_LAYOUTS = ["revista", "ticket", "dividido"]
 LAYOUT_NAMES = {"revista": "Revista", "marcador": "Marcador", "poster": "Póster", "ticket": "Ticket",
                 "dividido": "Dividido"}
@@ -380,6 +380,8 @@ def pick_dividido(m: dict, theme: str = "dark") -> bytes:
 
 # ---------------------------------------------------------------- despacho
 def render_recap(m: dict, layout: str = "revista", theme: str = "dark") -> bytes:
+    if layout not in ("revista", "marcador", "poster"):
+        return recap_scoreboard(m, theme)
     return {"marcador": recap_marcador, "poster": recap_poster}.get(layout, P.render_recap)(m, theme)
 
 

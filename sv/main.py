@@ -2160,6 +2160,7 @@ def _correct(state: dict, p: dict, result: str) -> None:
 
 # ---------------------------------------------------------------- post partido (formato revista)
 def RECAP_BUTTONS(p: dict) -> list:
+    from . import layouts
     pid, msgs = p["id"], (p.get("recap") or {}).get("msgs") or {}
     st = p.get("ig_res_status")
     if _vip_only(p):   # NBA: el final va al VIP y a Instagram (nunca a Gratis)
@@ -2176,8 +2177,8 @@ def RECAP_BUTTONS(p: dict) -> list:
         [("✅ Instagram" if st == "posted" else "⏳ Instagram en cola" if st == "queued" else "📸 Compartir en Instagram",
           "noop" if st in ("queued", "posted") else f"xi:{pid}")],
         [("🖼 Adjuntar mi imagen", f"xp:{pid}"), ("✏️ Cambiar titular", f"xt:{pid}")],
-        [("🌙 Modo noche" if (p.get("recap") or {}).get("theme") == "light" else "☀️ Modo día", f"xh:{pid}"),
-         ("🔀 Otro diseño", f"xl:{pid}")],
+        [("🌙 Modo noche" if (p.get("recap") or {}).get("theme") == "light" else "☀️ Modo día", f"xh:{pid}")]
+        + ([("🔀 Otro diseño", f"xl:{pid}")] if len(layouts.RECAP_LAYOUTS) > 1 else []),
     ] + ([[("✋ No compartir sola", f"xn:{pid}")]] if (p.get("recap") or {}).get("auto_at")
          and not p["recap"].get("auto_done") and not p["recap"].get("auto_off") else [])
 
@@ -2257,7 +2258,7 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
     data = recap.build(p, rep, photo, old.get("custom_title"))
     data["credit"] = photo[1]["text"] if photo and photo[1] else None
     from . import layouts
-    layout = old.get("layout") or layouts.next_layout(state, "recap")
+    layout = old.get("layout") if old.get("layout") in layouts.RECAP_LAYOUTS else layouts.next_layout(state, "recap")
     if old.get("mode") == "raw" and os.path.exists(_upload_file(p)):
         with open(_upload_file(p), "rb") as f:
             image = postimage.fit_instagram(f.read())
