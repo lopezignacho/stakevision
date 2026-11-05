@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-11-05T02:40:29.181467+00:00",
+ "updated_at": "2026-11-05T02:45:34.364176+00:00",
  "summary": {
-  "picks": 21,
+  "picks": 22,
   "wins": 15,
-  "losses": 4,
-  "hit_rate": 0.7895,
-  "yield": 0.4105,
+  "losses": 5,
+  "hit_rate": 0.75,
+  "yield": 0.3491,
   "avg_odds": 1.79,
-  "units": 27.09
+  "units": 24.09
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 3,
    "prob": 0.561,
    "free": true,
-   "result": null,
+   "result": "L",
    "legs": [
     {
      "home": "Sao Paulo FC SP",
@@ -32,7 +32,10 @@
      "mtype": "totals",
      "handicap": 2.0,
      "sport": "soccer",
-     "score": null
+     "score": [
+      0,
+      0
+     ]
     }
    ],
    "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.78).\nProbabilidad estimada: 56,1%. Para no perder a esta cuota se necesita 56,2%."
