@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
+from . import formatting
 from . import postimage as P
 
 W, H = 1080, 1350
@@ -587,4 +588,113 @@ def nba_board(m: dict, theme: str = "dark") -> bytes:
         d.text((70, by0 + 84), t2, font=f2, fill=ink, anchor="ls")
     _legal(d, T, 1326)
     _credit(im, T, m.get("credit"), x=1046, y=150)
+    return P._jpeg(im)
+
+
+# ---------------------------------------------------------------- «marcador grande»: escudos, resultado y goles por equipo
+def recap_scoreboard(m: dict, theme: str = "dark") -> bytes:
+    """Diseño limpio y fuerte: fondo partido con los colores de cada club, escudos oficiales grandes a los lados,
+    marcador gigante al centro, titular en una línea, los goles de cada equipo bajo su escudo y nuestro pick
+    en una franja al pie. Si hay foto del protagonista, va arriba y se funde con el fondo."""
+    from . import newsimage as NI
+    rep = m["report"]
+    home, away = rep["home"], rep["away"]
+    W_, H_ = W, H
+    hf, _ = P.team_palette(home)
+    af, _ = P.team_palette(away)
+    win = "home" if home["score"] > away["score"] else "away" if away["score"] > home["score"] else ""
+    # fondo: dos colores en diagonal, muy oscurecidos
+    im = Image.new("RGBA", (W_, H_), (8, 10, 16, 255))
+    left = Image.new("RGBA", (W_, H_), P._mix(hf, (6, 8, 14), 0.62) + (255,))
+    right = Image.new("RGBA", (W_, H_), P._mix(af, (6, 8, 14), 0.62) + (255,))
+    mask = Image.new("L", (W_, H_), 0)
+    ImageDraw.Draw(mask).polygon([(0, 0), (W_ * 0.58, 0), (W_ * 0.42, H_), (0, H_)], fill=255)
+    im.paste(right, (0, 0))
+    im.paste(left, (0, 0), mask)
+    if m.get("photo"):   # protagonista arriba, fundido hacia abajo
+        ph = P._enhance(P._cover(m["photo"], (W_, 620), side="center", face_w=0.16)).convert("RGBA")
+        ph.putalpha(P._alpha_ramp((W_, 620), [(0, 255), (0.55, 230), (1, 0)], False))
+        im.alpha_composite(ph, (0, 0))
+    vign = Image.new("RGBA", (W_, H_), (0, 0, 0, 0))
+    vign.putalpha(P._alpha_ramp((W_, H_), [(0, 120), (0.3, 30), (0.7, 60), (1, 200)], False))
+    im.alpha_composite(vign)
+    d = ImageDraw.Draw(im)
+    P._put_logo(im, 190, "dark", 52, 40)
+    # competición + FINAL
+    eb = (m.get("eyebrow") or "").upper()
+    fe = NI._wide(24, 800)
+    tw = d.textlength("FINAL", font=fe)
+    d.rounded_rectangle((W_ - 52 - tw - 44, 56, W_ - 52, 100), 22, fill=(255, 255, 255))
+    d.text((W_ - 52 - tw / 2 - 22, 78), "FINAL", font=fe, fill=(12, 14, 20), anchor="mm")
+    if eb:
+        d.text((W_ - 52, 124), eb, font=NI._wide(20, 600), fill=(150, 230, 120), anchor="ra")
+    # escudos + marcador
+    cy = 690 if m.get("photo") else 430
+    for t, cx in ((home, 190), (away, W_ - 190)):
+        sh = P.shield(t, 230)
+        im.alpha_composite(sh, (cx - sh.width // 2, cy - sh.height // 2))
+        name = formatting.team(t.get("short") or t.get("name") or "").upper()
+        nf = NI._wide(28, 800)
+        while d.textlength(name, font=nf) > 330 and nf.size > 18:
+            nf = NI._wide(nf.size - 2, 800)
+        ImageDraw.Draw(im).text((cx, cy + sh.height // 2 + 14), name, font=nf, fill=(255, 255, 255), anchor="ma")
+    d = ImageDraw.Draw(im)
+    grey = (150, 156, 168)
+    sh_ = NI._tall(str(home["score"]), 260, (255, 255, 255) if win in ("home", "") else grey, 1.0, NI._league(260))
+    sa_ = NI._tall(str(away["score"]), 260, (255, 255, 255) if win in ("away", "") else grey, 1.0, NI._league(260))
+    gap = 120
+    im.alpha_composite(sh_, (W_ // 2 - gap // 2 - sh_.width, cy - sh_.height // 2))
+    im.alpha_composite(sa_, (W_ // 2 + gap // 2, cy - sa_.height // 2))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle((W_ // 2 - 24, cy - 6, W_ // 2 + 24, cy + 6), 4, fill=(150, 230, 120))
+    # titular en una sola línea (sin cortar palabras)
+    y = cy + 200
+    head = (m.get("headline") or "").upper()
+    hf_ = NI._fit_all(d, [head], NI._league(120), W_ - 104, 1, 0.45)
+    d.text((W_ / 2, y), head, font=hf_, fill=(255, 255, 255), anchor="ma")
+    y += hf_.size + 10
+    sub = m.get("dato") or ""
+    if sub:
+        sf = NI._fit_all(d, [sub], P._font("Medium", 30), W_ - 120, 1, 0.6)
+        d.text((W_ / 2, y), sub, font=sf, fill=(210, 216, 226), anchor="ma")
+        y += sf.size + 30
+    # goles: cada equipo bajo su lado
+    n_max = max([sum(1 for g in rep.get("goals") or [] if g["side"] == s_) for s_ in ("home", "away")] or [0])
+    avail = (H_ - 220) - y   # hasta la franja del pick
+    lh = max(30, min(44, avail // max(n_max, 1)))
+    gf = P._font("Medium", round(lh * 0.6))
+    mf = NI._league(round(lh * 0.8))
+    for side, x0, anchor in (("home", 70, "la"), ("away", W_ - 70, "ra")):
+        yy = y
+        goals = [g for g in rep.get("goals") or [] if g["side"] == side][:max(1, avail // lh)]
+        for g in goals:
+            extra = " (P)" if g.get("kind") == "penalty" else " (AG)" if g.get("kind") == "own" else ""
+            who = f"{g.get('player') or ''}{extra}"
+            minute = g.get("label") or f"{g.get('min')}'"
+            if anchor == "la":
+                d.text((x0, yy), minute, font=mf, fill=(150, 230, 120), anchor="la")
+                d.text((x0 + 78, yy + 6), who, font=gf, fill=(240, 242, 246), anchor="la")
+            else:
+                d.text((x0, yy), minute, font=mf, fill=(150, 230, 120), anchor="ra")
+                d.text((x0 - 78, yy + 6), who, font=gf, fill=(240, 242, 246), anchor="ra")
+            yy += lh
+    # nuestro pick: franja al pie
+    pk = m.get("pick")
+    if pk:
+        res = pk.get("result")
+        col = (52, 180, 84) if res == "W" else (200, 60, 60) if res == "L" else (110, 116, 128)
+        tag = {"W": "VERDE", "L": "ROJA", "V": "NULA"}.get(res, "")
+        y0 = H_ - 190
+        d.rounded_rectangle((52, y0, W_ - 52, y0 + 92), 26, fill=col)
+        lf = NI._fit_all(d, [f"NUESTRO PICK  ·  {pk['label']}  ·  {pk['odds']}"], NI._wide(26, 700), W_ - 330, 1, 0.6)
+        d.text((86, y0 + 46), f"NUESTRO PICK  ·  {pk['label']}  ·  {pk['odds']}", font=lf, fill=(255, 255, 255), anchor="lm")
+        tf = NI._wide(30, 900)
+        tx = W_ - 86 - d.textlength(tag, font=tf)
+        d.text((W_ - 86, y0 + 46), tag, font=tf, fill=(255, 255, 255), anchor="rm")
+        if res == "W":   # visto dibujado (la fuente no trae el símbolo)
+            d.line([(tx - 50, y0 + 46), (tx - 38, y0 + 60), (tx - 16, y0 + 32)], fill=(255, 255, 255), width=6, joint="curve")
+    d.text((W_ / 2, H_ - 62), "@" + P.INSTAGRAM + "  ·  +18 · Juega con responsabilidad", font=P._font("Medium", 22),
+           fill=(190, 196, 206), anchor="mm")
+    if m.get("credit"):
+        d.text((W_ / 2, H_ - 30), m["credit"], font=P._font("Regular", 17), fill=(150, 156, 168), anchor="mm")
     return P._jpeg(im)
