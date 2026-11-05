@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-05T03:36:26.524414+00:00",
+ "updated_at": "2026-11-05T03:41:04.640258+00:00",
  "summary": {
   "picks": 22,
   "wins": 15,
@@ -10,6 +10,33 @@
   "units": 24.09
  },
  "picks": [
+  {
+   "id": "269",
+   "published_at": "2026-11-05T03:40:57Z",
+   "kickoff": "2026-11-05T17:45:00.000Z",
+   "kind": "simple",
+   "price": 1.8,
+   "stake": 3,
+   "prob": 0.5583,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "FC Midtjylland",
+     "away": "Ajax Amsterdam",
+     "league": "Conference League",
+     "market": "Más/Menos Tiempo Completo",
+     "outcome": "Más",
+     "price": 1.8,
+     "label": "Más de 3 goles (si hay 3 justos, se devuelve)",
+     "mtype": "totals",
+     "handicap": 3.0,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.79): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\n• 📊 FC Midtjylland llega con 3 victorias seguidas: 4G 0E 1P en sus últimos 5, con 2,0 goles a favor y 1,4 en contra por partido; de local ganó 2 de 3.\n• 📊 Ajax Amsterdam llega con 3 victorias seguidas: 3G 0E 0P en sus últimos 3, con 1,7 goles a favor y 0,3 en contra por partido.\n⚠️ <b>En contra:</b>\n• 🎯 Se dieron más de 3 goles en 2 de 5 partidos de FC Midtjylland y en 0 de 3 de Ajax Amsterdam.\nProbabilidad estimada: 55,8%. Para no perder a esta cuota se necesita 55,6%."
+  },
   {
    "id": "238",
    "published_at": "2026-11-04T03:40:44Z",
