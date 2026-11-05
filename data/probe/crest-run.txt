@@ -1,2 +1,3 @@
-reporte: True ('https://a.espncdn.com/i/teamlogos/soccer/500/7914.png', 'https://a.espncdn.com/i/teamlogos/soccer/500/11429.png')
+reporte: True
+figura: Tolu Arokodare foto: False [{'player': 'Tolu Arokodare', 'team': 'Ajax Amsterdam', 'title': 'File:Tolu Arokodare 2026.jpg', 'ok': False, 'jersey': 'ropa casual', 'why': 'El jugador viste ropa casual y no la camiseta de fútbol del equipo.'}]
 ok
