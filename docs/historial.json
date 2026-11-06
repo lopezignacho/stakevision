@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-06T03:35:29.801476+00:00",
+ "updated_at": "2026-11-06T03:40:07.056901+00:00",
  "summary": {
   "picks": 23,
   "wins": 16,
@@ -10,6 +10,33 @@
   "units": 26.49
  },
  "picks": [
+  {
+   "id": "277",
+   "published_at": "2026-11-06T03:40:00Z",
+   "kickoff": "2026-11-06T20:45:00.000Z",
+   "kind": "simple",
+   "price": 1.78,
+   "stake": 3,
+   "prob": 0.5561,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "FC Famalicao",
+     "away": "FC Arouca",
+     "league": "Portugal · Liga Portugal",
+     "market": "Hándicap Asiático",
+     "outcome": "2",
+     "price": 1.78,
+     "label": "Arouca gana o empata",
+     "mtype": "spreads",
+     "handicap": -0.5,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.80).\n• Poco historial reciente de uno de los equipos: el análisis se apoya sobre todo en la cuota.\nProbabilidad estimada: 55,6%. Para no perder a esta cuota se necesita 56,2%."
+  },
   {
    "id": "269",
    "published_at": "2026-11-05T03:40:57Z",
