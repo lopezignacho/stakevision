@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-11-06T22:55:27.641635+00:00",
+ "updated_at": "2026-11-06T23:00:45.385856+00:00",
  "summary": {
-  "picks": 23,
+  "picks": 24,
   "wins": 16,
-  "losses": 5,
-  "hit_rate": 0.7619,
-  "yield": 0.3679,
+  "losses": 6,
+  "hit_rate": 0.7273,
+  "yield": 0.3132,
   "avg_odds": 1.79,
-  "units": 26.49
+  "units": 23.49
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 3,
    "prob": 0.5561,
    "free": true,
-   "result": null,
+   "result": "L",
    "legs": [
     {
      "home": "FC Famalicao",
@@ -32,7 +32,10 @@
      "mtype": "spreads",
      "handicap": -0.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      1,
+      0
+     ]
     }
    ],
    "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.80).\n• Poco historial reciente de uno de los equipos: el análisis se apoya sobre todo en la cuota.\nProbabilidad estimada: 55,6%. Para no perder a esta cuota se necesita 56,2%."
