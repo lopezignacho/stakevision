@@ -3067,7 +3067,7 @@ def _recap_share(state: dict, p: dict, where: str) -> None:
         telegram.send(chat, text)
 
 
-def _recap_fix(state: dict, p: dict, ig_image: bool = False) -> list[str]:
+def _recap_fix(state: dict, p: dict, ig_image: bool = False, owner_only: bool = False) -> list[str]:
     """Rehace el postpartido de un pick (otra foto, mismo resumen) y lo corrige donde ya salió:
     edita la imagen en VIP/Gratis y prepara el Reel nuevo para Instagram."""
     notes = []
@@ -3080,7 +3080,7 @@ def _recap_fix(state: dict, p: dict, ig_image: bool = False) -> list[str]:
     r = p["recap"]
     with open(_recap_file(p), "rb") as f:
         image = f.read()
-    for where, mid in (r.get("msgs") or {}).items():
+    for where, mid in ({} if owner_only else (r.get("msgs") or {})).items():   # owner_only: solo a tu panel
         chat = state["vip_chat"] if where == "vip" else config.FREE_CHANNEL
         name = "VIP" if where == "vip" else "Gratis"
         cap = r["tg"] if formatting.caption_fits(r["tg"]) else None
@@ -3152,7 +3152,7 @@ def _recap_fix_file(state: dict) -> None:
         if req.get(k_req):   # titular, dato y versión campeón revisados a mano
             r[k_rec] = req[k_req]
     try:
-        notes = _recap_fix(state, p, bool(req.get("ig_image")))
+        notes = _recap_fix(state, p, bool(req.get("ig_image")), bool(req.get("owner_only")))
     except Exception as e:  # noqa: BLE001
         traceback.print_exc()
         notes = [f"⚠️ falló la corrección: {e}"]
