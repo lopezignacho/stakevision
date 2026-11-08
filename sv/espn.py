@@ -35,10 +35,40 @@ def _scoreboard(day: str, sport: str) -> list[dict]:
         return []
 
 
+def _league_board(day: str, lg: str) -> list[dict]:
+    try:
+        return requests.get(f"https://site.api.espn.com/apis/site/v2/sports/soccer/{lg}/scoreboard",
+                            params={"dates": day}, timeout=20).json().get("events") or []
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def _find(home: str, away: str, kickoff_iso: str, sport: str = "soccer"):
-    """Busca el partido en el marcador de ESPN. Devuelve (evento, competición, local, visita) o None."""
+    """Busca el partido en el marcador de ESPN. Devuelve (evento, competición, local, visita) o None.
+    Primero en el marcador general; si no está (pasa con ligas como la chilena), liga por liga."""
     day = store.parse_ts(kickoff_iso).astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d")
-    for e in _scoreboard(day, sport):
+    boards = [_scoreboard(day, sport)]
+    found = _find_in(boards[0], home, away)
+    if found or sport != "soccer":
+        return found
+    from .crest import SOCCER_LEAGUES
+    key = (home, away, day)
+    order = ("chi.1", "chi.copa_chile", "chi.2") + tuple(x for x in SOCCER_LEAGUES if x != "chi.1")
+    if key in _WHERE:   # ya sabemos en qué liga está: una sola consulta
+        order = (_WHERE[key],)
+    for lg in order:
+        found = _find_in(_league_board(day, lg), home, away)
+        if found:
+            _WHERE[key] = lg
+            return found
+    return None
+
+
+_WHERE: dict = {}
+
+
+def _find_in(events: list[dict], home: str, away: str):
+    for e in events:
         c = (e.get("competitions") or [{}])[0]
         comp = c.get("competitors") or []
         h = next((x for x in comp if x.get("homeAway") == "home"), None)
