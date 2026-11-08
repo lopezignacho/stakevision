@@ -1,3 +1,12 @@
-reporte: True
-figura: Tolu Arokodare foto: False [{'player': 'Tolu Arokodare', 'team': 'Ajax Amsterdam', 'title': 'File:Tolu Arokodare 2026.jpg', 'ok': False, 'jersey': 'ropa casual', 'why': 'El jugador viste ropa casual y no la camiseta de fútbol del equipo.'}]
-ok
+reporte: False None
+Traceback (most recent call last):
+  File "/home/runner/work/stakevision/stakevision/tools/crest_probe.py", line 14, in <module>
+    who = recap.hero(rep)
+          ^^^^^^^^^^^^^^^
+  File "/home/runner/work/stakevision/stakevision/sv/recap.py", line 83, in hero
+    w = _winner(rep)
+        ^^^^^^^^^^^^
+  File "/home/runner/work/stakevision/stakevision/sv/recap.py", line 25, in _winner
+    h, a = rep["home"]["score"], rep["away"]["score"]
+           ~~~^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
