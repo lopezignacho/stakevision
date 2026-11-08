@@ -5,12 +5,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sv import commons, espn, layouts, matchphoto, recap  # noqa: E402
 OUT = "data/probe/crest"
 os.makedirs(OUT, exist_ok=True)
-home, away, ko = "FC Midtjylland", "Ajax Amsterdam", "2026-11-05T17:45:00Z"
+home, away, ko = os.environ.get("H_T", "Nublense"), os.environ.get("A_T", "Colo-Colo"), os.environ.get("KO", "2026-11-08T18:00:00Z")
 rep = espn.match_report(home, away, ko)
-print("reporte:", bool(rep))
-pick = {"price": 1.80, "result": "W", "legs": [{"league": "Conference League", "kickoff": ko, "home": home, "away": away,
-                                                "label": "Más de 3 goles", "sport": "soccer", "mtype": "totals",
-                                                "outcome": "Más", "handicap": 3.0}]}
+print("reporte:", bool(rep), rep and (rep["home"]["score"], rep["away"]["score"], [(g["label"], g["player"], g["side"]) for g in rep["goals"]]))
+pick = {"price": 1.93, "result": "W", "legs": [{"league": "Primera División de Chile", "kickoff": ko, "home": home, "away": away,
+                                                "label": "Gana Colo-Colo", "sport": "soccer", "mtype": "1x2",
+                                                "outcome": "2", "handicap": None}]}
 who = recap.hero(rep)
 photo = None
 try:
