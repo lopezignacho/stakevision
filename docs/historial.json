@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-11-08T20:10:32.669452+00:00",
+ "updated_at": "2026-11-08T20:15:37.784298+00:00",
  "summary": {
-  "picks": 24,
-  "wins": 16,
+  "picks": 25,
+  "wins": 17,
   "losses": 6,
-  "hit_rate": 0.7273,
-  "yield": 0.3132,
-  "avg_odds": 1.79,
-  "units": 23.49
+  "hit_rate": 0.7391,
+  "yield": 0.3369,
+  "avg_odds": 1.8,
+  "units": 26.28
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 3,
    "prob": 0.5181,
    "free": true,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Nublense",
@@ -32,7 +32,10 @@
      "mtype": "1x2",
      "handicap": null,
      "sport": "soccer",
-     "score": null
+     "score": [
+      1,
+      2
+     ]
     }
    ],
    "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.93): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\nProbabilidad estimada: 51,8%. Para no perder a esta cuota se necesita 51,8%."
