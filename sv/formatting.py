@@ -33,7 +33,7 @@ TEAM_FIX = {"Vina del Mar": "Viña del Mar", "Nunoa": "Ñuñoa", "Nuble": "Ñubl
             "Penarol": "Peñarol", "Atletico": "Atlético", "Gremio": "Grêmio", "Sao Paulo": "São Paulo",
             "Union Espanola": "Unión Española", "Cobresal": "Cobresal", "Nublense": "Ñublense",
             "Alaves": "Alavés", "Cadiz": "Cádiz", "Leganes": "Leganés", "Almeria": "Almería",
-            "Istanbul Basaksehir": "Başakşehir", "Bodoe/Glimt": "Bodø/Glimt", "Basaksehir": "Başakşehir", "Besiktas": "Beşiktaş",
+            "Istanbul Basaksehir": "Başakşehir", "Colo Colo": "Colo-Colo", "Nublense": "Ñublense", "Bodoe/Glimt": "Bodø/Glimt", "Basaksehir": "Başakşehir", "Besiktas": "Beşiktaş",
             "Fenerbahce": "Fenerbahçe", "Galatasaray": "Galatasaray", "Kasimpasa": "Kasımpaşa", "Goztepe": "Göztepe"}
 
 

@@ -614,8 +614,8 @@ def recap_scoreboard(m: dict, theme: str = "dark") -> bytes:
     im.paste(right, (0, 0))
     im.paste(left, (0, 0), mask)
     if m.get("photo"):   # protagonista arriba, fundido hacia abajo
-        ph = P._enhance(P._cover(m["photo"], (W_, 620), side="center", face_w=0.16)).convert("RGBA")
-        ph.putalpha(P._alpha_ramp((W_, 620), [(0, 255), (0.55, 230), (1, 0)], False))
+        ph = P._enhance(P._cover(m["photo"], (W_, 540), side="center", face_w=0.16)).convert("RGBA")
+        ph.putalpha(P._alpha_ramp((W_, 540), [(0, 255), (0.55, 230), (1, 0)], False))
         im.alpha_composite(ph, (0, 0))
     vign = Image.new("RGBA", (W_, H_), (0, 0, 0, 0))
     vign.putalpha(P._alpha_ramp((W_, H_), [(0, 120), (0.3, 30), (0.7, 60), (1, 200)], False))
@@ -631,9 +631,11 @@ def recap_scoreboard(m: dict, theme: str = "dark") -> bytes:
     if eb:
         d.text((W_ - 52, 124), eb, font=NI._wide(20, 600), fill=(150, 230, 120), anchor="ra")
     # escudos + marcador
-    cy = 690 if m.get("photo") else 430
+    photo_on = bool(m.get("photo"))
+    cy = 590 if photo_on else 430
+    crest_w = 190 if photo_on else 230
     for t, cx in ((home, 190), (away, W_ - 190)):
-        sh = P.shield(t, 230)
+        sh = P.shield(t, crest_w)
         im.alpha_composite(sh, (cx - sh.width // 2, cy - sh.height // 2))
         name = formatting.team(t.get("short") or t.get("name") or "").upper()
         nf = NI._wide(28, 800)
@@ -642,43 +644,45 @@ def recap_scoreboard(m: dict, theme: str = "dark") -> bytes:
         ImageDraw.Draw(im).text((cx, cy + sh.height // 2 + 14), name, font=nf, fill=(255, 255, 255), anchor="ma")
     d = ImageDraw.Draw(im)
     grey = (150, 156, 168)
-    sh_ = NI._tall(str(home["score"]), 260, (255, 255, 255) if win in ("home", "") else grey, 1.0, NI._league(260))
-    sa_ = NI._tall(str(away["score"]), 260, (255, 255, 255) if win in ("away", "") else grey, 1.0, NI._league(260))
+    ss = 220 if photo_on else 260
+    sh_ = NI._tall(str(home["score"]), ss, (255, 255, 255) if win in ("home", "") else grey, 1.0, NI._league(ss))
+    sa_ = NI._tall(str(away["score"]), ss, (255, 255, 255) if win in ("away", "") else grey, 1.0, NI._league(ss))
     gap = 120
     im.alpha_composite(sh_, (W_ // 2 - gap // 2 - sh_.width, cy - sh_.height // 2))
     im.alpha_composite(sa_, (W_ // 2 + gap // 2, cy - sa_.height // 2))
     d = ImageDraw.Draw(im)
     d.rounded_rectangle((W_ // 2 - 24, cy - 6, W_ // 2 + 24, cy + 6), 4, fill=(150, 230, 120))
     # titular en una sola línea (sin cortar palabras)
-    y = cy + 200
+    y = cy + (crest_w * 1.25) / 2 + 60
     head = (m.get("headline") or "").upper()
-    hf_ = NI._fit_all(d, [head], NI._league(120), W_ - 104, 1, 0.45)
+    hf_ = NI._fit_all(d, [head], NI._league(96 if photo_on else 120), W_ - 104, 1, 0.45)
     d.text((W_ / 2, y), head, font=hf_, fill=(255, 255, 255), anchor="ma")
     y += hf_.size + 10
     sub = m.get("dato") or ""
     if sub:
-        sf = NI._fit_all(d, [sub], P._font("Medium", 30), W_ - 120, 1, 0.6)
+        sf = NI._fit_all(d, [sub], P._font("Medium", 28 if photo_on else 30), W_ - 120, 1, 0.6)
         d.text((W_ / 2, y), sub, font=sf, fill=(210, 216, 226), anchor="ma")
-        y += sf.size + 30
+        y += sf.size + 24
     # goles: cada equipo bajo su lado
     n_max = max([sum(1 for g in rep.get("goals") or [] if g["side"] == s_) for s_ in ("home", "away")] or [0])
     avail = (H_ - 220) - y   # hasta la franja del pick
-    lh = max(30, min(44, avail // max(n_max, 1)))
+    lh = max(28, min(44, avail // max(n_max, 1)))
     gf = P._font("Medium", round(lh * 0.6))
     mf = NI._league(round(lh * 0.8))
     for side, x0, anchor in (("home", 70, "la"), ("away", W_ - 70, "ra")):
         yy = y
-        goals = [g for g in rep.get("goals") or [] if g["side"] == side][:max(1, avail // lh)]
+        goals = [g for g in rep.get("goals") or [] if g["side"] == side]   # todos (nunca se omite un gol)
         for g in goals:
             extra = " (P)" if g.get("kind") == "penalty" else " (AG)" if g.get("kind") == "own" else ""
             who = f"{g.get('player') or ''}{extra}"
             minute = g.get("label") or f"{g.get('min')}'"
+            mw = max(60, d.textlength(minute, font=mf)) + 18   # el nombre nunca pisa el minuto (90'+2')
             if anchor == "la":
                 d.text((x0, yy), minute, font=mf, fill=(150, 230, 120), anchor="la")
-                d.text((x0 + 78, yy + 6), who, font=gf, fill=(240, 242, 246), anchor="la")
+                d.text((x0 + mw, yy + 6), who, font=gf, fill=(240, 242, 246), anchor="la")
             else:
                 d.text((x0, yy), minute, font=mf, fill=(150, 230, 120), anchor="ra")
-                d.text((x0 - 78, yy + 6), who, font=gf, fill=(240, 242, 246), anchor="ra")
+                d.text((x0 - mw, yy + 6), who, font=gf, fill=(240, 242, 246), anchor="ra")
             yy += lh
     # nuestro pick: franja al pie
     pk = m.get("pick")
