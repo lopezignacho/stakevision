@@ -594,6 +594,42 @@ def nba_board(m: dict, theme: str = "dark") -> bytes:
 
 
 # ---------------------------------------------------------------- «marcador grande»: escudos, resultado y goles por equipo
+GOLD = (255, 204, 64)
+
+
+def _confetti(im, win: str, cy: int, crest_w: int, team_col: tuple) -> None:
+    """Papel picado dorado, blanco y del color del campeón, más un brillo dorado detrás de su escudo."""
+    import random
+    W_, H_ = im.size
+    cx = 190 if win == "home" else W_ - 190 if win == "away" else W_ // 2
+    glow = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    gd = ImageDraw.Draw(glow)
+    for r_, a in ((crest_w * 1.15, 40), (crest_w * 0.9, 70), (crest_w * 0.68, 110)):
+        gd.ellipse((cx - r_, cy - r_, cx + r_, cy + r_), fill=GOLD + (a,))
+    from PIL import ImageFilter
+    im.alpha_composite(glow.filter(ImageFilter.GaussianBlur(40)))
+    rnd = random.Random(35)
+    cols = [GOLD, (255, 232, 140), (255, 255, 255), P._mix(team_col, (255, 255, 255), 0.25)]
+    layer = Image.new("RGBA", im.size, (0, 0, 0, 0))
+    top = cy - crest_w * 0.62          # arriba de los escudos: lluvia densa
+    band = (cy + crest_w * 0.62, cy + crest_w * 0.62 + 360)   # nombres, titular, dato y goles: limpio
+    placed = 0
+    while placed < 190:
+        y = int(rnd.random() ** 1.4 * (H_ - 210))   # nunca sobre la franja del pick
+        x = rnd.randint(0, W_)
+        edge = x < 70 or x > W_ - 70
+        if not (y < top or edge or (y > band[1] and not (0.3 * W_ < x < 0.7 * W_ and y < band[1] + 60))):
+            continue
+        if band[0] < y < band[1] and not edge:
+            continue
+        placed += 1
+        w, h = rnd.randint(7, 16), rnd.randint(14, 30)
+        piece = Image.new("RGBA", (w, h), rnd.choice(cols) + (rnd.randint(150, 235),))
+        piece = piece.rotate(rnd.randint(0, 179), expand=True, resample=Image.BICUBIC)
+        layer.alpha_composite(piece, (min(max(0, x), W_ - piece.width), min(max(0, y), H_ - piece.height)))
+    im.alpha_composite(layer)
+
+
 def recap_scoreboard(m: dict, theme: str = "dark") -> bytes:
     """Diseño limpio y fuerte: fondo partido con los colores de cada club, escudos oficiales grandes a los lados,
     marcador gigante al centro, titular en una línea, los goles de cada equipo bajo su escudo y nuestro pick
@@ -620,20 +656,24 @@ def recap_scoreboard(m: dict, theme: str = "dark") -> bytes:
     vign = Image.new("RGBA", (W_, H_), (0, 0, 0, 0))
     vign.putalpha(P._alpha_ramp((W_, H_), [(0, 120), (0.3, 30), (0.7, 60), (1, 200)], False))
     im.alpha_composite(vign)
-    d = ImageDraw.Draw(im)
-    P._put_logo(im, 190, "dark", 52, 40)
-    # competición + FINAL
-    eb = (m.get("eyebrow") or "").upper()
-    fe = NI._wide(24, 800)
-    tw = d.textlength("FINAL", font=fe)
-    d.rounded_rectangle((W_ - 52 - tw - 44, 56, W_ - 52, 100), 22, fill=(255, 255, 255))
-    d.text((W_ - 52 - tw / 2 - 22, 78), "FINAL", font=fe, fill=(12, 14, 20), anchor="mm")
-    if eb:
-        d.text((W_ - 52, 124), eb, font=NI._wide(20, 600), fill=(150, 230, 120), anchor="ra")
-    # escudos + marcador
+    champ = (m.get("champion") or "").upper()   # «CAMPEÓN 2026»: versión de celebración (dorado + papel picado)
     photo_on = bool(m.get("photo"))
     cy = 590 if photo_on else 430
     crest_w = 190 if photo_on else 230
+    if champ:
+        _confetti(im, win, cy, crest_w, hf if win == "home" else af)
+    d = ImageDraw.Draw(im)
+    P._put_logo(im, 190, "dark", 52, 40)
+    # competición + FINAL (o CAMPEÓN)
+    eb = (m.get("eyebrow") or "").upper()
+    fe = NI._wide(24, 800)
+    pill = champ or "FINAL"
+    tw = d.textlength(pill, font=fe)
+    d.rounded_rectangle((W_ - 52 - tw - 44, 56, W_ - 52, 100), 22, fill=GOLD if champ else (255, 255, 255))
+    d.text((W_ - 52 - tw / 2 - 22, 78), pill, font=fe, fill=(12, 14, 20), anchor="mm")
+    if eb:
+        d.text((W_ - 52, 124), eb, font=NI._wide(20, 600), fill=(150, 230, 120), anchor="ra")
+    # escudos + marcador
     for t, cx in ((home, 190), (away, W_ - 190)):
         sh = P.shield(t, crest_w)
         im.alpha_composite(sh, (cx - sh.width // 2, cy - sh.height // 2))
@@ -656,7 +696,8 @@ def recap_scoreboard(m: dict, theme: str = "dark") -> bytes:
     y = cy + (crest_w * 1.25) / 2 + 60
     head = (m.get("headline") or "").upper()
     hf_ = NI._fit_all(d, [head], NI._league(96 if photo_on else 120), W_ - 104, 1, 0.45)
-    d.text((W_ / 2, y), head, font=hf_, fill=(255, 255, 255), anchor="ma")
+    d.text((W_ / 2, y), head, font=hf_, fill=GOLD if champ else (255, 255, 255), anchor="ma",
+           stroke_width=3 if champ else 0, stroke_fill=(40, 26, 0))
     y += hf_.size + 10
     sub = m.get("dato") or ""
     if sub:

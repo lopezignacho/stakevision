@@ -2255,7 +2255,7 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
             t = rep.get(who.get("side")) or {}
             photo = (matchphoto.for_scorer(who["full"], [x for x in (t.get("name"), t.get("short")) if x], "soccer")
                      or commons.team_photo(t.get("name") or "", "soccer"))   # sin foto segura: colores del equipo
-    data = recap.build(p, rep, photo, old.get("custom_title"))
+    data = recap.build(p, rep, photo, old.get("custom_title"), old.get("custom_dato"), old.get("champion"))
     data["credit"] = photo[1]["text"] if photo and photo[1] else None
     from . import layouts
     layout = old.get("layout") if old.get("layout") in layouts.RECAP_LAYOUTS else layouts.next_layout(state, "recap")
@@ -2270,6 +2270,7 @@ def _recap(state: dict, p: dict, reuse: bool = False) -> bool:
         f.write(image)
     credit = photo[1] if photo and old.get("mode") != "raw" else None
     p["recap"] = {"title": data["headline"], "custom_title": old.get("custom_title"), "credit": credit,
+                  "custom_dato": old.get("custom_dato"), "champion": old.get("champion"),
                   "msgs": old.get("msgs") or {}, "panel": old.get("panel"), "hero": who["full"] if who else None,
                   "report": rep, "photo_src": old.get("photo_src"), "mode": old.get("mode"), "v": RECAP_TEXT_V,
                   "theme": old.get("theme"), "layout": layout,
@@ -2883,6 +2884,7 @@ def _recap_nba(state: dict, p: dict, reuse: bool = False) -> bool:
         with open(cache, "wb") as f:
             f.write(data["photo"])
     p["recap"] = {"title": data["headline"], "custom_title": old.get("custom_title"), "credit": credit,
+                  "custom_dato": old.get("custom_dato"), "champion": old.get("champion"),
                   "msgs": old.get("msgs") or {}, "panel": old.get("panel"), "hero": None, "report": rep,
                   "photo_src": old.get("photo_src"), "mode": old.get("mode"), "v": RECAP_TEXT_V,
                   "theme": old.get("theme"), "layout": "nba", "photo_cache": cache,
@@ -3126,7 +3128,8 @@ def _recap_fix(state: dict, p: dict, ig_image: bool = False) -> list[str]:
 
 
 def _recap_fix_file(state: dict) -> None:
-    """data/recap_fix.json ({"id": "...", "pid": "117"}): rehace y corrige un postpartido ya compartido, una vez."""
+    """data/recap_fix.json ({"id": "...", "pid": "117", "title"?, "dato"?, "champion"?: "CAMPEÓN 2026", "ig_image"?}):
+    rehace y corrige un postpartido ya compartido, una vez."""
     import json
     path = os.path.join(config.ROOT, "data", "recap_fix.json")
     owner = state.get("owner_chat")
@@ -3144,6 +3147,10 @@ def _recap_fix_file(state: dict) -> None:
     if not p:
         telegram.send(owner, "⚠️ No encontré el pick para corregir su postpartido.")
         return
+    r = p.setdefault("recap", {})
+    for k_req, k_rec in (("title", "custom_title"), ("dato", "custom_dato"), ("champion", "champion")):
+        if req.get(k_req):   # titular, dato y versión campeón revisados a mano
+            r[k_rec] = req[k_req]
     try:
         notes = _recap_fix(state, p, bool(req.get("ig_image")))
     except Exception as e:  # noqa: BLE001

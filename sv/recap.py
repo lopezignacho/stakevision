@@ -125,7 +125,8 @@ def pick_label(p: dict) -> str:
     return sel[:sel.index(" (")] if " (" in sel else sel
 
 
-def build(p: dict, rep: dict, photo: tuple[bytes, dict] | None, title: str | None = None) -> dict:
+def build(p: dict, rep: dict, photo: tuple[bytes, dict] | None, title: str | None = None,
+          dato_text: str | None = None, champion: str | None = None) -> dict:
     """Datos para postimage.render_recap y los textos que acompañan la imagen."""
     l = p["legs"][0]
     title = (title or headline(rep)).upper()
@@ -133,7 +134,7 @@ def build(p: dict, rep: dict, photo: tuple[bytes, dict] | None, title: str | Non
             "subline": subline(rep, l["kickoff"]),
             "pick": None if p.get("news") else
             {"label": pick_label(p), "odds": formatting.odds(p["price"]), "result": p.get("result") or "V"},
-            "dato": dato(rep),
+            "dato": dato_text or dato(rep), "champion": champion,
             "photo": photo[0] if photo else None, "credit": photo[1]["text"] if photo and photo[1] else None}
     return data
 
@@ -305,10 +306,19 @@ def _body(p: dict, rep: dict) -> tuple[str, list[str], str]:
     return opener, parts, question
 
 
+def _champ_lines(p: dict, title: str) -> list[str]:
+    """Versión campeón (revisada a mano): titular y dato arriba del texto, con euforia."""
+    r = p.get("recap") or {}
+    if not r.get("champion"):
+        return []
+    return [f"🏆🔥 {title} 🔥🏆", f"⭐ {r.get('custom_dato') or r['champion']} ⭐"]
+
+
 def telegram_caption(p: dict, rep: dict, title: str) -> str:
     esc = formatting.escape
     opener, parts, question = _body(p, rep)
-    lines = [f"📰 <b>{esc(opener)}</b>", ""]
+    ch = _champ_lines(p, title)
+    lines = ([f"<b>{esc(ch[0])}</b>", esc(ch[1]), ""] if ch else []) + [f"📰 <b>{esc(opener)}</b>", ""]
     lines += [f"<b>{esc(parts[0])}</b>"] + [esc(x) for x in parts[1:]]
     ps = _pick_story(p)
     if ps:
@@ -319,7 +329,8 @@ def telegram_caption(p: dict, rep: dict, title: str) -> str:
 
 def instagram_caption(p: dict, rep: dict, title: str, credit: dict | None) -> str:
     opener, parts, question = _body(p, rep)
-    lines = [opener, ""] + parts + [""] + (_goal_lines(rep) or [])
+    lines = (_champ_lines(p, title) + [""]) if _champ_lines(p, title) else []
+    lines += [opener, ""] + parts + [""] + (_goal_lines(rep) or [])
     ps = _pick_story(p)
     if ps:
         lines += ["", ps]
