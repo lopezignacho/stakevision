@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-08T16:00:38.170115+00:00",
+ "updated_at": "2026-11-08T16:05:45.259890+00:00",
  "summary": {
   "picks": 24,
   "wins": 16,
@@ -10,6 +10,33 @@
   "units": 23.49
  },
  "picks": [
+  {
+   "id": "296",
+   "published_at": "2026-11-08T16:05:37Z",
+   "kickoff": "2026-11-08T18:00:00.000Z",
+   "kind": "simple",
+   "price": 1.93,
+   "stake": 3,
+   "prob": 0.5181,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Nublense",
+     "away": "Colo-Colo",
+     "league": "Chile · Primera División",
+     "market": "Resultado del partido",
+     "outcome": "2",
+     "price": 1.93,
+     "label": "Gana Colo-Colo",
+     "mtype": "1x2",
+     "handicap": null,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.93): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\nProbabilidad estimada: 51,8%. Para no perder a esta cuota se necesita 51,8%."
+  },
   {
    "id": "277",
    "published_at": "2026-11-06T03:40:00Z",
