@@ -1,12 +1,3 @@
-reporte: False None
-Traceback (most recent call last):
-  File "/home/runner/work/stakevision/stakevision/tools/crest_probe.py", line 14, in <module>
-    who = recap.hero(rep)
-          ^^^^^^^^^^^^^^^
-  File "/home/runner/work/stakevision/stakevision/sv/recap.py", line 83, in hero
-    w = _winner(rep)
-        ^^^^^^^^^^^^
-  File "/home/runner/work/stakevision/stakevision/sv/recap.py", line 25, in _winner
-    h, a = rep["home"]["score"], rep["away"]["score"]
-           ~~~^^^^^^^^
-TypeError: 'NoneType' object is not subscriptable
+reporte: True (1, 2, [("14'", 'A. Vidal', 'away'), ("29'", 'L. Molina', 'home'), ("90'+2'", 'M. Bolados', 'away')])
+figura: Marco Bolados foto: True [{'player': 'Marco Bolados', 'team': 'Colo Colo', 'title': 'File:Marcos Bolados Everton v Colo-Colo 20230806 01.jpg', 'ok': True, 'jersey': 'Colo Colo', 'why': 'Marco Bolados viste claramente la camiseta oficial de Colo Colo con su escudo y patrocinadores.'}]
+ok
