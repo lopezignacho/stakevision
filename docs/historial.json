@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-09T03:35:32.053051+00:00",
+ "updated_at": "2026-11-09T03:40:39.500312+00:00",
  "summary": {
   "picks": 25,
   "wins": 17,
@@ -10,6 +10,33 @@
   "units": 26.28
  },
  "picks": [
+  {
+   "id": "304",
+   "published_at": "2026-11-09T03:40:33Z",
+   "kickoff": "2026-11-09T20:00:00.000Z",
+   "kind": "simple",
+   "price": 1.88,
+   "stake": 3,
+   "prob": 0.5327,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Sportivo San Lorenzo",
+     "away": "Rubio Nu",
+     "league": "Paraguay · División de Honor",
+     "market": "Resultado Tiempo Completo",
+     "outcome": "2",
+     "price": 1.88,
+     "label": "Gana Rubio Nu",
+     "mtype": "1x2",
+     "handicap": 0.0,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "✅ <b>A favor:</b>\n• Cuota en línea con la justa (1.88): no hay regalo de la casa, la decisión se apoya en la forma de los equipos.\nProbabilidad estimada: 53,3%. Para no perder a esta cuota se necesita 53,2%."
+  },
   {
    "id": "296",
    "published_at": "2026-11-08T16:05:37Z",
