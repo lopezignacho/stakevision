@@ -117,6 +117,20 @@ def download(file_id: str) -> bytes:
     return r.content
 
 
+def peek(from_chat, message_id: int, to_chat) -> str | None:
+    """Texto de un mensaje de un canal (se reenvía a to_chat, se lee y se borra el reenvío). None si no existe."""
+    try:
+        m = _call("forwardMessage", chat_id=to_chat, from_chat_id=from_chat, message_id=message_id,
+                  disable_notification=True)
+    except TelegramError:
+        return None
+    try:
+        _call("deleteMessage", chat_id=to_chat, message_id=m["message_id"])
+    except TelegramError:
+        pass
+    return m.get("text") or m.get("caption") or ""
+
+
 def delete_message(chat_id, message_id: int) -> bool:
     try:
         return bool(_call("deleteMessage", chat_id=chat_id, message_id=message_id))

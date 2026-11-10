@@ -1276,7 +1276,7 @@ def _builder_manual(state: dict, req: dict) -> None:
     p = {"id": pid, "kind": "builder", "status": "selected", "legs": legs, "bb": b, "price": price,
          "prob": b["prob"], "edge": round(b["prob"] * price - 1, 4), "stake": int(req.get("stake") or 2),
          "tier": "justa", "created_at": _iso(now), "kickoff": ko, "sport": "basketball", "stake_v": 2,
-         "manual_builder": True}
+         "manual_builder": req["id"]}
     state["picks"][pid] = p
     if req.get("already_posted"):   # ya está en VIP (texto): se registra sin repetir el mensaje
         p["channel_msgs"] = {"vip": req.get("vip_msg")}
@@ -1290,6 +1290,53 @@ def _builder_manual(state: dict, req: dict) -> None:
                                      for l in legs_bb)
                         + f"\n📈 Cuota {formatting.odds(price)} · Stake {p['stake']}/10 · probabilidad estimada "
                           f"{formatting.pct(b['prob'])}\nSe califica solo con el boxscore al terminar y queda en la web.")
+
+
+def _vip_replace_file(state: dict) -> None:
+    """data/vip_replace.json ({"id", "pid", "match": [textos]}): cambia un mensaje de texto del VIP por el pick con
+    su imagen. Telegram no deja agregar una foto a un texto: se ubica el mensaje (debe contener todos los textos
+    de match), se publica el pick con imagen y recién ahí se borra el texto. Una vez."""
+    import json
+    path = os.path.join(config.ROOT, "data", "vip_replace.json")
+    owner, vip = state.get("owner_chat"), state.get("vip_chat")
+    if not os.path.exists(path) or not owner or not vip:
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("vip_replace_done") or []):
+        return
+    state.setdefault("vip_replace_done", []).append(req["id"])
+    p = state["picks"].get(str(req.get("pid") or ""))
+    if not p and req.get("builder_id"):   # el Bet Builder registrado con data/builder_manual.json
+        cands = [q for q in state["picks"].values() if q.get("manual_builder") in (req["builder_id"], True)]
+        p = max(cands, key=lambda q: int(q["id"])) if cands else None
+    if not p:
+        telegram.send(owner, "⚠️ No encontré el pick para reemplazar el mensaje del VIP.")
+        return
+    known = [m for q in state["picks"].values() for d in (q.get("channel_msgs"), q.get("result_msgs"))
+             for k, m in (d or {}).items() if k == "vip" and isinstance(m, int)]
+    start = max(known or [1])
+    old = None
+    for mid in range(start + 60, max(start - 5, 0), -1):   # del más nuevo al más viejo
+        txt = telegram.peek(vip, mid, owner)
+        if txt and all(w.lower() in txt.lower() for w in req.get("match") or []):
+            old = mid
+            break
+    if not old:
+        telegram.send(owner, "⚠️ No encontré el mensaje anterior en el VIP; no publiqué nada para no duplicar.")
+        return
+    from . import postimage
+    image = postimage.render_builder(p, "vip") if p.get("kind") == "builder" else _pick_image(p, "vip")
+    new = _post(vip, formatting.channel_post(p, "vip"), image)
+    p.setdefault("channel_msgs", {})["vip"] = new
+    p["has_photo"] = True
+    gone = telegram.delete_message(vip, old)
+    telegram.send(owner, f"✅ <b>VIP actualizado</b> · pick #{p['id']}: publicado con imagen"
+                  + (" y borré el mensaje de texto anterior." if gone else
+                     ". ⚠️ No pude borrar el texto anterior: bórralo tú desde el canal."))
 
 
 def _vip_post_file(state: dict) -> None:
@@ -4271,6 +4318,7 @@ def poll() -> None:
         _cancel_file(state)
         _vip_post_file(state)
         _builder_manual_file(state)
+        _vip_replace_file(state)
         _repair_file(state)
         _refresh_file(state)
         _recap_fix_file(state)
