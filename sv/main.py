@@ -1187,6 +1187,111 @@ def _win_repost_file(state: dict) -> None:
                                              "se publica en Instagram en unos minutos.")
 
 
+def _builder_manual_file(state: dict) -> None:
+    """data/builder_manual.json: Bet Builder armado por el dueño en su app, registrado como un pick VIP más
+    (imagen, calificación automática con el boxscore y web al terminar). Una vez.
+    {"id", "team", "sport": "basketball", "price", "stake", "legs": [{"player", "stat": "ast|tpm|pts|reb", "line"}],
+     "already_posted": true}  ← ya salió en VIP como texto: no se repite el mensaje; el resultado sí sale."""
+    import json
+    path = os.path.join(config.ROOT, "data", "builder_manual.json")
+    owner = state.get("owner_chat")
+    if not os.path.exists(path) or not owner:
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or req["id"] in (state.get("builder_manual_done") or []):
+        return
+    state.setdefault("builder_manual_done", []).append(req["id"])
+    try:
+        _builder_manual(state, req)
+    except Exception as e:  # noqa: BLE001
+        traceback.print_exc()
+        telegram.send(owner, f"⚠️ No pude registrar el Bet Builder: {formatting.escape(str(e))[:300]}")
+
+
+def _builder_manual(state: dict, req: dict) -> None:
+    from zoneinfo import ZoneInfo
+    from . import builder, espn, nba
+    owner = state["owner_chat"]
+    now = store.now_utc()
+    ev = None
+    for back in (0, 1):
+        day = (now - timedelta(hours=6 + 24 * back)).astimezone(ZoneInfo("America/New_York")).strftime("%Y%m%d")
+        for e in nba._get("/scoreboard", dates=day).get("events") or []:
+            comp = (e.get("competitions") or [{}])[0].get("competitors") or []
+            if any(_name_hit(req["team"], (x.get("team") or {}).get("displayName", "")) for x in comp):
+                ev = e
+                break
+        if ev:
+            break
+    if not ev:
+        telegram.send(owner, f"⚠️ No encontré el partido de {formatting.escape(req['team'])}.")
+        return
+    comp = ev["competitions"][0]["competitors"]
+    teams = {x["homeAway"]: x["team"] for x in comp}
+    ko = ev["date"].replace("Z", ":00Z") if len(ev["date"]) == 17 else ev["date"]
+    kdt = store.parse_ts(ko)
+    logs = {side: builder._nba_logs(str(t["id"]), kdt) for side, t in teams.items()}
+    words = {k: w for k, (_l, w) in builder.NBA_LINES.items()}
+    legs_bb = []
+    for x in req["legs"]:
+        want = set(espn._toks(x["player"]))
+        found = None
+        for side, games in logs.items():
+            for g in games:
+                for pid, row in g.items():
+                    if want & set(espn._toks(row["name"])):
+                        found = (side, pid, row["name"])
+                        break
+                if found:
+                    break
+            if found:
+                break
+        if not found:
+            telegram.send(owner, f"⚠️ No encontré a {formatting.escape(x['player'])} en los últimos partidos.")
+            return
+        side, pid, name = found
+        vals = [g[pid][x["stat"]] for g in logs[side] if pid in g and g[pid]["min"] > 0]
+        n = len(vals)
+        hits = sum(1 for v in vals if v >= int(x["line"]))
+        legs_bb.append({"player": name, "pid": pid, "team": teams[side].get("displayName"), "side": side,
+                        "stat": x["stat"], "line": int(x["line"]), "word": words[x["stat"]], "hits": hits, "n": n,
+                        "avg": round(sum(vals) / n, 1) if n else 0, "p": builder._p(hits, n) if n else 0.5,
+                        "label": f"{name}: {int(x['line'])}+ {words[x['stat']]}"})
+    prob = 1.0
+    for l in legs_bb:
+        prob *= l["p"]
+    price = float(req["price"])
+    home, away = teams["home"]["displayName"], teams["away"]["displayName"]
+    b = {"legs": legs_bb, "prob": round(prob, 4), "fair": round(1 / prob, 2), "target": price,
+         "home": home, "away": away, "event": ev.get("id"), "sport": "basketball", "kickoff": ko}
+    state["seq"] += 1
+    pid = str(state["seq"])
+    legs = [{"home": home, "away": away, "kickoff": ko, "league": "USA · NBA", "sport": "basketball", "mtype": "prop",
+             "outcome": l["label"], "label": l["label"], "market": "Bet Builder", "price": None,
+             "handicap": l["line"], "fixture_id": f"bb-{b['event']}"} for l in legs_bb]
+    p = {"id": pid, "kind": "builder", "status": "selected", "legs": legs, "bb": b, "price": price,
+         "prob": b["prob"], "edge": round(b["prob"] * price - 1, 4), "stake": int(req.get("stake") or 2),
+         "tier": "justa", "created_at": _iso(now), "kickoff": ko, "sport": "basketball", "stake_v": 2,
+         "manual_builder": True}
+    state["picks"][pid] = p
+    if req.get("already_posted"):   # ya está en VIP (texto): se registra sin repetir el mensaje
+        p["channel_msgs"] = {"vip": req.get("vip_msg")}
+        p.update(status="published", published_at=req.get("posted_at") or _iso(now), free=False)
+    else:
+        _publish(state, p, free=False, vip_too=True)
+    from . import postimage
+    image = postimage.render_builder(p, "vip")
+    telegram.send_photo(owner, image, caption=f"🧩 <b>Bet Builder #{pid} registrado</b> (VIP)\n"
+                        + "\n".join(f"• {formatting.escape(l['label'])} · {l['hits']}/{l['n']} (prom. {l['avg']})"
+                                     for l in legs_bb)
+                        + f"\n📈 Cuota {formatting.odds(price)} · Stake {p['stake']}/10 · probabilidad estimada "
+                          f"{formatting.pct(b['prob'])}\nSe califica solo con el boxscore al terminar y queda en la web.")
+
+
 def _vip_post_file(state: dict) -> None:
     """data/vip_post.json ({"id", "text"}): mensaje para el canal VIP escrito a mano (p. ej. un Bet Builder que no
     es la apuesta diaria). Se envía una sola vez y te aviso."""
@@ -4165,6 +4270,7 @@ def poll() -> None:
     try:
         _cancel_file(state)
         _vip_post_file(state)
+        _builder_manual_file(state)
         _repair_file(state)
         _refresh_file(state)
         _recap_fix_file(state)
