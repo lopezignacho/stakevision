@@ -1187,6 +1187,30 @@ def _win_repost_file(state: dict) -> None:
                                              "se publica en Instagram en unos minutos.")
 
 
+def _vip_post_file(state: dict) -> None:
+    """data/vip_post.json ({"id", "text"}): mensaje para el canal VIP escrito a mano (p. ej. un Bet Builder que no
+    es la apuesta diaria). Se envía una sola vez y te aviso."""
+    import json
+    path = os.path.join(config.ROOT, "data", "vip_post.json")
+    owner = state.get("owner_chat")
+    if not os.path.exists(path) or not owner or not state.get("vip_chat"):
+        return
+    try:
+        with open(path, encoding="utf-8") as f:
+            req = json.load(f)
+    except Exception:  # noqa: BLE001
+        return
+    if not req.get("id") or not req.get("text") or req["id"] in (state.get("vip_post_done") or []):
+        return
+    state.setdefault("vip_post_done", []).append(req["id"])   # marcado antes de enviar: nunca dos veces
+    try:
+        telegram.send(state["vip_chat"], req["text"])
+        telegram.send(owner, "💎 <b>Publicado en VIP</b>\n" + req["text"])
+    except Exception as e:  # noqa: BLE001
+        traceback.print_exc()
+        telegram.send(owner, f"⚠️ No pude publicar en VIP: {formatting.escape(str(e))[:300]}")
+
+
 def _cancel_file(state: dict) -> None:
     """data/cancel.json ({"id": "...", "pid": "39", "refree": true}): cancelar un pick publicado, una sola vez."""
     import json
@@ -4140,6 +4164,7 @@ def poll() -> None:
             traceback.print_exc()
     try:
         _cancel_file(state)
+        _vip_post_file(state)
         _repair_file(state)
         _refresh_file(state)
         _recap_fix_file(state)
