@@ -1,15 +1,55 @@
 {
- "updated_at": "2026-11-10T05:35:32.960457+00:00",
+ "updated_at": "2026-11-10T05:40:45.404367+00:00",
  "summary": {
-  "picks": 26,
-  "wins": 17,
+  "picks": 27,
+  "wins": 18,
   "losses": 7,
-  "hit_rate": 0.7083,
-  "yield": 0.2874,
+  "hit_rate": 0.72,
+  "yield": 0.3014,
   "avg_odds": 1.8,
-  "units": 23.28
+  "units": 25.02
  },
  "picks": [
+  {
+   "id": "317",
+   "published_at": "2026-11-10T03:11:00Z",
+   "kickoff": "2026-11-10T03:00:00Z",
+   "kind": "builder",
+   "price": 1.87,
+   "stake": 2,
+   "prob": null,
+   "free": false,
+   "result": "W",
+   "legs": [
+    {
+     "home": "Golden State Warriors",
+     "away": "New Orleans Pelicans",
+     "league": "USA · NBA",
+     "market": "Bet Builder",
+     "outcome": "Yaxel Lendeborg: 3+ asistencias",
+     "price": null,
+     "label": "Yaxel Lendeborg: 3+ asistencias",
+     "mtype": "prop",
+     "handicap": 3,
+     "sport": "basketball",
+     "score": null
+    },
+    {
+     "home": "Golden State Warriors",
+     "away": "New Orleans Pelicans",
+     "league": "USA · NBA",
+     "market": "Bet Builder",
+     "outcome": "Stephen Curry: 4+ triples",
+     "price": null,
+     "label": "Stephen Curry: 4+ triples",
+     "mtype": "prop",
+     "handicap": 4,
+     "sport": "basketball",
+     "score": null
+    }
+   ],
+   "analysis": null
+  },
   {
    "id": "304",
    "published_at": "2026-11-09T03:40:33Z",
