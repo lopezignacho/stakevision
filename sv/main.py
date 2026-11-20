@@ -212,11 +212,14 @@ def _auto_reject(p: dict, d: dict | None, lead) -> str | None:
         return "empieza muy pronto para publicarlo con tiempo"
     if not (_min_odds(d) <= d["price"] <= config.ODDS_MAX):
         return f"la cuota {formatting.odds(d['price'])} está fuera del rango"
-    if d["edge"] < config.AUTO_FREE_MIN_EDGE:
+    espn_src = (p.get("odds_src") or d.get("odds_src")) == "espn"
+    if not espn_src and d["edge"] < config.AUTO_FREE_MIN_EDGE:
         return "la cuota está muy por debajo de la justa"
     ev = _leg_evidence(d["legs"][0])
     if ev and ev["verdict"] == "contra":
         return "los datos (forma y cara a cara) lo contradicen"
+    if espn_src:   # cuota de una sola casa: el margen es el de la casa, no se exige «valor»
+        return None
     from . import evidence
     pp = evidence.blend(d["prob"], ev)
     if pp < 1 / d["price"]:
@@ -1495,33 +1498,49 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
         if not manual:   # escaneo diario: solo los partidos de HOY (hora Chile)
             to = min(to, _end_of_today())
 
-    markets = oddspapi.markets()
-    fixtures = (oddspapi.live_fixtures if live else oddspapi.upcoming_fixtures)(_iso(frm), _iso(to))
-    fixtures = [f for f in fixtures if frm <= store.parse_ts(f["startTime"]) <= to]
-    by_id = {f["fixtureId"]: f for f in fixtures}
-    print(f"Partidos con cuotas de Betano en la ventana: {len(by_id)}")
+    src_espn = False
+    try:
+        markets = oddspapi.markets()
+        fixtures = (oddspapi.live_fixtures if live else oddspapi.upcoming_fixtures)(_iso(frm), _iso(to))
+    except oddspapi.OddsPapiError as e:
+        if live:
+            raise
+        # Sin OddsPapi (p. ej. cuota mensual agotada): cuotas gratis de ESPN, para que nunca falte el pick diario
+        print(f"OddsPapi no disponible ({e}); uso las cuotas de ESPN")
+        from . import espnodds
+        selections, n_leagues, analyzed = espnodds.soccer_selections(frm, to)
+        tournaments = list(range(n_leagues))
+        src_espn = True
+        if not selections:
+            telegram.send(state["owner_chat"], f"{title}: no encontré partidos con cuotas en tus ligas "
+                          f"en las próximas {hours} horas.")
+            return
+    if not src_espn:
+        fixtures = [f for f in fixtures if frm <= store.parse_ts(f["startTime"]) <= to]
+        by_id = {f["fixtureId"]: f for f in fixtures}
+        print(f"Partidos con cuotas de Betano en la ventana: {len(by_id)}")
 
-    counts: dict[int, int] = {}
-    for f in fixtures:
-        t = f["tournamentId"]
-        if t in config.TOURNAMENTS:
-            counts[t] = counts.get(t, 0) + 1
-    order = list(config.TOURNAMENTS)
-    tournaments = sorted(counts, key=order.index)[:config.MAX_TOURNAMENTS_PER_CALL * config.ODDS_BATCHES]
-    names = {t: config.TOURNAMENTS[t] for t in tournaments}
-    print("Ligas analizadas hoy: " + "; ".join(f"{names[t]} ({counts[t]})" for t in tournaments))
-    if not tournaments:
-        telegram.send(state["owner_chat"], f"{title}: ninguna de tus ligas tiene partidos "
-                      + ("jugándose ahora." if live else f"en las próximas {hours} horas."))
-        return
+        counts: dict[int, int] = {}
+        for f in fixtures:
+            t = f["tournamentId"]
+            if t in config.TOURNAMENTS:
+                counts[t] = counts.get(t, 0) + 1
+        order = list(config.TOURNAMENTS)
+        tournaments = sorted(counts, key=order.index)[:config.MAX_TOURNAMENTS_PER_CALL * config.ODDS_BATCHES]
+        names = {t: config.TOURNAMENTS[t] for t in tournaments}
+        print("Ligas analizadas hoy: " + "; ".join(f"{names[t]} ({counts[t]})" for t in tournaments))
+        if not tournaments:
+            telegram.send(state["owner_chat"], f"{title}: ninguna de tus ligas tiene partidos "
+                          + ("jugándose ahora." if live else f"en las próximas {hours} horas."))
+            return
 
-    odds_rows = oddspapi.odds_by_tournaments(tournaments)
-    selections, analyzed = [], 0
-    for row in odds_rows:
-        fx = by_id.get(row.get("fixtureId"))
-        if fx and len(row.get("bookmakerOdds") or {}) == 2:
-            analyzed += 1
-            selections += selections_for_fixture(fx, row, markets)
+        odds_rows = oddspapi.odds_by_tournaments(tournaments)
+        selections, analyzed = [], 0
+        for row in odds_rows:
+            fx = by_id.get(row.get("fixtureId"))
+            if fx and len(row.get("bookmakerOdds") or {}) == 2:
+                analyzed += 1
+                selections += selections_for_fixture(fx, row, markets)
 
     # No repetir partidos que ya tienen un candidato pendiente o un pick publicado.
     busy = {l["fixture_id"] for p in state["picks"].values()
@@ -1529,9 +1548,15 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
     selections = [x for x in selections if x.fixture_id not in busy]
     daily = not manual and not live
     want = top or (config.DAILY_TOP if daily else config.MAX_CANDIDATES)
-    picks = build_picks(selections, max_n=want * 2,
-                        min_n=(top or (config.DAILY_TOP if daily else config.MIN_DAILY_CANDIDATES)) * 2)
-    if config.PROTECTED_LINES:
+    if src_espn:   # una sola casa: no hay «valor» medible; las más probables dentro del rango de cuota
+        from . import espnodds
+        from .value import Pick
+        picks = [Pick("simple", [x], tier="justa")
+                 for x in espnodds.best_singles(selections, want * 3, config.ODDS_MIN, config.ODDS_MAX)]
+    else:
+        picks = build_picks(selections, max_n=want * 2,
+                            min_n=(top or (config.DAILY_TOP if daily else config.MIN_DAILY_CANDIDATES)) * 2)
+    if config.PROTECTED_LINES and not src_espn:
         picks = [_protect(pk, selections) for pk in picks]
     # Segunda opinión con datos: los que el H2H y la forma reciente contradicen van al final (o fuera)
     scored = []
@@ -1559,6 +1584,11 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
     if not picks:
         if best:
             best = "\n\nLo más cercano dentro del rango (valor frente a la cuota justa):\n" + best
+        if src_espn:
+            telegram.send(state["owner_chat"], f"{title}: {analyzed} partidos con cuotas (ESPN), ninguna opción "
+                          f"dentro de {config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f}. No hay picks para proponer.")
+            store.save(state)
+            return
         telegram.send(state["owner_chat"],
                       f"{title}: {len(tournaments)} ligas, {analyzed} partidos con cuotas de ambas casas, "
                       f"{len(selections)} cuotas comparadas. "
@@ -1568,6 +1598,11 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
         return
 
     n_val = sum(1 for p in picks if p.tier == "valor")
+    if src_espn:
+        telegram.send(state["owner_chat"], "ℹ️ OddsPapi no está disponible (cuota mensual agotada), así que hoy uso "
+                      "las cuotas de referencia que publica ESPN. Elijo las más probables dentro de "
+                      f"{config.ODDS_MIN:.2f}–{config.ODDS_MAX:.2f} y las reviso con nuestros datos (forma y cara a "
+                      "cara). Confirma la cuota en tu app: si es distinta, dímela y la ajusto.")
     if daily:
         free_on = config.AUTO_FREE and not state.get("auto_free_off")
         telegram.send(state["owner_chat"],
@@ -1600,6 +1635,8 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
         state["seq"] += 1
         pid = str(state["seq"])
         d.update(id=pid, status="candidate", created_at=_iso(now), stake_v=2)
+        if src_espn:
+            d["odds_src"] = "espn"
         if daily:
             d["daily_top"] = _local_today()
         if live:

@@ -376,7 +376,10 @@ def owner_candidate(pick: dict) -> str:
     if pick["kind"] != "builder":
         from . import argument
         pp = argument.shown_prob(pick)
-        if pp < 1 / pick["price"]:
+        if pick.get("odds_src") == "espn":
+            margin = ("\n📊 Cuota de referencia (ESPN): incluye el margen de la casa. Puede salir como gratis "
+                      "si nuestros datos no lo contradicen. Confirma la cuota en tu app.")
+        elif pp < 1 / pick["price"]:
             margin = (f"\n⚖️ <b>Sin margen:</b> le damos {argument.prob_text(pp)} y la cuota pide "
                       f"{argument.prob_text(1 / pick['price'])}. No sale como gratis automático; decide tú.")
     pub = "\n".join(public_label(l) for l in pick["legs"])

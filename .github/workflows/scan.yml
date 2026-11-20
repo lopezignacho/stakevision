@@ -2,6 +2,9 @@ name: Escaneo diario
 
 on:
   # Lo lanza cron-job.org a las 09:07 de Chile (el horario de GitHub se atrasa demasiado).
+  # Respaldo por si cron-job.org no lo lanza: el escaneo sale una sola vez al día (el segundo no hace nada).
+  schedule:
+    - cron: "41 12 * * *"
   workflow_dispatch:
     inputs:
       horas:

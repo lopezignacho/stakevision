@@ -12,6 +12,8 @@ import test_engine as te  # noqa: E402
 from sv import apifootball, config, main, oddspapi, store, telegram  # noqa: E402
 # archivos de pedidos reales del repo (data/*.json): no deben correr en las pruebas
 main._post_media_file = main._score_fix_file = main._free_now_file = main._win_repost_file = lambda state: None
+main._manual_free_file = main._vip_post_file = main._builder_manual_file = main._vip_replace_file = lambda state: None
+main._recap_fix_file = main._cancel_file = lambda state: None
 
 tmp = tempfile.mkdtemp()
 config.STATE_FILE = os.path.join(tmp, "state.enc")
