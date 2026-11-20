@@ -1,0 +1,1441 @@
+{
+ "quota": "subscriptions.0.request_limit=250, subscriptions.0.request_count=316",
+ "fixtures_call": "Se agotó la cuota mensual de OddsPapi",
+ "picks": [
+  {
+   "id": "297",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-08T19:10:32Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Chicago Bulls vs Philadelphia 76ers"
+  },
+  {
+   "id": "298",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-08T21:40:35Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Detroit Pistons vs Los Angeles Lakers"
+  },
+  {
+   "id": "299",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-08T22:40:29Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Minnesota Timberwolves vs Utah Jazz"
+  },
+  {
+   "id": "300",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-08T23:10:33Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Dallas Mavericks vs Brooklyn Nets"
+  },
+  {
+   "id": "301",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-08T23:40:30Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Milwaukee Bucks vs Boston Celtics"
+  },
+  {
+   "id": "302",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-09T00:41:06Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "LA Clippers vs New Orleans Pelicans"
+  },
+  {
+   "id": "303",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-09T00:41:14Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Sacramento Kings vs Miami Heat"
+  },
+  {
+   "id": "304",
+   "status": "settled",
+   "kind": "simple",
+   "price": 1.88,
+   "created_at": "2026-11-09T03:05:33Z",
+   "published_at": "2026-11-09T03:40:33Z",
+   "result": "L",
+   "free": true,
+   "match": "Sportivo San Lorenzo vs Rubio Nu"
+  },
+  {
+   "id": "305",
+   "status": "expired",
+   "kind": "simple",
+   "price": 1.7,
+   "created_at": "2026-11-09T22:40:30Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Atlanta Hawks vs Los Angeles Lakers"
+  },
+  {
+   "id": "306",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-09T22:40:41Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Atlanta Hawks vs Los Angeles Lakers"
+  },
+  {
+   "id": "307",
+   "status": "expired",
+   "kind": "simple",
+   "price": 1.78,
+   "created_at": "2026-11-09T22:40:30Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Charlotte Hornets vs Cleveland Cavaliers"
+  },
+  {
+   "id": "308",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-09T22:40:46Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Charlotte Hornets vs Cleveland Cavaliers"
+  },
+  {
+   "id": "309",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-09T22:40:51Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Detroit Pistons vs Washington Wizards"
+  },
+  {
+   "id": "310",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-09T23:10:38Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Toronto Raptors vs Memphis Grizzlies"
+  },
+  {
+   "id": "311",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-09T23:40:34Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Dallas Mavericks vs Indiana Pacers"
+  },
+  {
+   "id": "312",
+   "status": "expired",
+   "kind": "simple",
+   "price": 1.75,
+   "created_at": "2026-11-10T00:10:27Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Houston Rockets vs Denver Nuggets"
+  },
+  {
+   "id": "313",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-10T00:10:34Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Houston Rockets vs Denver Nuggets"
+  },
+  {
+   "id": "314",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-10T00:42:40Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Phoenix Suns vs San Antonio Spurs"
+  },
+  {
+   "id": "315",
+   "status": "expired",
+   "kind": "simple",
+   "price": 1.75,
+   "created_at": "2026-11-10T01:40:30Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Golden State Warriors vs New Orleans Pelicans"
+  },
+  {
+   "id": "316",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-10T01:40:42Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Golden State Warriors vs New Orleans Pelicans"
+  },
+  {
+   "id": "317",
+   "status": "settled",
+   "kind": "builder",
+   "price": 1.87,
+   "created_at": "2026-11-10T03:23:57Z",
+   "published_at": "2026-11-10T03:11:00Z",
+   "result": "W",
+   "free": false,
+   "match": "Golden State Warriors vs New Orleans Pelicans"
+  },
+  {
+   "id": "318",
+   "status": "expired",
+   "kind": "simple",
+   "price": 1.83,
+   "created_at": "2026-11-10T23:10:26Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "New York Knicks vs Milwaukee Bucks"
+  },
+  {
+   "id": "319",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-10T23:10:36Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "New York Knicks vs Milwaukee Bucks"
+  },
+  {
+   "id": "320",
+   "status": "expired",
+   "kind": "simple",
+   "price": 1.93,
+   "created_at": "2026-11-10T23:40:31Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Philadelphia 76ers vs Boston Celtics"
+  },
+  {
+   "id": "321",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-10T23:40:35Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Philadelphia 76ers vs Boston Celtics"
+  },
+  {
+   "id": "322",
+   "status": "expired",
+   "kind": "simple",
+   "price": 1.72,
+   "created_at": "2026-11-11T00:40:32Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Phoenix Suns vs LA Clippers"
+  },
+  {
+   "id": "323",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-11T00:40:38Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Phoenix Suns vs LA Clippers"
+  },
+  {
+   "id": "324",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-11T00:40:45Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Utah Jazz vs Miami Heat"
+  },
+  {
+   "id": "325",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-11T01:43:39Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Sacramento Kings vs Orlando Magic"
+  },
+  {
+   "id": "326",
+   "status": "expired",
+   "kind": "simple",
+   "price": 1.75,
+   "created_at": "2026-11-11T02:40:30Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Portland Trail Blazers vs Oklahoma City Thunder"
+  },
+  {
+   "id": "327",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-11T02:40:41Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Portland Trail Blazers vs Oklahoma City Thunder"
+  },
+  {
+   "id": "328",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-11T22:44:33Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Indiana Pacers vs Washington Wizards"
+  },
+  {
+   "id": "329",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-11T22:44:38Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "New York Knicks vs Cleveland Cavaliers"
+  },
+  {
+   "id": "330",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-11T22:44:44Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Toronto Raptors vs Boston Celtics"
+  },
+  {
+   "id": "331",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-11T23:40:30Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Chicago Bulls vs San Antonio Spurs"
+  },
+  {
+   "id": "332",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-11T23:40:37Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Memphis Grizzlies vs Denver Nuggets"
+  },
+  {
+   "id": "333",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-11T23:40:42Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Milwaukee Bucks vs Los Angeles Lakers"
+  },
+  {
+   "id": "334",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-11T23:40:49Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "New Orleans Pelicans vs Brooklyn Nets"
+  },
+  {
+   "id": "335",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-12T00:40:37Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Utah Jazz vs Orlando Magic"
+  },
+  {
+   "id": "336",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-12T01:10:34Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Houston Rockets vs Golden State Warriors"
+  },
+  {
+   "id": "337",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-12T01:40:33Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Portland Trail Blazers vs Oklahoma City Thunder"
+  },
+  {
+   "id": "338",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-12T22:40:30Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Philadelphia 76ers vs Toronto Raptors"
+  },
+  {
+   "id": "339",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-12T22:40:35Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Washington Wizards vs Detroit Pistons"
+  },
+  {
+   "id": "340",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-12T23:40:37Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Minnesota Timberwolves vs Dallas Mavericks"
+  },
+  {
+   "id": "341",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-13T00:43:04Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Phoenix Suns vs Charlotte Hornets"
+  },
+  {
+   "id": "342",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-13T22:40:31Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Indiana Pacers vs New York Knicks"
+  },
+  {
+   "id": "343",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-13T22:40:34Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Orlando Magic vs Milwaukee Bucks"
+  },
+  {
+   "id": "344",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-13T23:40:35Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Miami Heat vs Cleveland Cavaliers"
+  },
+  {
+   "id": "345",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-13T23:40:44Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Chicago Bulls vs Atlanta Hawks"
+  },
+  {
+   "id": "346",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-13T23:40:51Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "New Orleans Pelicans vs Memphis Grizzlies"
+  },
+  {
+   "id": "347",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-14T00:10:49Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Houston Rockets vs Utah Jazz"
+  },
+  {
+   "id": "348",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-14T01:10:36Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "San Antonio Spurs vs Golden State Warriors"
+  },
+  {
+   "id": "349",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-14T01:44:28Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Sacramento Kings vs Portland Trail Blazers"
+  },
+  {
+   "id": "350",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-14T02:11:53Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "LA Clippers vs Oklahoma City Thunder"
+  },
+  {
+   "id": "351",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-14T22:40:34Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "New Orleans Pelicans vs Denver Nuggets"
+  },
+  {
+   "id": "352",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-14T23:43:52Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Miami Heat vs Detroit Pistons"
+  },
+  {
+   "id": "353",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-14T23:43:59Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Memphis Grizzlies vs Brooklyn Nets"
+  },
+  {
+   "id": "354",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-14T23:44:06Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Minnesota Timberwolves vs Chicago Bulls"
+  },
+  {
+   "id": "355",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-15T16:40:36Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Philadelphia 76ers vs Indiana Pacers"
+  },
+  {
+   "id": "356",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-15T19:40:30Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Phoenix Suns vs Los Angeles Lakers"
+  },
+  {
+   "id": "357",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-15T20:10:40Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "LA Clippers vs Charlotte Hornets"
+  },
+  {
+   "id": "358",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-15T20:40:34Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Utah Jazz vs San Antonio Spurs"
+  },
+  {
+   "id": "359",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-15T21:40:29Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Boston Celtics vs Dallas Mavericks"
+  },
+  {
+   "id": "360",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-15T21:40:34Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Toronto Raptors vs New York Knicks"
+  },
+  {
+   "id": "361",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-15T22:40:34Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Washington Wizards vs Houston Rockets"
+  },
+  {
+   "id": "362",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-15T23:40:31Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Milwaukee Bucks vs Atlanta Hawks"
+  },
+  {
+   "id": "363",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-16T00:40:38Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Sacramento Kings vs Oklahoma City Thunder"
+  },
+  {
+   "id": "364",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-16T22:40:41Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Boston Celtics vs Orlando Magic"
+  },
+  {
+   "id": "365",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-16T22:40:45Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Cleveland Cavaliers vs Chicago Bulls"
+  },
+  {
+   "id": "366",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-16T22:40:49Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Washington Wizards vs Memphis Grizzlies"
+  },
+  {
+   "id": "367",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-16T23:15:51Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Brooklyn Nets vs Philadelphia 76ers"
+  },
+  {
+   "id": "368",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-16T23:15:58Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Miami Heat vs Houston Rockets"
+  },
+  {
+   "id": "369",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-16T23:42:18Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Minnesota Timberwolves vs Portland Trail Blazers"
+  },
+  {
+   "id": "370",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-16T23:42:24Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "New Orleans Pelicans vs Golden State Warriors"
+  },
+  {
+   "id": "371",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-17T00:40:34Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Denver Nuggets vs Phoenix Suns"
+  },
+  {
+   "id": "372",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-17T19:27:19Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Denmark vs Norway"
+  },
+  {
+   "id": "373",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-17T23:10:35Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Toronto Raptors vs New York Knicks"
+  },
+  {
+   "id": "374",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-17T23:40:29Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Minnesota Timberwolves vs Portland Trail Blazers"
+  },
+  {
+   "id": "375",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-17T23:40:33Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "San Antonio Spurs vs Detroit Pistons"
+  },
+  {
+   "id": "376",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-18T02:13:12Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "LA Clippers vs Utah Jazz"
+  },
+  {
+   "id": "377",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-18T02:40:49Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Los Angeles Lakers vs Charlotte Hornets"
+  },
+  {
+   "id": "378",
+   "status": "expired",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-19T07:46:36Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Memphis Grizzlies vs Golden State Warriors"
+  },
+  {
+   "id": "379",
+   "status": "bb",
+   "kind": "builder",
+   "price": 3.0,
+   "created_at": "2026-11-19T07:46:41Z",
+   "published_at": null,
+   "result": null,
+   "free": null,
+   "match": "Detroit Pistons vs Toronto Raptors"
+  }
+ ],
+ "auto_free": {
+  "date": "2026-11-20",
+  "status": "none",
+  "pool": []
+ },
+ "keys": [
+  "auto_free",
+  "auto_scan_date",
+  "bb_date",
+  "bb_nba_done",
+  "builder_manual_done",
+  "cancel_done",
+  "cmds_v",
+  "contacts",
+  "design_seq",
+  "force_free_done",
+  "free_now_done",
+  "ig",
+  "ig_inbox",
+  "ig_jobs",
+  "invites",
+  "livebb_done",
+  "livebb_quota",
+  "lock_now_done",
+  "manual",
+  "manual_free_done",
+  "nba_digest_date",
+  "nba_live",
+  "nba_odds_until",
+  "nba_pre",
+  "nba_queue",
+  "news_done",
+  "news_items",
+  "news_next",
+  "news_pending",
+  "news_pm_done",
+  "news_seen",
+  "news_seq",
+  "news_test_done",
+  "owner_chat",
+  "picks",
+  "post_media_done",
+  "recap_fix_done",
+  "refresh_done",
+  "repair_done",
+  "score_fix_done",
+  "seq",
+  "tg_offset",
+  "vip_chat",
+  "vip_post_done",
+  "vip_replace_done",
+  "win_repost_done"
+ ],
+ "espn_soccer_with_odds": 89,
+ "espn_soccer_sample": [
+  {
+   "name": "Espanyol at Athletic Club",
+   "date": "2026-11-20T20:00Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 350,
+   "ou": 2.5
+  },
+  {
+   "name": "FC Cologne at Bayern Munich",
+   "date": "2026-11-20T19:30Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 1000,
+   "ou": 4.5
+  },
+  {
+   "name": "Atlético de San Luis at Puebla",
+   "date": "2026-11-21T01:00Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 260,
+   "ou": 2.5
+  },
+  {
+   "name": "Atlas at FC Juárez",
+   "date": "2026-11-21T03:00Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 270,
+   "ou": 2.5
+  },
+  {
+   "name": "Atlante at Tijuana",
+   "date": "2026-11-21T03:10Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 330,
+   "ou": 2.5
+  },
+  {
+   "name": "Le Havre AC at Troyes",
+   "date": "2026-11-20T19:45Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 235,
+   "ou": 2.5
+  },
+  {
+   "name": "Marseille at Toulouse",
+   "date": "2026-11-20T20:00Z",
+   "provider": null,
+   "home": null,
+   "away": null,
+   "draw": null,
+   "ou": null
+  },
+  {
+   "name": "Adelaide United FC at Western Sydney Wanderers FC",
+   "date": "2026-11-20T08:40Z",
+   "provider": null,
+   "home": null,
+   "away": null,
+   "draw": null,
+   "ou": null
+  },
+  {
+   "name": "Melbourne Victory at Auckland FC",
+   "date": "2026-11-21T04:00Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 250,
+   "ou": 2.5
+  },
+  {
+   "name": "Wellington Phoenix at Western Sydney ",
+   "date": "2026-11-20T05:50Z",
+   "provider": null,
+   "home": null,
+   "away": null,
+   "draw": null,
+   "ou": null
+  },
+  {
+   "name": "Al Nassr at Al Ahli",
+   "date": "2026-11-20T17:30Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 300,
+   "ou": 3.5
+  },
+  {
+   "name": "Paredes at FC Porto",
+   "date": "2026-11-20T20:45Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 950,
+   "ou": 3.5
+  },
+  {
+   "name": "Krylia Sovetov at Rostov",
+   "date": "2026-11-20T16:30Z",
+   "provider": null,
+   "home": null,
+   "away": null,
+   "draw": null,
+   "ou": null
+  },
+  {
+   "name": "KVC Westerlo at Cercle Brugge KSV",
+   "date": "2026-11-20T19:45Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 285,
+   "ou": 3.5
+  },
+  {
+   "name": "Leganés at FC Andorra",
+   "date": "2026-11-20T19:30Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 275,
+   "ou": 2.5
+  }
+ ],
+ "espn_soccer_raw": [
+  {
+   "overUnder": 2.5,
+   "link": {
+    "language": "en-US",
+    "rel": [
+     "game",
+     "desktop",
+     "bets"
+    ],
+    "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244",
+    "text": "Game",
+    "shortText": "Game",
+    "isExternal": true,
+    "isPremium": false,
+    "isHidden": false
+   },
+   "provider": {
+    "id": "100",
+    "name": "DraftKings",
+    "priority": 1,
+    "displayName": "DraftKings",
+    "logos": [
+     {
+      "href": "https://a.espncdn.com/i/betting/Draftkings_Light.svg",
+      "rel": [
+       "light"
+      ]
+     },
+     {
+      "href": "https://a.espncdn.com/i/betting/Draftkings_Dark.svg",
+      "rel": [
+       "dark"
+      ]
+     }
+    ]
+   },
+   "drawOdds": {
+    "moneyLine": 350,
+    "link": {
+     "language": "en-US",
+     "rel": [
+      "draw",
+      "desktop",
+      "bets",
+      "draftkings"
+     ],
+     "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_2",
+     "text": "Draw Bet",
+     "shortText": "Draw Bet",
+     "isExternal": true,
+     "isPremium": false,
+     "isHidden": false
+    }
+   },
+   "total": {
+    "displayName": "Total",
+    "shortDisplayName": "Total",
+    "over": {
+     "open": {
+      "line": "o2.5",
+      "odds": "-120"
+     },
+     "close": {
+      "line": "o2.5",
+      "odds": "-160",
+      "link": {
+       "rel": [
+        "over",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0OU87123234O250_1",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "over",
+         "betType": "straight",
+         "betDetails": "Over:2.5"
+        }
+       }
+      }
+     }
+    },
+    "under": {
+     "open": {
+      "line": "u2.5",
+      "odds": "-110"
+     },
+     "close": {
+      "line": "u2.5",
+      "odds": "+125",
+      "link": {
+       "rel": [
+        "under",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0OU87123234U250_3",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "under",
+         "betType": "straight",
+         "betDetails": "Under:2.5"
+        }
+       }
+      }
+     }
+    }
+   },
+   "pointSpread": {
+    "displayName": "Spread",
+    "shortDisplayName": "Spread",
+    "home": {
+     "open": {
+      "line": "-0.5",
+      "odds": "-195"
+     },
+     "close": {
+      "line": "-1.5",
+      "odds": "+120",
+      "link": {
+       "rel": [
+        "homeSpread",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0HC87123239N150_1",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "home",
+         "betType": "straight",
+         "betDetails": "Spread:ATH-1.5"
+        }
+       }
+      }
+     }
+    },
+    "away": {
+     "open": {
+      "line": "+0.5",
+      "odds": "+125"
+     },
+     "close": {
+      "line": "+1.5",
+      "odds": "-165",
+      "link": {
+       "rel": [
+        "awaySpread",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0HC87123239P150_3",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "away",
+         "betType": "straight",
+         "betDetails": "Spread:ESP+1.5"
+        }
+       }
+      }
+     }
+    }
+   },
+   "moneyline": {
+    "displayName": "Moneyline",
+    "shortDisplayName": "ML",
+    "home": {
+     "open": {
+      "odds": "-175"
+     },
+     "close": {
+      "odds": "-210",
+      "link": {
+       "rel": [
+        "home",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_1",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "home",
+         "betType": "straight"
+        }
+       }
+      }
+     }
+    },
+    "away": {
+     "open": {
+      "odds": "+450"
+     },
+     "close": {
+      "odds": "+550",
+      "link": {
+       "rel": [
+        "away",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_3",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "away",
+         "betType": "straight"
+        }
+       }
+      }
+     }
+    },
+    "draw": {
+     "open": {
+      "odds": "+295"
+     },
+     "close": {
+      "odds": "+350",
+      "link": {
+       "rel": [
+        "draw",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_2",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "draw",
+         "betType": "straight"
+        }
+       }
+      }
+     }
+    }
+   },
+   "details": "ATH -210"
+  }
+ ],
+ "nba": [
+  {
+   "name": "Charlotte Hornets at Atlanta Hawks",
+   "date": "2026-11-21T00:00Z",
+   "details": "ATL -6.5",
+   "ou": 218.5,
+   "home_ml": null,
+   "away_ml": null
+  },
+  {
+   "name": "Orlando Magic at Brooklyn Nets",
+   "date": "2026-11-21T00:30Z",
+   "details": "ORL -6.5",
+   "ou": 224.5,
+   "home_ml": null,
+   "away_ml": null
+  },
+  {
+   "name": "Indiana Pacers at Cleveland Cavaliers",
+   "date": "2026-11-21T00:30Z",
+   "details": "CLE -5.5",
+   "ou": 233.5,
+   "home_ml": null,
+   "away_ml": null
+  },
+  {
+   "name": "Toronto Raptors at Detroit Pistons",
+   "date": "2026-11-21T00:30Z",
+   "details": "DET -6.5",
+   "ou": 216.5,
+   "home_ml": null,
+   "away_ml": null
+  },
+  {
+   "name": "Washington Wizards at Chicago Bulls",
+   "date": "2026-11-21T01:00Z",
+   "details": "CHI -2.5",
+   "ou": 237.5,
+   "home_ml": null,
+   "away_ml": null
+  },
+  {
+   "name": "New Orleans Pelicans at Oklahoma City Thunder",
+   "date": "2026-11-21T01:00Z",
+   "details": "OKC -11.5",
+   "ou": 228.5,
+   "home_ml": null,
+   "away_ml": null
+  },
+  {
+   "name": "Phoenix Suns at Utah Jazz",
+   "date": "2026-11-21T02:30Z",
+   "details": "PHX -4.5",
+   "ou": 225.5,
+   "home_ml": null,
+   "away_ml": null
+  },
+  {
+   "name": "Houston Rockets at Denver Nuggets",
+   "date": "2026-11-21T03:00Z",
+   "details": "DEN -1.5",
+   "ou": 226.5,
+   "home_ml": null,
+   "away_ml": null
+  },
+  {
+   "name": "Sacramento Kings at Los Angeles Lakers",
+   "date": "2026-11-21T03:00Z",
+   "details": "LAL -14.5",
+   "ou": 228.5,
+   "home_ml": null,
+   "away_ml": null
+  }
+ ]
+}
