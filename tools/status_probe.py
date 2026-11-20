@@ -23,16 +23,17 @@ odds = []
 for e in espn._scoreboard(day, "soccer")[:200]:
     c = (e.get("competitions") or [{}])[0]
     if c.get("odds"):
-        o = c["odds"][0]
+        o = c["odds"][0] or {}
         odds.append({"name": e.get("name"), "date": e.get("date"), "provider": (o.get("provider") or {}).get("name"),
                      "home": (o.get("homeTeamOdds") or {}).get("moneyLine"), "away": (o.get("awayTeamOdds") or {}).get("moneyLine"),
                      "draw": (o.get("drawOdds") or {}).get("moneyLine"), "ou": o.get("overUnder")})
 out["espn_soccer_with_odds"] = len(odds)
 out["espn_soccer_sample"] = odds[:15]
+out["espn_soccer_raw"] = next((c for e in espn._scoreboard(day, "soccer") for c in [(e.get("competitions") or [{}])[0]] if c.get("odds")), {}).get("odds")
 nb = []
 for e in nba._get("/scoreboard", dates=day).get("events") or []:
     c = (e.get("competitions") or [{}])[0]
-    o = (c.get("odds") or [{}])[0]
+    o = (c.get("odds") or [{}])[0] or {}
     nb.append({"name": e.get("name"), "date": e.get("date"), "details": o.get("details"), "ou": o.get("overUnder"),
                "home_ml": (o.get("homeTeamOdds") or {}).get("moneyLine"), "away_ml": (o.get("awayTeamOdds") or {}).get("moneyLine")})
 out["nba"] = nb
