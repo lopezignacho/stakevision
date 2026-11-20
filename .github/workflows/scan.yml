@@ -11,6 +11,10 @@ on:
         description: "Horas hacia adelante a analizar (30 normal, máx. 47)"
         required: false
         default: "30"
+      forzar:
+        description: "1 = repetir el escaneo diario de hoy (aunque ya haya salido)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -40,6 +44,7 @@ jobs:
           STATE_KEY: ${{ secrets.STATE_KEY }}
           LINK_CODE: ${{ secrets.LINK_CODE }}
           SCAN_HOURS: ${{ github.event.inputs.horas }}
+          FORCE_SCAN: ${{ github.event.inputs.forzar }}
         run: python -m sv.main scan
       - name: Guardar estado
         run: |

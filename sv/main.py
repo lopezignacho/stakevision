@@ -164,7 +164,7 @@ def scan(hours: int | None = None, top: int | None = None, manual: bool = False,
         return
     if not manual and not live:   # el escaneo diario sale una sola vez (lo pueden lanzar dos caminos)
         today = _local_today()
-        if state.get("auto_scan_date") == today:
+        if state.get("auto_scan_date") == today and not os.environ.get("FORCE_SCAN"):
             print("El escaneo de hoy ya salió.")
             return
         state["auto_scan_date"] = today
