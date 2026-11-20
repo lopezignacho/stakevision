@@ -1551,8 +1551,12 @@ def _scan_soccer(hours: int | None = None, top: int | None = None, manual: bool 
     if src_espn:   # una sola casa: no hay «valor» medible; las más probables dentro del rango de cuota
         from . import espnodds
         from .value import Pick
+        pool_sel = selections
+        if daily:   # el gratis necesita tiempo: aviso + publicación antes del partido
+            soon = now + timedelta(minutes=config.AUTO_FREE_DELAY_MIN + config.AUTO_FREE_MIN_LEAD_MIN + 10)
+            pool_sel = [x for x in selections if store.parse_ts(x.kickoff) >= soon] or selections
         picks = [Pick("simple", [x], tier="justa")
-                 for x in espnodds.best_singles(selections, want * 3, config.ODDS_MIN, config.ODDS_MAX)]
+                 for x in espnodds.best_singles(pool_sel, want * 3, config.ODDS_MIN, config.ODDS_MAX)]
     else:
         picks = build_picks(selections, max_n=want * 2,
                             min_n=(top or (config.DAILY_TOP if daily else config.MIN_DAILY_CANDIDATES)) * 2)
