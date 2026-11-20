@@ -1,0 +1,629 @@
+{
+ "n": 89,
+ "soccer_event_keys": [
+  "id",
+  "uid",
+  "date",
+  "name",
+  "shortName",
+  "season",
+  "competitions",
+  "status",
+  "venue",
+  "links"
+ ],
+ "soccer_comp_keys": [
+  "id",
+  "uid",
+  "date",
+  "startDate",
+  "attendance",
+  "timeValid",
+  "recent",
+  "status",
+  "venue",
+  "format",
+  "altGameNote",
+  "notes",
+  "geoBroadcasts",
+  "broadcasts",
+  "broadcast",
+  "competitors",
+  "details",
+  "odds",
+  "wasSuspended",
+  "playByPlayAvailable",
+  "playByPlayAthletes"
+ ],
+ "soccer_league": {
+  "league": null,
+  "season": {
+   "year": 2026,
+   "type": 14357,
+   "slug": "2026-27-laliga"
+  },
+  "uid": "s:600~l:740~e:401882805"
+ },
+ "soccer_odds": [
+  {
+   "overUnder": 2.5,
+   "link": {
+    "language": "en-US",
+    "rel": [
+     "game",
+     "desktop",
+     "bets"
+    ],
+    "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244",
+    "text": "Game",
+    "shortText": "Game",
+    "isExternal": true,
+    "isPremium": false,
+    "isHidden": false
+   },
+   "provider": {
+    "id": "100",
+    "name": "DraftKings",
+    "priority": 1,
+    "displayName": "DraftKings",
+    "logos": [
+     {
+      "href": "https://a.espncdn.com/i/betting/Draftkings_Light.svg",
+      "rel": [
+       "light"
+      ]
+     },
+     {
+      "href": "https://a.espncdn.com/i/betting/Draftkings_Dark.svg",
+      "rel": [
+       "dark"
+      ]
+     }
+    ]
+   },
+   "drawOdds": {
+    "moneyLine": 350,
+    "link": {
+     "language": "en-US",
+     "rel": [
+      "draw",
+      "desktop",
+      "bets",
+      "draftkings"
+     ],
+     "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_2",
+     "text": "Draw Bet",
+     "shortText": "Draw Bet",
+     "isExternal": true,
+     "isPremium": false,
+     "isHidden": false
+    }
+   },
+   "total": {
+    "displayName": "Total",
+    "shortDisplayName": "Total",
+    "over": {
+     "open": {
+      "line": "o2.5",
+      "odds": "-120"
+     },
+     "close": {
+      "line": "o2.5",
+      "odds": "-160",
+      "link": {
+       "rel": [
+        "over",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0OU87123234O250_1",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "over",
+         "betType": "straight",
+         "betDetails": "Over:2.5"
+        }
+       }
+      }
+     }
+    },
+    "under": {
+     "open": {
+      "line": "u2.5",
+      "odds": "-110"
+     },
+     "close": {
+      "line": "u2.5",
+      "odds": "+125",
+      "link": {
+       "rel": [
+        "under",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0OU87123234U250_3",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "under",
+         "betType": "straight",
+         "betDetails": "Under:2.5"
+        }
+       }
+      }
+     }
+    }
+   },
+   "pointSpread": {
+    "displayName": "Spread",
+    "shortDisplayName": "Spread",
+    "home": {
+     "open": {
+      "line": "-0.5",
+      "odds": "-195"
+     },
+     "close": {
+      "line": "-1.5",
+      "odds": "+120",
+      "link": {
+       "rel": [
+        "homeSpread",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0HC87123239N150_1",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "home",
+         "betType": "straight",
+         "betDetails": "Spread:ATH-1.5"
+        }
+       }
+      }
+     }
+    },
+    "away": {
+     "open": {
+      "line": "+0.5",
+      "odds": "+125"
+     },
+     "close": {
+      "line": "+1.5",
+      "odds": "-165",
+      "link": {
+       "rel": [
+        "awaySpread",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0HC87123239P150_3",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "away",
+         "betType": "straight",
+         "betDetails": "Spread:ESP+1.5"
+        }
+       }
+      }
+     }
+    }
+   },
+   "moneyline": {
+    "displayName": "Moneyline",
+    "shortDisplayName": "ML",
+    "home": {
+     "open": {
+      "odds": "-175"
+     },
+     "close": {
+      "odds": "-210",
+      "link": {
+       "rel": [
+        "home",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_1",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "home",
+         "betType": "straight"
+        }
+       }
+      }
+     }
+    },
+    "away": {
+     "open": {
+      "odds": "+450"
+     },
+     "close": {
+      "odds": "+550",
+      "link": {
+       "rel": [
+        "away",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_3",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "away",
+         "betType": "straight"
+        }
+       }
+      }
+     }
+    },
+    "draw": {
+     "open": {
+      "odds": "+295"
+     },
+     "close": {
+      "odds": "+350",
+      "link": {
+       "rel": [
+        "draw",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_2",
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "esp.1",
+         "sport": "soccer",
+         "gameId": 401882805,
+         "betSide": "draw",
+         "betType": "straight"
+        }
+       }
+      }
+     }
+    }
+   },
+   "details": "ATH -210"
+  }
+ ],
+ "nba_odds": [
+  {
+   "provider": {
+    "id": "100",
+    "name": "DraftKings",
+    "priority": 1,
+    "logos": [
+     {
+      "href": "https://a.espncdn.com/i/betting/Draftkings_Light.svg",
+      "rel": [
+       "light"
+      ]
+     },
+     {
+      "href": "https://a.espncdn.com/i/betting/Draftkings_Dark.svg",
+      "rel": [
+       "dark"
+      ]
+     }
+    ],
+    "displayName": "DraftKings"
+   },
+   "details": "ATL -6.5",
+   "overUnder": 218.5,
+   "spread": -6.5,
+   "awayTeamOdds": {
+    "favorite": false,
+    "underdog": true,
+    "team": {
+     "id": "30",
+     "uid": "s:40~l:46~t:30",
+     "abbreviation": "CHA",
+     "name": "Hornets",
+     "displayName": "Charlotte Hornets",
+     "logo": "https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/cha.png"
+    },
+    "favoriteAtOpen": false
+   },
+   "homeTeamOdds": {
+    "favorite": true,
+    "underdog": false,
+    "team": {
+     "id": "1",
+     "uid": "s:40~l:46~t:1",
+     "abbreviation": "ATL",
+     "name": "Hawks",
+     "displayName": "Atlanta Hawks",
+     "logo": "https://a.espncdn.com/i/teamlogos/nba/500/scoreboard/atl.png"
+    },
+    "favoriteAtOpen": true
+   },
+   "moneyline": {
+    "displayName": "Moneyline",
+    "shortDisplayName": "ML",
+    "home": {
+     "close": {
+      "odds": "-249",
+      "link": {
+       "language": "en-US",
+       "rel": [
+        "home",
+        "desktop",
+        "bets",
+        "draftkings"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F35039359%3Foutcomes%3D0ML87292641_1",
+       "text": "Home Bet",
+       "shortText": "Home Bet",
+       "isExternal": true,
+       "isPremium": false,
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "nba",
+         "sport": "basketball",
+         "gameId": 401909305,
+         "betSide": "home",
+         "betType": "straight"
+        }
+       }
+      }
+     },
+     "open": {
+      "odds": "-212"
+     }
+    },
+    "away": {
+     "close": {
+      "odds": "+205",
+      "link": {
+       "language": "en-US",
+       "rel": [
+        "away",
+        "desktop",
+        "bets",
+        "draftkings"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F35039359%3Foutcomes%3D0ML87292641_3",
+       "text": "Away Bet",
+       "shortText": "Away Bet",
+       "isExternal": true,
+       "isPremium": false,
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "nba",
+         "sport": "basketball",
+         "gameId": 401909305,
+         "betSide": "away",
+         "betType": "straight"
+        }
+       }
+      }
+     },
+     "open": {
+      "odds": "+177"
+     }
+    }
+   },
+   "pointSpread": {
+    "displayName": "Spread",
+    "shortDisplayName": "Spread",
+    "home": {
+     "close": {
+      "line": "-6.5",
+      "odds": "-115",
+      "link": {
+       "language": "en-US",
+       "rel": [
+        "homeSpread",
+        "desktop",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F35039359%3Foutcomes%3D0HC87292641N650_1",
+       "text": "Home Point Spread",
+       "shortText": "Home Point Spread",
+       "isExternal": true,
+       "isPremium": false,
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "nba",
+         "sport": "basketball",
+         "gameId": 401909305,
+         "betSide": "none",
+         "betType": "straight",
+         "betDetails": "Spread:ATL-6.5"
+        }
+       }
+      }
+     },
+     "open": {
+      "line": "-5.5",
+      "odds": "-110"
+     }
+    },
+    "away": {
+     "close": {
+      "line": "+6.5",
+      "odds": "-105",
+      "link": {
+       "language": "en-US",
+       "rel": [
+        "awaySpread",
+        "desktop",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F35039359%3Foutcomes%3D0HC87292641P650_3",
+       "text": "Away Point Spread",
+       "shortText": "Away Point Spread",
+       "isExternal": true,
+       "isPremium": false,
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "nba",
+         "sport": "basketball",
+         "gameId": 401909305,
+         "betSide": "none",
+         "betType": "straight",
+         "betDetails": "Spread:CHA+6.5"
+        }
+       }
+      }
+     },
+     "open": {
+      "line": "+5.5",
+      "odds": "-110"
+     }
+    }
+   },
+   "total": {
+    "displayName": "Total",
+    "shortDisplayName": "Total",
+    "over": {
+     "close": {
+      "line": "o218.5",
+      "odds": "-115",
+      "link": {
+       "language": "en-US",
+       "rel": [
+        "over",
+        "desktop",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F35039359%3Foutcomes%3D0OU87292641O21850_1",
+       "text": "Over Odds",
+       "shortText": "Over Odds",
+       "isExternal": true,
+       "isPremium": false,
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "nba",
+         "sport": "basketball",
+         "gameId": 401909305,
+         "betSide": "over",
+         "betType": "straight",
+         "betDetails": "Over:218.5"
+        }
+       }
+      }
+     },
+     "open": {
+      "line": "o218.5",
+      "odds": "-106"
+     }
+    },
+    "under": {
+     "close": {
+      "line": "u218.5",
+      "odds": "-105",
+      "link": {
+       "language": "en-US",
+       "rel": [
+        "under",
+        "desktop",
+        "bets"
+       ],
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F35039359%3Foutcomes%3D0OU87292641U21850_3",
+       "text": "Under Odds",
+       "shortText": "Under Odds",
+       "isExternal": true,
+       "isPremium": false,
+       "tracking": {
+        "campaign": "betting-integrations",
+        "tags": {
+         "league": "nba",
+         "sport": "basketball",
+         "gameId": 401909305,
+         "betSide": "under",
+         "betType": "straight",
+         "betDetails": "Under:218.5"
+        }
+       }
+      }
+     },
+     "open": {
+      "line": "u218.5",
+      "odds": "-114"
+     }
+    }
+   },
+   "link": {
+    "language": "en-US",
+    "rel": [
+     "game",
+     "desktop",
+     "bets"
+    ],
+    "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F35039359",
+    "text": "See More Odds",
+    "shortText": "Game",
+    "isExternal": true,
+    "isPremium": false,
+    "tracking": {
+     "campaign": "betting-integrations",
+     "tags": {
+      "league": "nba",
+      "sport": "basketball",
+      "gameId": 401909305,
+      "betSide": "none",
+      "betType": "straight"
+     }
+    }
+   },
+   "header": {
+    "logo": {
+     "dark": "https://a.espncdn.com/i/espnbet/dark/espn-bet-square-off.svg",
+     "light": "https://a.espncdn.com/i/espnbet/espn-bet-square-off.svg",
+     "exclusivesLogoDark": "https://a.espncdn.com/i/espnbet/espn-bet-square-mint.svg",
+     "exclusivesLogoLight": "https://a.espncdn.com/i/espnbet/espn-bet-square-mint.svg"
+    },
+    "text": "Game Odds"
+   },
+   "footer": {
+    "disclaimer": "GAMBLING PROBLEM? CALL 1-800-GAMBLER or 1-800-MY-RESET, (800) 327-5050 or visit gamblinghelplinema.org (MA). Call 877-8-HOPENY/text HOPENY (467369) (NY). Call 888-789-7777/visit ccpg.org (CT), or visit www.mdgamblinghelp.org (MD), 1-800-981-0023 (PR). 21+ and present in most states. (18+ DC/KY/NH/PR/WY). Void in ONT. Eligibility restrictions apply. Terms: draftkings.com/sportsbook. On behalf of Boot Hill Casino (KS). Pass-thru of per wager tax may apply in IL."
+   }
+  }
+ ],
+ "lg_chi.1": [
+  [
+   "Audax Italiano at Cobresal",
+   true
+  ],
+  [
+   "Unión La Calera at Palestino",
+   true
+  ]
+ ],
+ "lg_eng.1": [],
+ "lg_esp.1": [
+  [
+   "Espanyol at Athletic Club",
+   true
+  ]
+ ],
+ "lg_arg.1": [
+  [
+   "Belgrano (Córdoba) at Vélez Sarsfield",
+   true
+  ]
+ ],
+ "lg_bra.1": [],
+ "lg_ita.1": []
+}
