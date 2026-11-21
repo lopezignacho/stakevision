@@ -20,6 +20,7 @@ jobs:
       - env:
           STATE_KEY: ${{ secrets.STATE_KEY }}
           ODDSPAPI_KEY: ${{ secrets.ODDSPAPI_KEY }}
+          APIFOOTBALL_KEY: ${{ secrets.APIFOOTBALL_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: mkdir -p data/probe && (python tools/status_probe.py 2>&1 | tee data/probe/status-run.txt) || true
       - run: |

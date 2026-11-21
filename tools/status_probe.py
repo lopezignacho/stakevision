@@ -40,3 +40,16 @@ out["nba"] = nb
 os.makedirs("data/probe", exist_ok=True)
 json.dump(out, open("data/probe/status.json", "w"), ensure_ascii=False, indent=1, default=str)
 print("ok")
+try:
+    from sv import main as M, apifootball
+    p = st["picks"].get(os.environ.get("PID", "383"))
+    l = p["legs"][0]
+    out2 = {"apifootball": str(apifootball.final_score(l["home"], l["away"], l["kickoff"])),
+            "espn_final": str(M._espn_final(l))}
+    r = espn.live_report(l["home"], l["away"], l["kickoff"])
+    out2["espn_live"] = {k: r.get(k) for k in ("state", "status_name", "clock")} | {"score": [r["home"]["score"], r["away"]["score"]]} if r else None
+    out2["grade"] = str(M._grade(p))
+except Exception as e:
+    out2 = {"err": repr(e)}
+json.dump(out2, open("data/probe/grade.json", "w"), ensure_ascii=False, indent=1, default=str)
+print(out2)
