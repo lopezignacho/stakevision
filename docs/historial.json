@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-11-20T20:49:31.164095+00:00",
+ "updated_at": "2026-11-21T01:34:40.010241+00:00",
  "summary": {
-  "picks": 27,
-  "wins": 18,
+  "picks": 28,
+  "wins": 19,
   "losses": 7,
-  "hit_rate": 0.72,
-  "yield": 0.3014,
+  "hit_rate": 0.7308,
+  "yield": 0.3178,
   "avg_odds": 1.8,
-  "units": 25.02
+  "units": 27.33
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 3,
    "prob": 0.5137,
    "free": true,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Deportivo Recoleta",
@@ -32,7 +32,10 @@
      "mtype": "totals",
      "handicap": 2.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      2,
+      2
+     ]
     }
    ],
    "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.95).\nProbabilidad estimada: 51,4%. Para no perder a esta cuota se necesita 56,5%."
