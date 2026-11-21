@@ -1999,6 +1999,8 @@ def _grade(pick: dict) -> tuple[str | None, list, bool]:
             sc = nba.final_score(l["home"], l["away"], l["kickoff"])
         else:
             sc = apifootball.final_score(l["home"], l["away"], l["kickoff"])
+            if not sc:   # respaldo: ESPN (si API-Football no encuentra el partido o se agotó su cuota diaria)
+                sc = _espn_final(l)
         scores.append(sc)
         results.append(grade_leg(l, *sc) if sc else None)
     finished = all(scores)
@@ -2009,6 +2011,19 @@ def _grade(pick: dict) -> tuple[str | None, list, bool]:
     if all(r == "V" for r in results):
         return "V", scores, True
     return "W", scores, True
+
+
+def _espn_final(l: dict):
+    """Marcador final de ESPN, solo si terminó en los 90' (con prórroga o penales no sirve para el 90')."""
+    try:
+        from . import espn
+        rep = espn.match_report(l["home"], l["away"], l["kickoff"])
+    except Exception:
+        traceback.print_exc()
+        return None
+    if not rep or rep.get("status_name") not in ("STATUS_FULL_TIME", "STATUS_FINAL"):
+        return None
+    return rep["home"]["score"], rep["away"]["score"]
 
 
 def _post(chat, text: str, image: bytes | None) -> int:
