@@ -1,39 +1,7 @@
 {
- "quota": "subscriptions.0.request_limit=250, subscriptions.0.request_count=317",
+ "quota": "subscriptions.0.request_limit=250, subscriptions.0.request_count=318",
  "fixtures_call": "Se agotó la cuota mensual de OddsPapi",
  "picks": [
-  {
-   "id": "302",
-   "status": "expired",
-   "kind": "builder",
-   "price": 3.0,
-   "created_at": "2026-11-09T00:41:06Z",
-   "published_at": null,
-   "result": null,
-   "free": null,
-   "kickoff": "2026-11-09T02:00:00Z",
-   "channel_msgs": null,
-   "label": "Darius Garland: 15+ puntos",
-   "score": null,
-   "live": null,
-   "match": "LA Clippers vs New Orleans Pelicans"
-  },
-  {
-   "id": "303",
-   "status": "expired",
-   "kind": "builder",
-   "price": 3.0,
-   "created_at": "2026-11-09T00:41:14Z",
-   "published_at": null,
-   "result": null,
-   "free": null,
-   "kickoff": "2026-11-09T02:00:00Z",
-   "channel_msgs": null,
-   "label": "Giannis Antetokounmpo: 6+ rebotes",
-   "score": null,
-   "live": null,
-   "match": "Sacramento Kings vs Miami Heat"
-  },
   {
    "id": "304",
    "status": "settled",
@@ -1568,7 +1536,7 @@
    "provider": "DraftKings",
    "home": null,
    "away": null,
-   "draw": 230,
+   "draw": 235,
    "ou": 2.5
   }
  ],
@@ -1833,16 +1801,16 @@
   {
    "name": "Milwaukee Bucks at Philadelphia 76ers",
    "date": "2026-11-21T18:00Z",
-   "details": null,
-   "ou": null,
+   "details": "PHI -11.5",
+   "ou": 228.5,
    "home_ml": null,
    "away_ml": null
   },
   {
    "name": "Portland Trail Blazers at New York Knicks",
    "date": "2026-11-22T00:30Z",
-   "details": null,
-   "ou": null,
+   "details": "NY -5.5",
+   "ou": 218.5,
    "home_ml": null,
    "away_ml": null
   },
@@ -1857,8 +1825,8 @@
   {
    "name": "Memphis Grizzlies at Minnesota Timberwolves",
    "date": "2026-11-22T01:00Z",
-   "details": null,
-   "ou": null,
+   "details": "MIN -5.5",
+   "ou": 227.5,
    "home_ml": null,
    "away_ml": null
   },
