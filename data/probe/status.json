@@ -1,62 +1,7 @@
 {
- "quota": "subscriptions.0.request_limit=250, subscriptions.0.request_count=316",
+ "quota": "subscriptions.0.request_limit=250, subscriptions.0.request_count=317",
  "fixtures_call": "Se agotó la cuota mensual de OddsPapi",
  "picks": [
-  {
-   "id": "297",
-   "status": "expired",
-   "kind": "builder",
-   "price": 3.0,
-   "created_at": "2026-11-08T19:10:32Z",
-   "published_at": null,
-   "result": null,
-   "free": null,
-   "match": "Chicago Bulls vs Philadelphia 76ers"
-  },
-  {
-   "id": "298",
-   "status": "expired",
-   "kind": "builder",
-   "price": 3.0,
-   "created_at": "2026-11-08T21:40:35Z",
-   "published_at": null,
-   "result": null,
-   "free": null,
-   "match": "Detroit Pistons vs Los Angeles Lakers"
-  },
-  {
-   "id": "299",
-   "status": "expired",
-   "kind": "builder",
-   "price": 3.0,
-   "created_at": "2026-11-08T22:40:29Z",
-   "published_at": null,
-   "result": null,
-   "free": null,
-   "match": "Minnesota Timberwolves vs Utah Jazz"
-  },
-  {
-   "id": "300",
-   "status": "expired",
-   "kind": "builder",
-   "price": 3.0,
-   "created_at": "2026-11-08T23:10:33Z",
-   "published_at": null,
-   "result": null,
-   "free": null,
-   "match": "Dallas Mavericks vs Brooklyn Nets"
-  },
-  {
-   "id": "301",
-   "status": "expired",
-   "kind": "builder",
-   "price": 3.0,
-   "created_at": "2026-11-08T23:40:30Z",
-   "published_at": null,
-   "result": null,
-   "free": null,
-   "match": "Milwaukee Bucks vs Boston Celtics"
-  },
   {
    "id": "302",
    "status": "expired",
@@ -66,6 +11,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-09T02:00:00Z",
+   "channel_msgs": null,
+   "label": "Darius Garland: 15+ puntos",
+   "score": null,
+   "live": null,
    "match": "LA Clippers vs New Orleans Pelicans"
   },
   {
@@ -77,6 +27,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-09T02:00:00Z",
+   "channel_msgs": null,
+   "label": "Giannis Antetokounmpo: 6+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Sacramento Kings vs Miami Heat"
   },
   {
@@ -88,6 +43,17 @@
    "published_at": "2026-11-09T03:40:33Z",
    "result": "L",
    "free": true,
+   "kickoff": "2026-11-09T20:00:00.000Z",
+   "channel_msgs": {
+    "vip": 111,
+    "free": 181
+   },
+   "label": "Gana Rubio Nu",
+   "score": [
+    2,
+    2
+   ],
+   "live": null,
    "match": "Sportivo San Lorenzo vs Rubio Nu"
   },
   {
@@ -99,6 +65,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T00:00:00.000Z",
+   "channel_msgs": null,
+   "label": "Los Angeles Lakers +5.5 (hándicap de puntos)",
+   "score": null,
+   "live": null,
    "match": "Atlanta Hawks vs Los Angeles Lakers"
   },
   {
@@ -110,6 +81,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Luka Doncic: 5+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Atlanta Hawks vs Los Angeles Lakers"
   },
   {
@@ -121,6 +97,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T00:00:00.000Z",
+   "channel_msgs": null,
+   "label": "Charlotte Hornets +10.5 (hándicap de puntos)",
+   "score": null,
+   "live": null,
    "match": "Charlotte Hornets vs Cleveland Cavaliers"
   },
   {
@@ -132,6 +113,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Donovan Mitchell: 15+ puntos",
+   "score": null,
+   "live": null,
    "match": "Charlotte Hornets vs Cleveland Cavaliers"
   },
   {
@@ -143,6 +129,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Cade Cunningham: 7+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Detroit Pistons vs Washington Wizards"
   },
   {
@@ -154,6 +145,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T00:30:00Z",
+   "channel_msgs": null,
+   "label": "RJ Barrett: 20+ puntos",
+   "score": null,
+   "live": null,
    "match": "Toronto Raptors vs Memphis Grizzlies"
   },
   {
@@ -165,6 +161,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Cooper Flagg: 5+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Dallas Mavericks vs Indiana Pacers"
   },
   {
@@ -176,6 +177,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T01:30:00.000Z",
+   "channel_msgs": null,
+   "label": "Houston Rockets -2.5 (hándicap de puntos)",
+   "score": null,
+   "live": null,
    "match": "Houston Rockets vs Denver Nuggets"
   },
   {
@@ -187,6 +193,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T01:30:00Z",
+   "channel_msgs": null,
+   "label": "Nikola Jokic: 7+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Houston Rockets vs Denver Nuggets"
   },
   {
@@ -198,6 +209,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T02:00:00Z",
+   "channel_msgs": null,
+   "label": "Victor Wembanyama: 7+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Phoenix Suns vs San Antonio Spurs"
   },
   {
@@ -209,6 +225,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T03:00:00.000Z",
+   "channel_msgs": null,
+   "label": "New Orleans Pelicans +13.5 (hándicap de puntos)",
+   "score": null,
+   "live": null,
    "match": "Golden State Warriors vs New Orleans Pelicans"
   },
   {
@@ -220,6 +241,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-10T03:00:00Z",
+   "channel_msgs": null,
+   "label": "Stephen Curry: 22+ puntos",
+   "score": null,
+   "live": null,
    "match": "Golden State Warriors vs New Orleans Pelicans"
   },
   {
@@ -231,6 +257,13 @@
    "published_at": "2026-11-10T03:11:00Z",
    "result": "W",
    "free": false,
+   "kickoff": "2026-11-10T03:00:00Z",
+   "channel_msgs": {
+    "vip": 116
+   },
+   "label": "Yaxel Lendeborg: 3+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Golden State Warriors vs New Orleans Pelicans"
   },
   {
@@ -242,6 +275,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-11T00:30:00.000Z",
+   "channel_msgs": null,
+   "label": "Milwaukee Bucks +16.5 (hándicap de puntos)",
+   "score": null,
+   "live": null,
    "match": "New York Knicks vs Milwaukee Bucks"
   },
   {
@@ -253,6 +291,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-11T00:30:00Z",
+   "channel_msgs": null,
+   "label": "Jalen Brunson: 18+ puntos",
+   "score": null,
+   "live": null,
    "match": "New York Knicks vs Milwaukee Bucks"
   },
   {
@@ -264,6 +307,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-11T01:00:00.000Z",
+   "channel_msgs": null,
+   "label": "Gana Boston Celtics (incluye prórroga)",
+   "score": null,
+   "live": null,
    "match": "Philadelphia 76ers vs Boston Celtics"
   },
   {
@@ -275,6 +323,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-11T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Tyrese Maxey: 4+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Philadelphia 76ers vs Boston Celtics"
   },
   {
@@ -286,6 +339,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-11T02:00:00.000Z",
+   "channel_msgs": null,
+   "label": "LA Clippers +5.5 (hándicap de puntos)",
+   "score": null,
+   "live": null,
    "match": "Phoenix Suns vs LA Clippers"
   },
   {
@@ -297,6 +355,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-11T02:00:00Z",
+   "channel_msgs": null,
+   "label": "Devin Booker: 20+ puntos",
+   "score": null,
+   "live": null,
    "match": "Phoenix Suns vs LA Clippers"
   },
   {
@@ -308,6 +371,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-11T02:00:00Z",
+   "channel_msgs": null,
+   "label": "Bam Adebayo: 3+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Utah Jazz vs Miami Heat"
   },
   {
@@ -319,6 +387,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-11T03:00:00Z",
+   "channel_msgs": null,
+   "label": "Darius Acuff Jr.: 2+ triples",
+   "score": null,
+   "live": null,
    "match": "Sacramento Kings vs Orlando Magic"
   },
   {
@@ -330,6 +403,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-11T04:00:00.000Z",
+   "channel_msgs": null,
+   "label": "Portland Trail Blazers +3.5 (hándicap de puntos)",
+   "score": null,
+   "live": null,
    "match": "Portland Trail Blazers vs Oklahoma City Thunder"
   },
   {
@@ -341,6 +419,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-11T04:00:00Z",
+   "channel_msgs": null,
+   "label": "Shai Gilgeous-Alexander: 1+ triples",
+   "score": null,
+   "live": null,
    "match": "Portland Trail Blazers vs Oklahoma City Thunder"
   },
   {
@@ -352,6 +435,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-12T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Anthony Davis: 18+ puntos",
+   "score": null,
+   "live": null,
    "match": "Indiana Pacers vs Washington Wizards"
   },
   {
@@ -363,6 +451,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-12T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Karl-Anthony Towns: 12+ rebotes",
+   "score": null,
+   "live": null,
    "match": "New York Knicks vs Cleveland Cavaliers"
   },
   {
@@ -374,6 +467,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-12T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Jayson Tatum: 4+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Toronto Raptors vs Boston Celtics"
   },
   {
@@ -385,6 +483,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-12T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Victor Wembanyama: 7+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Chicago Bulls vs San Antonio Spurs"
   },
   {
@@ -396,6 +499,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-12T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Nikola Jokic: 7+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Memphis Grizzlies vs Denver Nuggets"
   },
   {
@@ -407,6 +515,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-12T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Luka Doncic: 30+ puntos",
+   "score": null,
+   "live": null,
    "match": "Milwaukee Bucks vs Los Angeles Lakers"
   },
   {
@@ -418,6 +531,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-12T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Zion Williamson: 15+ puntos",
+   "score": null,
+   "live": null,
    "match": "New Orleans Pelicans vs Brooklyn Nets"
   },
   {
@@ -429,6 +547,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-12T02:00:00Z",
+   "channel_msgs": null,
+   "label": "Franz Wagner: 5+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Utah Jazz vs Orlando Magic"
   },
   {
@@ -440,6 +563,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-12T02:30:00Z",
+   "channel_msgs": null,
+   "label": "Alperen Sengun: 15+ puntos",
+   "score": null,
+   "live": null,
    "match": "Houston Rockets vs Golden State Warriors"
   },
   {
@@ -451,6 +579,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-12T03:00:00Z",
+   "channel_msgs": null,
+   "label": "Deni Avdija: 4+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Portland Trail Blazers vs Oklahoma City Thunder"
   },
   {
@@ -462,6 +595,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-13T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Tyrese Maxey: 4+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Philadelphia 76ers vs Toronto Raptors"
   },
   {
@@ -473,6 +611,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-13T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Anthony Davis: 18+ puntos",
+   "score": null,
+   "live": null,
    "match": "Washington Wizards vs Detroit Pistons"
   },
   {
@@ -484,6 +627,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-13T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Cooper Flagg: 6+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Minnesota Timberwolves vs Dallas Mavericks"
   },
   {
@@ -495,6 +643,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-13T02:00:00Z",
+   "channel_msgs": null,
+   "label": "Devin Booker: 2+ triples",
+   "score": null,
+   "live": null,
    "match": "Phoenix Suns vs Charlotte Hornets"
   },
   {
@@ -506,6 +659,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-14T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Jalen Brunson: 4+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Indiana Pacers vs New York Knicks"
   },
   {
@@ -517,6 +675,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-14T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Franz Wagner: 15+ puntos",
+   "score": null,
+   "live": null,
    "match": "Orlando Magic vs Milwaukee Bucks"
   },
   {
@@ -528,6 +691,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-14T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Giannis Antetokounmpo: 3+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Miami Heat vs Cleveland Cavaliers"
   },
   {
@@ -539,6 +707,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-14T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Jalen Johnson: 7+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Chicago Bulls vs Atlanta Hawks"
   },
   {
@@ -550,6 +723,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-14T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Zion Williamson: 4+ rebotes",
+   "score": null,
+   "live": null,
    "match": "New Orleans Pelicans vs Memphis Grizzlies"
   },
   {
@@ -561,6 +739,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-14T01:30:00Z",
+   "channel_msgs": null,
+   "label": "Alperen Sengun: 15+ puntos",
+   "score": null,
+   "live": null,
    "match": "Houston Rockets vs Utah Jazz"
   },
   {
@@ -572,6 +755,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-14T02:30:00Z",
+   "channel_msgs": null,
+   "label": "Victor Wembanyama: 7+ rebotes",
+   "score": null,
+   "live": null,
    "match": "San Antonio Spurs vs Golden State Warriors"
   },
   {
@@ -583,6 +771,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-14T03:00:00Z",
+   "channel_msgs": null,
+   "label": "Darius Acuff Jr.: 2+ triples",
+   "score": null,
+   "live": null,
    "match": "Sacramento Kings vs Portland Trail Blazers"
   },
   {
@@ -594,6 +787,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-14T03:30:00Z",
+   "channel_msgs": null,
+   "label": "Shai Gilgeous-Alexander: 25+ puntos",
+   "score": null,
+   "live": null,
    "match": "LA Clippers vs Oklahoma City Thunder"
   },
   {
@@ -605,6 +803,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-15T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Nikola Jokic: 7+ rebotes",
+   "score": null,
+   "live": null,
    "match": "New Orleans Pelicans vs Denver Nuggets"
   },
   {
@@ -616,6 +819,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-15T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Bam Adebayo: 8+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Miami Heat vs Detroit Pistons"
   },
   {
@@ -627,6 +835,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-15T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Michael Porter Jr.: 3+ triples",
+   "score": null,
+   "live": null,
    "match": "Memphis Grizzlies vs Brooklyn Nets"
   },
   {
@@ -638,6 +851,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-15T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Jaden McDaniels: 3+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Minnesota Timberwolves vs Chicago Bulls"
   },
   {
@@ -649,6 +867,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-15T18:00:00Z",
+   "channel_msgs": null,
+   "label": "Tyrese Maxey: 4+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Philadelphia 76ers vs Indiana Pacers"
   },
   {
@@ -660,6 +883,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-15T21:00:00Z",
+   "channel_msgs": null,
+   "label": "Luka Doncic: 30+ puntos",
+   "score": null,
+   "live": null,
    "match": "Phoenix Suns vs Los Angeles Lakers"
   },
   {
@@ -671,6 +899,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-15T21:30:00Z",
+   "channel_msgs": null,
+   "label": "Darius Garland: 1+ triples",
+   "score": null,
+   "live": null,
    "match": "LA Clippers vs Charlotte Hornets"
   },
   {
@@ -682,6 +915,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-15T22:00:00Z",
+   "channel_msgs": null,
+   "label": "Darryn Peterson: 2+ triples",
+   "score": null,
+   "live": null,
    "match": "Utah Jazz vs San Antonio Spurs"
   },
   {
@@ -693,6 +931,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-15T23:00:00Z",
+   "channel_msgs": null,
+   "label": "Jayson Tatum: 4+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Boston Celtics vs Dallas Mavericks"
   },
   {
@@ -704,6 +947,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-15T23:00:00Z",
+   "channel_msgs": null,
+   "label": "Jalen Brunson: 22+ puntos",
+   "score": null,
+   "live": null,
    "match": "Toronto Raptors vs New York Knicks"
   },
   {
@@ -715,6 +963,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-16T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Alperen Sengun: 15+ puntos",
+   "score": null,
+   "live": null,
    "match": "Washington Wizards vs Houston Rockets"
   },
   {
@@ -726,6 +979,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-16T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Jalen Johnson: 7+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Milwaukee Bucks vs Atlanta Hawks"
   },
   {
@@ -737,6 +995,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-16T02:00:00Z",
+   "channel_msgs": null,
+   "label": "Shai Gilgeous-Alexander: 25+ puntos",
+   "score": null,
+   "live": null,
    "match": "Sacramento Kings vs Oklahoma City Thunder"
   },
   {
@@ -748,6 +1011,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-17T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Jayson Tatum: 4+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Boston Celtics vs Orlando Magic"
   },
   {
@@ -759,6 +1027,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-17T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Donovan Mitchell: 3+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Cleveland Cavaliers vs Chicago Bulls"
   },
   {
@@ -770,6 +1043,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-17T00:00:00Z",
+   "channel_msgs": null,
+   "label": "Anthony Davis: 8+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Washington Wizards vs Memphis Grizzlies"
   },
   {
@@ -781,6 +1059,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-17T00:30:00Z",
+   "channel_msgs": null,
+   "label": "Tyrese Maxey: 4+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Brooklyn Nets vs Philadelphia 76ers"
   },
   {
@@ -792,6 +1075,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-17T00:30:00Z",
+   "channel_msgs": null,
+   "label": "Alperen Sengun: 15+ puntos",
+   "score": null,
+   "live": null,
    "match": "Miami Heat vs Houston Rockets"
   },
   {
@@ -803,6 +1091,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-17T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Jaden McDaniels: 3+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Minnesota Timberwolves vs Portland Trail Blazers"
   },
   {
@@ -814,6 +1107,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-17T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Zion Williamson: 4+ rebotes",
+   "score": null,
+   "live": null,
    "match": "New Orleans Pelicans vs Golden State Warriors"
   },
   {
@@ -825,6 +1123,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-17T02:00:00Z",
+   "channel_msgs": null,
+   "label": "Nikola Jokic: 8+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Denver Nuggets vs Phoenix Suns"
   },
   {
@@ -836,6 +1139,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-17T19:45:00Z",
+   "channel_msgs": null,
+   "label": "Julian Ryerson: 1+ faltas cometidas",
+   "score": null,
+   "live": null,
    "match": "Denmark vs Norway"
   },
   {
@@ -847,6 +1155,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-18T00:30:00Z",
+   "channel_msgs": null,
+   "label": "Scottie Barnes: 4+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Toronto Raptors vs New York Knicks"
   },
   {
@@ -858,6 +1171,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-18T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Jaden McDaniels: 3+ asistencias",
+   "score": null,
+   "live": null,
    "match": "Minnesota Timberwolves vs Portland Trail Blazers"
   },
   {
@@ -869,6 +1187,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-18T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Cade Cunningham: 7+ asistencias",
+   "score": null,
+   "live": null,
    "match": "San Antonio Spurs vs Detroit Pistons"
   },
   {
@@ -880,6 +1203,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-18T03:30:00Z",
+   "channel_msgs": null,
+   "label": "Darius Garland: 1+ triples",
+   "score": null,
+   "live": null,
    "match": "LA Clippers vs Utah Jazz"
   },
   {
@@ -891,6 +1219,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-18T04:00:00Z",
+   "channel_msgs": null,
+   "label": "Luka Doncic: 30+ puntos",
+   "score": null,
+   "live": null,
    "match": "Los Angeles Lakers vs Charlotte Hornets"
   },
   {
@@ -902,6 +1235,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-20T01:00:00Z",
+   "channel_msgs": null,
+   "label": "Cameron Boozer: 7+ rebotes",
+   "score": null,
+   "live": null,
    "match": "Memphis Grizzlies vs Golden State Warriors"
   },
   {
@@ -913,50 +1251,78 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-21T00:30:00Z",
+   "channel_msgs": null,
+   "label": "Immanuel Quickley: 1+ triples",
+   "score": null,
+   "live": null,
    "match": "Detroit Pistons vs Toronto Raptors"
   },
   {
    "id": "380",
-   "status": "candidate",
+   "status": "expired",
    "kind": "simple",
    "price": 1.65,
    "created_at": "2026-11-20T18:42:00Z",
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-20T19:45:00Z",
+   "channel_msgs": null,
+   "label": "Le Havre AC +0.5 (hándicap asiático)",
+   "score": null,
+   "live": null,
    "match": "Troyes vs Le Havre AC"
   },
   {
    "id": "381",
-   "status": "candidate",
+   "status": "expired",
    "kind": "simple",
    "price": 1.65,
    "created_at": "2026-11-20T18:42:00Z",
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-20T20:30:00Z",
+   "channel_msgs": null,
+   "label": "Sportivo Luqueño +0.5 (hándicap asiático)",
+   "score": null,
+   "live": null,
    "match": "Sportivo Ameliano vs Sportivo Luqueño"
   },
   {
    "id": "382",
-   "status": "candidate",
+   "status": "expired",
    "kind": "simple",
    "price": 1.74,
    "created_at": "2026-11-20T18:42:00Z",
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-20T19:45:00Z",
+   "channel_msgs": null,
+   "label": "KVC Westerlo +0.5 (hándicap asiático)",
+   "score": null,
+   "live": null,
    "match": "Cercle Brugge KSV vs KVC Westerlo"
   },
   {
    "id": "383",
-   "status": "selected",
+   "status": "published",
    "kind": "simple",
    "price": 1.77,
    "created_at": "2026-11-20T18:44:14Z",
-   "published_at": null,
+   "published_at": "2026-11-20T20:48:02Z",
    "result": null,
-   "free": null,
+   "free": true,
+   "kickoff": "2026-11-20T23:00:00Z",
+   "channel_msgs": {
+    "vip": 118,
+    "free": 185
+   },
+   "label": "Más de 2.5 goles",
+   "score": null,
+   "live": null,
    "match": "Deportivo Recoleta vs Guaraní"
   },
   {
@@ -968,6 +1334,11 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-20T21:30:00Z",
+   "channel_msgs": null,
+   "label": "Menos de 2.5 goles",
+   "score": null,
+   "live": null,
    "match": "Independiente Medellín vs Independiente Santa Fe"
   },
   {
@@ -979,12 +1350,17 @@
    "published_at": null,
    "result": null,
    "free": null,
+   "kickoff": "2026-11-20T23:30:00Z",
+   "channel_msgs": null,
+   "label": "Unión La Calera +0.5 (hándicap asiático)",
+   "score": null,
+   "live": null,
    "match": "Palestino vs Unión La Calera"
   }
  ],
  "auto_free": {
   "date": "2026-11-20",
-  "status": "pending",
+  "status": "published",
   "pid": "383",
   "opt": "A",
   "at": "2026-11-20T19:14:19Z",
@@ -1058,29 +1434,20 @@
   "vip_replace_done",
   "win_repost_done"
  ],
- "espn_soccer_with_odds": 89,
+ "espn_soccer_with_odds": 100,
  "espn_soccer_sample": [
   {
-   "name": "Espanyol at Athletic Club",
-   "date": "2026-11-20T20:00Z",
+   "name": "Fulham at Manchester City",
+   "date": "2026-11-21T12:30Z",
    "provider": "DraftKings",
    "home": null,
    "away": null,
-   "draw": 350,
-   "ou": 2.5
+   "draw": 425,
+   "ou": 3.5
   },
   {
-   "name": "FC Cologne at Bayern Munich",
-   "date": "2026-11-20T19:30Z",
-   "provider": "DraftKings",
-   "home": null,
-   "away": null,
-   "draw": 1000,
-   "ou": 4.5
-  },
-  {
-   "name": "Atlético de San Luis at Puebla",
-   "date": "2026-11-21T01:00Z",
+   "name": "Nottingham Forest at AFC Bournemouth",
+   "date": "2026-11-21T15:00Z",
    "provider": "DraftKings",
    "home": null,
    "away": null,
@@ -1088,26 +1455,71 @@
    "ou": 2.5
   },
   {
-   "name": "Atlas at FC Juárez",
-   "date": "2026-11-21T03:00Z",
+   "name": "Sunderland at Aston Villa",
+   "date": "2026-11-21T15:00Z",
    "provider": "DraftKings",
    "home": null,
    "away": null,
-   "draw": 270,
+   "draw": 285,
    "ou": 2.5
   },
   {
-   "name": "Atlante at Tijuana",
-   "date": "2026-11-21T03:10Z",
+   "name": "Leeds United at Chelsea",
+   "date": "2026-11-21T15:00Z",
    "provider": "DraftKings",
    "home": null,
    "away": null,
-   "draw": 330,
+   "draw": 260,
    "ou": 2.5
   },
   {
-   "name": "Le Havre AC at Troyes",
-   "date": "2026-11-20T19:45Z",
+   "name": "Crystal Palace at Coventry City",
+   "date": "2026-11-21T15:00Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 255,
+   "ou": 2.5
+  },
+  {
+   "name": "Ipswich Town at Tottenham Hotspur",
+   "date": "2026-11-21T15:00Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 340,
+   "ou": 2.5
+  },
+  {
+   "name": "Arsenal at Newcastle United",
+   "date": "2026-11-21T17:30Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 340,
+   "ou": 2.5
+  },
+  {
+   "name": "Deportivo at Alavés",
+   "date": "2026-11-21T13:00Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 240,
+   "ou": 2.5
+  },
+  {
+   "name": "Valencia at Rayo Vallecano",
+   "date": "2026-11-21T15:15Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 255,
+   "ou": 2.5
+  },
+  {
+   "name": "Real Betis at Sevilla",
+   "date": "2026-11-21T17:30Z",
    "provider": "DraftKings",
    "home": null,
    "away": null,
@@ -1115,90 +1527,54 @@
    "ou": 2.5
   },
   {
-   "name": "Marseille at Toulouse",
-   "date": "2026-11-20T20:00Z",
-   "provider": null,
-   "home": null,
-   "away": null,
-   "draw": null,
-   "ou": null
-  },
-  {
-   "name": "Adelaide United FC at Western Sydney Wanderers FC",
-   "date": "2026-11-20T08:40Z",
-   "provider": null,
-   "home": null,
-   "away": null,
-   "draw": null,
-   "ou": null
-  },
-  {
-   "name": "Melbourne Victory at Auckland FC",
-   "date": "2026-11-21T04:00Z",
+   "name": "Celta Vigo at Real Madrid",
+   "date": "2026-11-21T20:00Z",
    "provider": "DraftKings",
    "home": null,
    "away": null,
-   "draw": 250,
-   "ou": 2.5
-  },
-  {
-   "name": "Wellington Phoenix at Western Sydney ",
-   "date": "2026-11-20T05:50Z",
-   "provider": null,
-   "home": null,
-   "away": null,
-   "draw": null,
-   "ou": null
-  },
-  {
-   "name": "Al Nassr at Al Ahli",
-   "date": "2026-11-20T17:30Z",
-   "provider": "DraftKings",
-   "home": null,
-   "away": null,
-   "draw": 300,
+   "draw": 700,
    "ou": 3.5
   },
   {
-   "name": "Paredes at FC Porto",
-   "date": "2026-11-20T20:45Z",
+   "name": "Philadelphia Union at New England Revolution",
+   "date": "2026-11-21T19:00Z",
    "provider": "DraftKings",
    "home": null,
    "away": null,
-   "draw": 950,
+   "draw": 255,
    "ou": 3.5
   },
   {
-   "name": "Krylia Sovetov at Rostov",
-   "date": "2026-11-20T16:30Z",
-   "provider": null,
-   "home": null,
-   "away": null,
-   "draw": null,
-   "ou": null
-  },
-  {
-   "name": "KVC Westerlo at Cercle Brugge KSV",
-   "date": "2026-11-20T19:45Z",
+   "name": "Portland Timbers at FC Dallas",
+   "date": "2026-11-21T21:00Z",
    "provider": "DraftKings",
    "home": null,
    "away": null,
-   "draw": 285,
+   "draw": 295,
    "ou": 3.5
   },
   {
-   "name": "Leganés at FC Andorra",
-   "date": "2026-11-20T19:30Z",
+   "name": "Columbus Crew at Inter Miami CF",
+   "date": "2026-11-21T23:00Z",
    "provider": "DraftKings",
    "home": null,
    "away": null,
-   "draw": 280,
+   "draw": 360,
+   "ou": 3.5
+  },
+  {
+   "name": "Kansas City Current at Washington Spirit",
+   "date": "2026-11-22T01:00Z",
+   "provider": "DraftKings",
+   "home": null,
+   "away": null,
+   "draw": 230,
    "ou": 2.5
   }
  ],
  "espn_soccer_raw": [
   {
-   "overUnder": 2.5,
+   "overUnder": 3.5,
    "link": {
     "language": "en-US",
     "rel": [
@@ -1206,7 +1582,7 @@
      "desktop",
      "bets"
     ],
-    "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244",
+    "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34962893",
     "text": "Game",
     "shortText": "Game",
     "isExternal": true,
@@ -1234,7 +1610,7 @@
     ]
    },
    "drawOdds": {
-    "moneyLine": 350,
+    "moneyLine": 425,
     "link": {
      "language": "en-US",
      "rel": [
@@ -1243,7 +1619,7 @@
       "bets",
       "draftkings"
      ],
-     "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_2",
+     "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34962893%3Foutcomes%3D0ML87095905_2",
      "text": "Draw Bet",
      "shortText": "Draw Bet",
      "isExternal": true,
@@ -1256,27 +1632,27 @@
     "shortDisplayName": "Total",
     "over": {
      "open": {
-      "line": "o2.5",
-      "odds": "-120"
+      "line": "o3.5",
+      "odds": "+115"
      },
      "close": {
-      "line": "o2.5",
-      "odds": "-160",
+      "line": "o3.5",
+      "odds": "+100",
       "link": {
        "rel": [
         "over",
         "bets"
        ],
-       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0OU87123234O250_1",
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34962893%3Foutcomes%3D0OU87095929O350_1",
        "tracking": {
         "campaign": "betting-integrations",
         "tags": {
-         "league": "esp.1",
+         "league": "eng.1",
          "sport": "soccer",
-         "gameId": 401882805,
+         "gameId": 401879233,
          "betSide": "over",
          "betType": "straight",
-         "betDetails": "Over:2.5"
+         "betDetails": "Over:3.5"
         }
        }
       }
@@ -1284,27 +1660,27 @@
     },
     "under": {
      "open": {
-      "line": "u2.5",
-      "odds": "-110"
+      "line": "u3.5",
+      "odds": "-155"
      },
      "close": {
-      "line": "u2.5",
-      "odds": "+125",
+      "line": "u3.5",
+      "odds": "-125",
       "link": {
        "rel": [
         "under",
         "bets"
        ],
-       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0OU87123234U250_3",
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34962893%3Foutcomes%3D0OU87095929U350_3",
        "tracking": {
         "campaign": "betting-integrations",
         "tags": {
-         "league": "esp.1",
+         "league": "eng.1",
          "sport": "soccer",
-         "gameId": 401882805,
+         "gameId": 401879233,
          "betSide": "under",
          "betType": "straight",
-         "betDetails": "Under:2.5"
+         "betDetails": "Under:3.5"
         }
        }
       }
@@ -1316,27 +1692,27 @@
     "shortDisplayName": "Spread",
     "home": {
      "open": {
-      "line": "-0.5",
-      "odds": "-195"
+      "line": "-1.5",
+      "odds": "-105"
      },
      "close": {
       "line": "-1.5",
-      "odds": "+120",
+      "odds": "-105",
       "link": {
        "rel": [
         "homeSpread",
         "bets"
        ],
-       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0HC87123239N150_1",
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34962893%3Foutcomes%3D0HC87095934N150_1",
        "tracking": {
         "campaign": "betting-integrations",
         "tags": {
-         "league": "esp.1",
+         "league": "eng.1",
          "sport": "soccer",
-         "gameId": 401882805,
+         "gameId": 401879233,
          "betSide": "home",
          "betType": "straight",
-         "betDetails": "Spread:ATH-1.5"
+         "betDetails": "Spread:MNC-1.5"
         }
        }
       }
@@ -1344,27 +1720,27 @@
     },
     "away": {
      "open": {
-      "line": "+0.5",
-      "odds": "+125"
+      "line": "+1.5",
+      "odds": "-150"
      },
      "close": {
       "line": "+1.5",
-      "odds": "-165",
+      "odds": "-130",
       "link": {
        "rel": [
         "awaySpread",
         "bets"
        ],
-       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0HC87123239P150_3",
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34962893%3Foutcomes%3D0HC87095934P150_3",
        "tracking": {
         "campaign": "betting-integrations",
         "tags": {
-         "league": "esp.1",
+         "league": "eng.1",
          "sport": "soccer",
-         "gameId": 401882805,
+         "gameId": 401879233,
          "betSide": "away",
          "betType": "straight",
-         "betDetails": "Spread:ESP+1.5"
+         "betDetails": "Spread:FUL+1.5"
         }
        }
       }
@@ -1376,22 +1752,22 @@
     "shortDisplayName": "ML",
     "home": {
      "open": {
-      "odds": "-175"
+      "odds": "-250"
      },
      "close": {
-      "odds": "-210",
+      "odds": "-255",
       "link": {
        "rel": [
         "home",
         "bets"
        ],
-       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_1",
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34962893%3Foutcomes%3D0ML87095905_1",
        "tracking": {
         "campaign": "betting-integrations",
         "tags": {
-         "league": "esp.1",
+         "league": "eng.1",
          "sport": "soccer",
-         "gameId": 401882805,
+         "gameId": 401879233,
          "betSide": "home",
          "betType": "straight"
         }
@@ -1401,22 +1777,22 @@
     },
     "away": {
      "open": {
-      "odds": "+450"
+      "odds": "+550"
      },
      "close": {
-      "odds": "+550",
+      "odds": "+600",
       "link": {
        "rel": [
         "away",
         "bets"
        ],
-       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_3",
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34962893%3Foutcomes%3D0ML87095905_3",
        "tracking": {
         "campaign": "betting-integrations",
         "tags": {
-         "league": "esp.1",
+         "league": "eng.1",
          "sport": "soccer",
-         "gameId": 401882805,
+         "gameId": 401879233,
          "betSide": "away",
          "betType": "straight"
         }
@@ -1426,22 +1802,22 @@
     },
     "draw": {
      "open": {
-      "odds": "+295"
+      "odds": "+400"
      },
      "close": {
-      "odds": "+350",
+      "odds": "+425",
       "link": {
        "rel": [
         "draw",
         "bets"
        ],
-       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34973244%3Foutcomes%3D0ML87123152_2",
+       "href": "https://sportsbook.draftkings.com/gateway?s=__s__&wpcid=__wpcid__&wpsrc=413&wpcn=ESPN&wpscn=Widget&wpcrn=BetSlipDeepLink&wpscid=__wpscid__&wpcrid=xx&preurl=https%3A%2F%2Fsportsbook.draftkings.com%2Fevent%2F34962893%3Foutcomes%3D0ML87095905_2",
        "tracking": {
         "campaign": "betting-integrations",
         "tags": {
-         "league": "esp.1",
+         "league": "eng.1",
          "sport": "soccer",
-         "gameId": 401882805,
+         "gameId": 401879233,
          "betSide": "draw",
          "betType": "straight"
         }
@@ -1450,79 +1826,55 @@
      }
     }
    },
-   "details": "ATH -210"
+   "details": "MNC -255"
   }
  ],
  "nba": [
   {
-   "name": "Charlotte Hornets at Atlanta Hawks",
-   "date": "2026-11-21T00:00Z",
-   "details": "ATL -6.5",
-   "ou": 218.5,
+   "name": "Milwaukee Bucks at Philadelphia 76ers",
+   "date": "2026-11-21T18:00Z",
+   "details": null,
+   "ou": null,
    "home_ml": null,
    "away_ml": null
   },
   {
-   "name": "Orlando Magic at Brooklyn Nets",
-   "date": "2026-11-21T00:30Z",
-   "details": "ORL -6.5",
-   "ou": 224.5,
+   "name": "Portland Trail Blazers at New York Knicks",
+   "date": "2026-11-22T00:30Z",
+   "details": null,
+   "ou": null,
    "home_ml": null,
    "away_ml": null
   },
   {
-   "name": "Indiana Pacers at Cleveland Cavaliers",
-   "date": "2026-11-21T00:30Z",
-   "details": "CLE -5.5",
-   "ou": 234.5,
+   "name": "LA Clippers at Dallas Mavericks",
+   "date": "2026-11-22T01:00Z",
+   "details": "DAL -5.5",
+   "ou": 229.5,
    "home_ml": null,
    "away_ml": null
   },
   {
-   "name": "Toronto Raptors at Detroit Pistons",
-   "date": "2026-11-21T00:30Z",
-   "details": "DET -6.5",
-   "ou": 216.5,
+   "name": "Memphis Grizzlies at Minnesota Timberwolves",
+   "date": "2026-11-22T01:00Z",
+   "details": null,
+   "ou": null,
    "home_ml": null,
    "away_ml": null
   },
   {
-   "name": "Washington Wizards at Chicago Bulls",
-   "date": "2026-11-21T01:00Z",
-   "details": "CHI -2.5",
-   "ou": 237.5,
+   "name": "New Orleans Pelicans at San Antonio Spurs",
+   "date": "2026-11-22T01:00Z",
+   "details": null,
+   "ou": null,
    "home_ml": null,
    "away_ml": null
   },
   {
-   "name": "New Orleans Pelicans at Oklahoma City Thunder",
-   "date": "2026-11-21T01:00Z",
-   "details": "OKC -11.5",
-   "ou": 228.5,
-   "home_ml": null,
-   "away_ml": null
-  },
-  {
-   "name": "Phoenix Suns at Utah Jazz",
-   "date": "2026-11-21T02:30Z",
-   "details": "PHX -4.5",
-   "ou": 225.5,
-   "home_ml": null,
-   "away_ml": null
-  },
-  {
-   "name": "Houston Rockets at Denver Nuggets",
-   "date": "2026-11-21T03:00Z",
-   "details": "DEN -1.5",
-   "ou": 226.5,
-   "home_ml": null,
-   "away_ml": null
-  },
-  {
-   "name": "Sacramento Kings at Los Angeles Lakers",
-   "date": "2026-11-21T03:00Z",
-   "details": "LAL -14.5",
-   "ou": 228.5,
+   "name": "Boston Celtics at Sacramento Kings",
+   "date": "2026-11-22T03:00Z",
+   "details": null,
+   "ou": null,
    "home_ml": null,
    "away_ml": null
   }
