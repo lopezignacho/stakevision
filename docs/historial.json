@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-11-21T16:37:21.229356+00:00",
+ "updated_at": "2026-11-21T21:53:26.059262+00:00",
  "summary": {
-  "picks": 28,
-  "wins": 19,
+  "picks": 29,
+  "wins": 20,
   "losses": 7,
-  "hit_rate": 0.7308,
-  "yield": 0.3178,
+  "hit_rate": 0.7407,
+  "yield": 0.3326,
   "avg_odds": 1.8,
-  "units": 27.33
+  "units": 29.93
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 4,
    "prob": 0.5714,
    "free": true,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Schalke 04",
@@ -32,7 +32,10 @@
      "mtype": "totals",
      "handicap": 3.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      0,
+      0
+     ]
     }
    ],
    "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.75).\nProbabilidad estimada: 57,1%. Para no perder a esta cuota se necesita 60,6%."
