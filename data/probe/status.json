@@ -1437,7 +1437,7 @@
   },
   {
    "id": "379",
-   "status": "bb",
+   "status": "expired",
    "kind": "builder",
    "price": 3.0,
    "created_at": "2026-11-19T07:46:41Z",
@@ -1513,12 +1513,12 @@
   },
   {
    "id": "383",
-   "status": "published",
+   "status": "settled",
    "kind": "simple",
    "price": 1.77,
    "created_at": "2026-11-20T18:44:14Z",
    "published_at": "2026-11-20T20:48:02Z",
-   "result": null,
+   "result": "W",
    "free": true,
    "kickoff": "2026-11-20T23:00:00Z",
    "channel_msgs": {
@@ -1527,15 +1527,18 @@
    },
    "next_check": null,
    "result_asked": null,
-   "auto_result": null,
+   "auto_result": true,
    "label": "Más de 2.5 goles",
-   "score": null,
+   "score": [
+    2,
+    2
+   ],
    "live": null,
    "match": "Deportivo Recoleta vs Guaraní"
   },
   {
    "id": "384",
-   "status": "candidate",
+   "status": "expired",
    "kind": "simple",
    "price": 1.69,
    "created_at": "2026-11-20T18:44:14Z",
@@ -1554,7 +1557,7 @@
   },
   {
    "id": "385",
-   "status": "candidate",
+   "status": "expired",
    "kind": "simple",
    "price": 1.71,
    "created_at": "2026-11-20T18:44:14Z",
