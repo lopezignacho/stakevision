@@ -13,7 +13,7 @@ except Exception as e:
     out["fixtures_call"] = str(e)[:200]
 st = store.load()
 since = (store.now_utc() - timedelta(days=12)).isoformat()
-out["picks"] = [{k: p.get(k) for k in ("id", "status", "kind", "price", "created_at", "published_at", "result", "free")}
+out["picks"] = [{k: p.get(k) for k in ("id", "status", "kind", "price", "created_at", "published_at", "result", "free", "kickoff", "channel_msgs")} | {"label": p["legs"][0].get("label"), "score": p["legs"][0].get("score"), "live": p.get("live_score")}
                 | {"match": f"{p['legs'][0].get('home')} vs {p['legs'][0].get('away')}"}
                 for p in state_picks if (p.get("created_at") or "") >= since] if (state_picks := list(st["picks"].values())) else []
 out["auto_free"] = st.get("auto_free")
