@@ -1,0 +1,14 @@
+{
+ "apifootball": "None",
+ "espn_final": "(2, 2)",
+ "espn_live": {
+  "state": "post",
+  "status_name": "STATUS_FULL_TIME",
+  "clock": "90'+3'",
+  "score": [
+   2,
+   2
+  ]
+ },
+ "grade": "('W', [(2, 2)], True)"
+}
