@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-24T06:50:32.794707+00:00",
+ "updated_at": "2026-11-24T18:25:16.848649+00:00",
  "summary": {
   "picks": 29,
   "wins": 20,
@@ -10,6 +10,33 @@
   "units": 29.93
  },
  "picks": [
+  {
+   "id": "405",
+   "published_at": "2026-11-24T18:25:09Z",
+   "kickoff": "2026-11-24T19:45:00Z",
+   "kind": "simple",
+   "price": 1.65,
+   "stake": 4,
+   "prob": 0.5714,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Norwich City",
+     "away": "Queens Park Rangers",
+     "league": "Regular Season",
+     "market": "Total de goles",
+     "outcome": "Más",
+     "price": 1.65,
+     "label": "Más de 2.5 goles",
+     "mtype": "totals",
+     "handicap": 2.5,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.75).\nProbabilidad estimada: 57,1%. Para no perder a esta cuota se necesita 60,6%."
+  },
   {
    "id": "390",
    "published_at": "2026-11-21T16:35:57Z",
