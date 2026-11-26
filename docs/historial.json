@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-26T03:11:09.836733+00:00",
+ "updated_at": "2026-11-26T12:35:19.227746+00:00",
  "summary": {
   "picks": 30,
   "wins": 20,
@@ -10,6 +10,33 @@
   "units": 25.93
  },
  "picks": [
+  {
+   "id": "413",
+   "published_at": "2026-11-26T12:35:13Z",
+   "kickoff": "2026-11-26T20:00:00Z",
+   "kind": "simple",
+   "price": 1.67,
+   "stake": 4,
+   "prob": 0.5685,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "Sparta Prague",
+     "away": "AZ Alkmaar",
+     "league": "League Phase",
+     "market": "Total de goles",
+     "outcome": "Más",
+     "price": 1.67,
+     "label": "Más de 2.5 goles",
+     "mtype": "totals",
+     "handicap": 2.5,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.76).\nProbabilidad estimada: 56,9%. Para no perder a esta cuota se necesita 59,9%."
+  },
   {
    "id": "405",
    "published_at": "2026-11-24T18:25:09Z",
