@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-11-27T13:35:49.196437+00:00",
+ "updated_at": "2026-11-27T22:23:14.623478+00:00",
  "summary": {
-  "picks": 31,
-  "wins": 21,
+  "picks": 32,
+  "wins": 22,
   "losses": 8,
-  "hit_rate": 0.7241,
-  "yield": 0.2919,
-  "avg_odds": 1.79,
-  "units": 28.61
+  "hit_rate": 0.7333,
+  "yield": 0.3068,
+  "avg_odds": 1.78,
+  "units": 31.29
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 4,
    "prob": 0.5628,
    "free": true,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Caykur Rizespor",
@@ -32,7 +32,10 @@
      "mtype": "totals",
      "handicap": 2.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      3,
+      2
+     ]
     }
    ],
    "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.78).\nProbabilidad estimada: 56,3%. Para no perder a esta cuota se necesita 59,9%."
