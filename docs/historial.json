@@ -1,13 +1,13 @@
 {
- "updated_at": "2026-11-26T21:57:53.475582+00:00",
+ "updated_at": "2026-11-27T03:56:08.847939+00:00",
  "summary": {
-  "picks": 30,
-  "wins": 20,
+  "picks": 31,
+  "wins": 21,
   "losses": 8,
-  "hit_rate": 0.7143,
-  "yield": 0.2759,
+  "hit_rate": 0.7241,
+  "yield": 0.2919,
   "avg_odds": 1.79,
-  "units": 25.93
+  "units": 28.61
  },
  "picks": [
   {
@@ -19,7 +19,7 @@
    "stake": 4,
    "prob": 0.5685,
    "free": true,
-   "result": null,
+   "result": "W",
    "legs": [
     {
      "home": "Sparta Prague",
@@ -32,7 +32,10 @@
      "mtype": "totals",
      "handicap": 2.5,
      "sport": "soccer",
-     "score": null
+     "score": [
+      2,
+      4
+     ]
     }
    ],
    "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.76).\nProbabilidad estimada: 56,9%. Para no perder a esta cuota se necesita 59,9%."
