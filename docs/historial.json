@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-28T04:02:15.333819+00:00",
+ "updated_at": "2026-11-28T12:52:28.811443+00:00",
  "summary": {
   "picks": 32,
   "wins": 22,
@@ -10,6 +10,33 @@
   "units": 31.29
  },
  "picks": [
+  {
+   "id": "423",
+   "published_at": "2026-11-28T12:52:23Z",
+   "kickoff": "2026-11-28T23:30:00Z",
+   "kind": "simple",
+   "price": 1.67,
+   "stake": 4,
+   "prob": 0.5685,
+   "free": true,
+   "result": null,
+   "legs": [
+    {
+     "home": "FC Cincinnati",
+     "away": "Nashville SC",
+     "league": "Eastern Conference Playoffs   Round One",
+     "market": "Total de goles",
+     "outcome": "Menos",
+     "price": 1.67,
+     "label": "Menos de 3.5 goles",
+     "mtype": "totals",
+     "handicap": 3.5,
+     "sport": "soccer",
+     "score": null
+    }
+   ],
+   "analysis": "⚠️ <b>En contra:</b>\n• Paga algo menos que la cuota justa (1.76).\nProbabilidad estimada: 56,9%. Para no perder a esta cuota se necesita 59,9%."
+  },
   {
    "id": "418",
    "published_at": "2026-11-27T13:33:59Z",
